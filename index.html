@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monster Hunter</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #1e3c72, #2a5298);
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        
+        h1 {
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            margin-bottom: 10px;
+        }
+        
+        #topBar {
+            width: 800px;
+            height: 60px;
+            background: #2C3E50;
+            border: 3px solid #34495E;
+            border-radius: 10px 10px 0 0;
+            margin-bottom: 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            box-sizing: border-box;
+        }
+        
+        .topBarSection {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: white;
+        }
+        
+        .topBarSection.left {
+            align-items: flex-start;
+        }
+        
+        .topBarSection.right {
+            align-items: flex-end;
+        }
+        
+        .topBarLabel {
+            font-size: 12px;
+            opacity: 0.8;
+            margin-bottom: 2px;
+        }
+        
+        .topBarValue {
+            font-size: 18px;
+            font-weight: bold;
+        }
+        
+        .topBarValue.level {
+            color: #ECF0F1;
+        }
+        
+        .topBarValue.score {
+            color: #F39C12;
+        }
+        
+        .topBarValue.kills {
+            color: #E74C3C;
+        }
+        
+        .topBarValue.powerups {
+            color: #9B59B6;
+        }
+        
+        .topBarValue.weapons {
+            color: #FFF;
+            font-size: 18px;
+            font-family: Arial, sans-serif;
+        }
+        
+        #gameCanvas {
+            border: 3px solid #34495E;
+            border-top: none;
+            border-radius: 0 0 10px 10px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.3);
+            background: #87CEEB;
+        }
+        
+        #gameInfo {
+            margin-top: 20px;
+            color: white;
+            text-align: center;
+            background: rgba(0,0,0,0.3);
+            padding: 15px;
+            border-radius: 10px;
+            min-width: 300px;
+        }
+        
+        .instructions {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+    <h1>🐉 Monster Hunter 🐉</h1>
+    
+    <!-- Top Border Bar -->
+    <div id="topBar">
+        <div class="topBarSection left">
+            <div class="topBarLabel">LEVEL</div>
+            <div class="topBarValue level" id="levelDisplay">1</div>
+        </div>
+        
+        <div class="topBarSection">
+            <div class="topBarLabel">SCORE</div>
+            <div class="topBarValue score" id="scoreDisplay">0</div>
+        </div>
+        
+        <div class="topBarSection">
+            <div class="topBarLabel">MONSTERS KILLED</div>
+            <div class="topBarValue kills" id="killsDisplay">0</div>
+        </div>
+        
+        <div class="topBarSection">
+            <div class="topBarLabel">WEAPONS</div>
+            <div class="topBarValue weapons" id="weaponsDisplay">🔫 ⚔️ 💣 🚀</div>
+        </div>
+        
+        <div class="topBarSection right">
+            <div class="topBarLabel">ACTIVE POWERUPS</div>
+            <div class="topBarValue powerups" id="powerupsDisplay">None</div>
+        </div>
+    </div>
+    
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    
+    <div id="gameInfo">
+        <div class="instructions">
+            Use WASD or arrow keys to move<br>
+            Press SPACE to switch weapons: 🔫 Bullets, ⚔️ Sword (always), 💣 Grenades (level 20+), 🚀 Missiles (level 40+)<br>
+            Auto-attacks closest monster with current weapon<br>
+            Collect powerups: ⇈ (Multi-Shot), ⚡ (Rapid Fire), 🛡️ (Invincibility), ❄️ (Freeze), ❤️ (Extra Life), 💣 (Bomb)<br>
+            Powerups affect all weapons: Multi-Shot doubles effects, Rapid Fire doubles speed<br>
+            Monsters have different HP - bigger ones are stronger!<br>
+            Some monsters chase you, others move randomly<br>
+            Level up every 100 points - background changes color gradually!<br>
+            New monster types appear every 10 levels<br>
+            You have 3 hearts - lose one when hit by monsters, get 1 second invincibility after damage!
+        </div>
+    </div>
+    
+    <script src="game.js"></script>
+</body>
+</html>
