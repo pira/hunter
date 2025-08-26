@@ -8,6 +8,10 @@ class Game {
         this.level = 1;
         this.killedByMonster = null; // Track which monster killed the player
         
+        // Version system
+        this.version = "1.2.5";
+        this.buildDate = "2025-08-27";
+        
         // Player
         this.player = {
             x: this.canvas.width / 2,
@@ -1844,6 +1848,9 @@ class Game {
             this.ctx.fillText(`Monsters Killed: ${this.monstersKilled}`, this.canvas.width / 2, this.canvas.height / 2 + 70);
             this.ctx.fillText('Refresh to play again', this.canvas.width / 2, this.canvas.height / 2 + 110);
         }
+        
+        // Draw version info at bottom of screen
+        this.drawVersionInfo();
     }
     
     drawTopBorderBar() {
@@ -1953,6 +1960,30 @@ class Game {
                 this.ctx.fillText('🤍', heartX, heartY);
             }
         }
+    }
+    
+    drawVersionInfo() {
+        // Draw version information at the bottom of the screen
+        this.ctx.save();
+        
+        // Set up text style
+        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+        this.ctx.font = '12px Arial';
+        this.ctx.textAlign = 'right';
+        this.ctx.textBaseline = 'bottom';
+        
+        // Draw version and build date
+        const versionText = `v${this.version}`;
+        const buildText = `Build: ${this.buildDate}`;
+        
+        // Position at bottom right corner
+        const padding = 10;
+        const lineHeight = 14;
+        
+        this.ctx.fillText(versionText, this.canvas.width - padding, this.canvas.height - padding - lineHeight);
+        this.ctx.fillText(buildText, this.canvas.width - padding, this.canvas.height - padding);
+        
+        this.ctx.restore();
     }
     
     update() {

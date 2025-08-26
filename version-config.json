@@ -1,0 +1,4 @@
+{
+  "strategy": "patch",
+  "comment": "Options: 'patch' (1.0.0 -> 1.0.1), 'minor' (1.0.0 -> 1.1.0), 'major' (1.0.0 -> 2.0.0), 'auto' (increments patch by default, but you can override by including [major], [minor], or [patch] in commit message)"
+}
