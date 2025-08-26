@@ -98,7 +98,7 @@ class Game {
         if (typeof createjs !== 'undefined' && createjs.Sound) {
             // Register sounds once during initialization
             createjs.Sound.registerSound({
-                src: "https://www.soundjay.com/mechanical/gun-gunshot-01.mp3", 
+                src: "sfx/gunshot.mp3", 
                 id: "shootSound"
             });            
             createjs.Sound.registerSound({
@@ -117,17 +117,17 @@ class Game {
             });
             
             createjs.Sound.registerSound({
-                src: "https://www.soundjay.com/human/man-scream-ahh-01.mp3", 
+                src: "sfx/man-scream-ahh.mp3", 
                 id: "playerHitSound"
             });
 
             createjs.Sound.registerSound({
-                src: "https://www.soundjay.com/misc/sounds/magic-chime-07.wav", 
+                src: "sfx/powerup.mp3", 
                 id: "powerupSound"
             });
             
             createjs.Sound.registerSound({
-                src: "https://www.soundjay.com/mechanical/explosion-01.mp3", 
+                src: "sfx/boom.mp3", 
                 id: "boomSound"
             });
             
@@ -142,10 +142,15 @@ class Game {
             });
 
             createjs.Sound.registerSound({
-                src: "https://www.soundjay.com/misc/fail-trumpet-01.mp3", 
+                src: "sfx/game-over.mp3", 
                 id: "gameOverSound"
             });
             
+            createjs.Sound.registerSound({
+                src: "sfx/level-up.mp3", 
+                id: "levelUpSound"
+            });
+
             // Define sound functions that play registered sounds
             this.sounds.shoot = () => {
                 const instance = createjs.Sound.play("shootSound", {duration: 500});
@@ -207,6 +212,12 @@ class Game {
                 instance.volume = 0.8;
             };
 
+            this.sounds.levelUp = () => {
+                const instance = createjs.Sound.play("levelUpSound");
+                instance.volume = 0.8;
+            };
+
+
         } else {
             // Fallback to empty functions if SoundJS is not available
             this.sounds.grenade = () => {};
@@ -219,6 +230,7 @@ class Game {
             this.sounds.playerHit = () => {};
             this.sounds.missile = () => {};
             this.sounds.monsterBossDeath = () => {};
+            this.sounds.levelUp = () => {};
         }
     }
     
@@ -2050,6 +2062,8 @@ class Game {
             this.level++;
             // Increase difficulty
             this.monsterSpawnRate = 110 - this.level;
+
+            this.sounds.levelUp();
         }
     }
     
