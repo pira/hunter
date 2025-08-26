@@ -94,113 +94,131 @@ class Game {
     }
     
     loadSounds() {
-        // Create simple sound effects using Web Audio API
-        try {
-            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        // Check if CreateJS SoundJS is available
+        if (typeof createjs !== 'undefined' && createjs.Sound) {
+            // Register sounds once during initialization
+            createjs.Sound.registerSound({
+                src: "https://www.soundjay.com/mechanical/gun-gunshot-01.mp3", 
+                id: "shootSound"
+            });            
+            createjs.Sound.registerSound({
+                src: "sfx/sword-slice.mp3", 
+                id: "swooshSound"
+            });
             
-            // Shooting sound - more like a real shot
+            createjs.Sound.registerSound({
+                src: "sfx/monster-death.mp3", 
+                id: "monsterDeathSound"
+            });
+
+            createjs.Sound.registerSound({
+                src: "sfx/monster-cry.mp3", 
+                id: "monsterBossDeathSound"
+            });
+            
+            createjs.Sound.registerSound({
+                src: "https://www.soundjay.com/human/man-scream-ahh-01.mp3", 
+                id: "playerHitSound"
+            });
+
+            createjs.Sound.registerSound({
+                src: "https://www.soundjay.com/misc/sounds/magic-chime-07.wav", 
+                id: "powerupSound"
+            });
+            
+            createjs.Sound.registerSound({
+                src: "https://www.soundjay.com/mechanical/explosion-01.mp3", 
+                id: "boomSound"
+            });
+            
+            createjs.Sound.registerSound({
+                src: "sfx/grenade.mp3", 
+                id: "grenadeSound"
+            });
+
+            createjs.Sound.registerSound({
+                src: "sfx/missile.mp3", 
+                id: "missileSound"
+            });
+
+            createjs.Sound.registerSound({
+                src: "https://www.soundjay.com/misc/fail-trumpet-01.mp3", 
+                id: "gameOverSound"
+            });
+            
+            // Define sound functions that play registered sounds
             this.sounds.shoot = () => {
-                const oscillator = audioContext.createOscillator();
-                const gainNode = audioContext.createGain();
-                
-                oscillator.connect(gainNode);
-                gainNode.connect(audioContext.destination);
-                
-                // Sharp, quick shot sound
-                oscillator.frequency.setValueAtTime(1200, audioContext.currentTime);
-                oscillator.frequency.exponentialRampToValueAtTime(200, audioContext.currentTime + 0.05);
-                
-                gainNode.gain.setValueAtTime(0.4, audioContext.currentTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.05);
-                
-                oscillator.start(audioContext.currentTime);
-                oscillator.stop(audioContext.currentTime + 0.05);
+                const instance = createjs.Sound.play("shootSound", {duration: 500});
+                if (instance) {
+                    instance.volume = 0.7;
+                }
             };
             
-            // Monster death sound - more satisfying
-            this.sounds.monsterDeath = () => {
-                const oscillator = audioContext.createOscillator();
-                const gainNode = audioContext.createGain();
-                
-                oscillator.connect(gainNode);
-                gainNode.connect(audioContext.destination);
-                
-                // Lower, more satisfying death sound
-                oscillator.frequency.setValueAtTime(300, audioContext.currentTime);
-                oscillator.frequency.exponentialRampToValueAtTime(150, audioContext.currentTime + 0.15);
-                
-                gainNode.gain.setValueAtTime(0.5, audioContext.currentTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.15);
-                
-                oscillator.start(audioContext.currentTime);
-                oscillator.stop(audioContext.currentTime + 0.15);
-            };
-            
-            // Powerup sound
-            this.sounds.powerup = () => {
-                const oscillator = audioContext.createOscillator();
-                const gainNode = audioContext.createGain();
-                
-                oscillator.connect(gainNode);
-                gainNode.connect(audioContext.destination);
-                
-                oscillator.frequency.setValueAtTime(600, audioContext.currentTime);
-                oscillator.frequency.setValueAtTime(800, audioContext.currentTime + 0.1);
-                oscillator.frequency.setValueAtTime(1000, audioContext.currentTime + 0.2);
-                
-                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime + 0.2);
-                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
-                
-                oscillator.start(audioContext.currentTime);
-                oscillator.stop(audioContext.currentTime + 0.3);
-            };
-            
-            // Boom sound for bomb
-            this.sounds.boom = () => {
-                const oscillator = audioContext.createOscillator();
-                const gainNode = audioContext.createGain();
-                
-                oscillator.connect(gainNode);
-                gainNode.connect(audioContext.destination);
-                
-                // Deep, powerful boom sound - more boomy with lower frequencies
-                oscillator.frequency.setValueAtTime(50, audioContext.currentTime);
-                oscillator.frequency.exponentialRampToValueAtTime(20, audioContext.currentTime + 0.5);
-                
-                gainNode.gain.setValueAtTime(0.8, audioContext.currentTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
-                
-                oscillator.start(audioContext.currentTime);
-                oscillator.stop(audioContext.currentTime + 0.5);
-            };
-            
-            // Sword swoosh sound
             this.sounds.swoosh = () => {
-                const oscillator = audioContext.createOscillator();
-                const gainNode = audioContext.createGain();
-                
-                oscillator.connect(gainNode);
-                gainNode.connect(audioContext.destination);
-                
-                // Swooshing sound - frequency sweep
-                oscillator.frequency.setValueAtTime(200, audioContext.currentTime);
-                oscillator.frequency.exponentialRampToValueAtTime(80, audioContext.currentTime + 0.15);
-                
-                gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.15);
-                
-                oscillator.start(audioContext.currentTime);
-                oscillator.stop(audioContext.currentTime + 0.15);
+                const instance = createjs.Sound.play("swooshSound", {duration: 400});
+                instance.volume = 0.5;
+                instance.playbackRate = 3;
             };
             
-        } catch (e) {
-            // Fallback if Web Audio API is not available
+            this.sounds.monsterDeath = () => {
+                const instance = createjs.Sound.play("monsterDeathSound");
+                instance.volume = 0.8;
+                instance.playbackRate = 1.5;
+            };
+            
+            this.sounds.powerup = () => {
+                const instance = createjs.Sound.play("powerupSound");
+                if (instance) {
+                    instance.volume = 0.6;
+                }
+            };
+            
+            this.sounds.boom = () => {
+                const instance = createjs.Sound.play("boomSound");
+                if (instance) {
+                    instance.volume = 0.9;
+                }
+            };
+            
+            this.sounds.grenade = () => {
+                const instance = createjs.Sound.play("grenadeSound");
+                if (instance) {
+                    instance.volume = 0.8;
+                }
+            };
+
+            this.sounds.missile = () => {
+                const instance = createjs.Sound.play("missileSound");
+                instance.volume = 0.8;
+            };
+
+            this.sounds.gameOver = () => {
+                const instance = createjs.Sound.play("gameOverSound");
+                instance.volume = 0.95;
+            };
+
+            this.sounds.playerHit = () => {
+                const instance = createjs.Sound.play("playerHitSound");
+                instance.volume = 0.8;
+            };
+
+            this.sounds.monsterBossDeath = () => {
+                const instance = createjs.Sound.play("monsterBossDeathSound");
+                instance.volume = 0.8;
+            };
+
+        } else {
+            // Fallback to empty functions if SoundJS is not available
+            this.sounds.grenade = () => {};
             this.sounds.shoot = () => {};
             this.sounds.monsterDeath = () => {};
             this.sounds.powerup = () => {};
             this.sounds.boom = () => {};
             this.sounds.swoosh = () => {};
+            this.sounds.gameOver = () => {};
+            this.sounds.playerHit = () => {};
+            this.sounds.missile = () => {};
+            this.sounds.monsterBossDeath = () => {};
         }
     }
     
@@ -381,9 +399,6 @@ class Game {
     useSword() {
         // No cooldown - sword blades are always active when sword is selected
         this.swordBlades.active = true;
-        
-        // Play sword sound (reuse shoot sound for now)
-        this.sounds.shoot();
     }
     
     fireMissiles() {
@@ -418,10 +433,9 @@ class Game {
                 trail: [] // Store trail positions for dotted effect
             };
             this.missiles.push(missile);
+            this.sounds.missile();
         });
         
-        // Play missile sound (reuse shoot sound for now)
-        this.sounds.shoot();
     }
     
     throwGrenades(targetX, targetY) {
@@ -460,8 +474,7 @@ class Game {
             }
         }
         
-        // Play grenade sound (reuse shoot sound for now)
-        this.sounds.shoot();
+        this.sounds.grenade();
     }
     
     spawnMonster() {
@@ -510,7 +523,8 @@ class Game {
             directionChangeRate: 100 + Math.random() * 100, // Change direction every 1.8-3.5 seconds
             healingTimer: 0, // Timer for healing when damaged
             spawnSafetyTimer: 120, // 2 seconds of safety at 60fps
-            isDangerous: false // Not dangerous during spawn safety period
+            isDangerous: false, // Not dangerous during spawn safety period
+            isBoss: tier === 'large' || tier === 'elite' || tier === 'legendary' || tier === 'mythic' || tier === 'ancient' || tier === 'ultimate'
         };
         
         this.monsters.push(monster);
@@ -577,7 +591,7 @@ class Game {
         
         if (this.level >= 70) {
             monsterTypes.ultimate = [
-                { shape: 'ultimate', color: '#FFFFFF', size: 60, sizeVariation: 20, speed: 2.5, speedVariation: 0.8, health: 50, name: 'Ultimate Destroyer', points: 1000 }
+                { shape: 'ultimate', color: '#FFFFFF', size: 60, sizeVariation: 20, speed: 2.4, speedVariation: 0.8, health: 50, name: 'Ultimate Destroyer', points: 1000 }
             ];
         }
         
@@ -921,11 +935,14 @@ class Game {
                 if (!this.invincible && monster.isDangerous) {
                     this.player.health--;
                     this.invincible = true;
-                    this.powerupTimers.invincible = 60; // 1 second at 60fps
+                    this.powerupTimers.invincible = 100;
                     
                     if (this.player.health <= 0) {
                         this.killedByMonster = monster; // Track which monster killed the player
                         this.gameOver = true;
+                        this.sounds.gameOver();
+                    } else {
+                        this.sounds.playerHit();
                     }
                 }
             }
@@ -1101,7 +1118,12 @@ class Game {
         this.score += monster.points;
         this.monstersKilled++;
         this.updateUI();
-        this.sounds.monsterDeath(); // Play monster death sound
+         // Play monster death sounds
+        if (monster.isBoss) {
+            this.sounds.monsterBossDeath();
+        } else {
+            this.sounds.monsterDeath(); 
+        }
         
         // Check if boss aura monster drops powerup
         this.checkBossPowerupDrop(monster);
@@ -1242,8 +1264,8 @@ class Game {
         }
         
         // Monster eyes
-        const eyeSize = monster.tier === 'large' || monster.tier === 'elite' || monster.tier === 'legendary' || monster.tier === 'mythic' || monster.tier === 'ancient' || monster.tier === 'ultimate' ? 3 : 4;
-        const eyeOffset = monster.tier === 'large' || monster.tier === 'elite' || monster.tier === 'legendary' || monster.tier === 'mythic' || monster.tier === 'ancient' || monster.tier === 'ultimate' ? 8 : 6;
+        const eyeSize = monster.isBoss ? 3 : 4;
+        const eyeOffset = monster.isBoss ? 8 : 6;
         
         if (monster.spawnSafetyTimer > 0) {
             // Draw closed eyes (horizontal lines) during spawn safety period
