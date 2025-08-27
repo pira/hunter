@@ -9,7 +9,7 @@ class Game {
         this.killedByMonster = null; // Track which monster killed the player
         
         // Version system
-        this.version = "1.2.8";
+        this.version = "1.2.10";
         this.buildDate = "2025-08-27";
         
         // Mobile support
@@ -304,15 +304,28 @@ class Game {
             this.keys[e.key.toLowerCase()] = false;
         });
         
-        // Mouse controls for shooting (manual override)
+        // Mouse controls for shooting (manual override) and restart button
         this.canvas.addEventListener('click', (e) => {
-            if (this.gameOver) return;
-            
             const rect = this.canvas.getBoundingClientRect();
             const mouseX = e.clientX - rect.left;
             const mouseY = e.clientY - rect.top;
             
+            // Check for restart button click when game is over
+            if (this.gameOver && this.restartButton) {
+                if (mouseX >= this.restartButton.x && 
+                    mouseX <= this.restartButton.x + this.restartButton.width &&
+                    mouseY >= this.restartButton.y && 
+                    mouseY <= this.restartButton.y + this.restartButton.height) {
+                    // Restart the game
+                    window.location.reload();
+                    return;
+                }
+            }
+            
+            // Normal shooting when game is active
+            if (!this.gameOver) {
             this.shootAtTarget(mouseX, mouseY);
+            }
         });
         
         // Mobile touch controls
@@ -393,6 +406,25 @@ class Game {
         
         // Initialize weapon button icon
         this.updateWeaponButtonIcon();
+        
+        // Handle restart button touch on mobile
+        this.canvas.addEventListener('touchstart', (e) => {
+            if (this.gameOver && this.restartButton) {
+                const touch = e.touches[0];
+                const rect = this.canvas.getBoundingClientRect();
+                const touchX = touch.clientX - rect.left;
+                const touchY = touch.clientY - rect.top;
+                
+                if (touchX >= this.restartButton.x && 
+                    touchX <= this.restartButton.x + this.restartButton.width &&
+                    touchY >= this.restartButton.y && 
+                    touchY <= this.restartButton.y + this.restartButton.height) {
+                    e.preventDefault();
+                    window.location.reload();
+                    return;
+                }
+            }
+        });
         
         // Prevent default touch behaviors
         document.addEventListener('touchstart', (e) => {
@@ -1351,14 +1383,26 @@ class Game {
         
         document.getElementById('weaponsDisplay').innerHTML = weaponsDisplay.trim();
         
-        // Update powerups display
+        // Update powerups display with time remaining
         let powerupText = 'None';
         if (this.multiShot || this.rapidFire || this.invincible || this.freeze) {
             powerupText = '';
-            if (this.multiShot) powerupText += '🏹 ';
-            if (this.rapidFire) powerupText += '⚡ ';
-            if (this.invincible) powerupText += '🛡️ ';
-            if (this.freeze) powerupText += '❄️ ';
+            if (this.multiShot) {
+                const timeLeft = Math.ceil(this.powerupTimers.multiShot / 60);
+                powerupText += `🏹${timeLeft}s `;
+            }
+            if (this.rapidFire) {
+                const timeLeft = Math.ceil(this.powerupTimers.rapidFire / 60);
+                powerupText += `⚡${timeLeft}s `;
+            }
+            if (this.invincible) {
+                const timeLeft = Math.ceil(this.powerupTimers.invincible / 60);
+                powerupText += `🛡️${timeLeft}s `;
+            }
+            if (this.freeze) {
+                const timeLeft = Math.ceil(this.powerupTimers.freeze / 60);
+                powerupText += `❄️${timeLeft}s `;
+            }
             powerupText = powerupText.trim();
         }
         document.getElementById('powerupsDisplay').textContent = powerupText;
@@ -1986,8 +2030,7 @@ class Game {
             this.ctx.fillText(powerup.emoji, powerup.x, powerup.y);
         });
         
-        // Draw powerup status
-        this.drawPowerupStatus();
+        // Powerup status now shown in top bar instead of on playing field
         
         // Draw game over screen
         if (this.gameOver) {
@@ -2017,10 +2060,9 @@ class Game {
             this.ctx.fillStyle = 'white';
             this.ctx.font = '24px Arial';
             this.ctx.fillText(`Killed by: ${this.killedByMonster.name}`, this.canvas.width / 2, this.canvas.height / 2 - 40);
-            this.ctx.fillText(`Final Score: ${this.score}`, this.canvas.width / 2, this.canvas.height / 2 + 30);
-            this.ctx.fillText(`Level: ${this.level}`, this.canvas.width / 2, this.canvas.height / 2 + 50);
-            this.ctx.fillText(`Monsters Killed: ${this.monstersKilled}`, this.canvas.width / 2, this.canvas.height / 2 + 70);
-            this.ctx.fillText('Refresh to play again', this.canvas.width / 2, this.canvas.height / 2 + 110);
+            
+            // Draw restart button
+            this.drawRestartButton();
         }
         
         // Draw version info at bottom of screen
@@ -2158,6 +2200,37 @@ class Game {
         this.ctx.fillText(buildText, this.canvas.width - padding, this.canvas.height - padding);
         
         this.ctx.restore();
+    }
+    
+    drawRestartButton() {
+        const buttonWidth = 150;
+        const buttonHeight = 50;
+        const buttonX = this.canvas.width / 2 - buttonWidth / 2;
+        const buttonY = this.canvas.height / 2 + 50;
+        
+        // Store button bounds for click detection
+        this.restartButton = {
+            x: buttonX,
+            y: buttonY,
+            width: buttonWidth,
+            height: buttonHeight
+        };
+        
+        // Draw button background
+        this.ctx.fillStyle = '#4CAF50';
+        this.ctx.fillRect(buttonX, buttonY, buttonWidth, buttonHeight);
+        
+        // Draw button border
+        this.ctx.strokeStyle = '#45a049';
+        this.ctx.lineWidth = 3;
+        this.ctx.strokeRect(buttonX, buttonY, buttonWidth, buttonHeight);
+        
+        // Draw button text
+        this.ctx.fillStyle = 'white';
+        this.ctx.font = 'bold 20px Arial';
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'middle';
+        this.ctx.fillText('Restart', buttonX + buttonWidth / 2, buttonY + buttonHeight / 2);
     }
     
     update() {
