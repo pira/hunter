@@ -132,8 +132,8 @@
         }
         
         .virtual-joystick {
-            width: 100px;
-            height: 100px;
+            width: 140px;
+            height: 140px;
             border: 3px solid rgba(255, 255, 255, 0.3);
             border-radius: 50%;
             position: relative;
@@ -241,7 +241,7 @@
         </div>
         
         <div class="topBarSection">
-            <div class="topBarLabel">MONSTERS KILLED</div>
+            <div class="topBarLabel">KILLS</div>
             <div class="topBarValue kills" id="killsDisplay">0</div>
         </div>
         
@@ -251,7 +251,7 @@
         </div>
         
         <div class="topBarSection right">
-            <div class="topBarLabel">ACTIVE POWERUPS</div>
+            <div class="topBarLabel">POWERUPS</div>
             <div class="topBarValue powerups" id="powerupsDisplay">None</div>
         </div>
     </div>
@@ -262,19 +262,18 @@
         <div class="instructions">
             <span class="desktop-instructions">Use WASD or arrow keys to move<br>
             Press SPACE to switch weapons: 🔫 Bullets, ⚔️ Sword (always), 💣 Grenades (level 20+), 🚀 Missiles (level 40+)<br></span>
-            <span class="mobile-instructions">Use virtual joystick to move, tap buttons to switch weapons and shoot<br></span>
+            <span class="mobile-instructions">Use virtual joystick to move, tap button to switch weapons (auto-shoot enabled)<br></span>
             Collect powerups: ⇈ (Multi-Shot), ⚡ (Rapid Fire), 🛡️ (Invincibility), ❄️ (Freeze), ❤️ (Extra Life), 💣 (Bomb)<br>
         </div>
     </div>
     
     <!-- Mobile Controls -->
     <div class="mobile-controls">
+        <div class="mobile-buttons">
+            <div class="mobile-btn" id="weaponSwitchBtn">🔫</div>
+        </div>
         <div class="virtual-joystick" id="virtualJoystick">
             <div class="joystick-knob" id="joystickKnob"></div>
-        </div>
-        <div class="mobile-buttons">
-            <div class="mobile-btn" id="weaponSwitchBtn">🔄</div>
-            <div class="mobile-btn" id="shootBtn">🎯</div>
         </div>
     </div>
     

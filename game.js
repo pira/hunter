@@ -9,7 +9,7 @@ class Game {
         this.killedByMonster = null; // Track which monster killed the player
         
         // Version system
-        this.version = "1.2.6";
+        this.version = "1.2.8";
         this.buildDate = "2025-08-27";
         
         // Mobile support
@@ -23,7 +23,7 @@ class Game {
                 currentY: 0,
                 centerX: 0,
                 centerY: 0,
-                maxDistance: 35
+                maxDistance: 50
             },
             movement: { x: 0, y: 0 }
         };
@@ -326,9 +326,8 @@ class Game {
         const joystick = document.getElementById('virtualJoystick');
         const joystickKnob = document.getElementById('joystickKnob');
         const weaponBtn = document.getElementById('weaponSwitchBtn');
-        const shootBtn = document.getElementById('shootBtn');
         
-        if (!joystick || !joystickKnob || !weaponBtn || !shootBtn) return;
+        if (!joystick || !joystickKnob || !weaponBtn) return;
         
         // Get joystick center position
         const joystickRect = joystick.getBoundingClientRect();
@@ -389,16 +388,11 @@ class Game {
         weaponBtn.addEventListener('touchstart', (e) => {
             e.preventDefault();
             this.switchWeapon();
+            this.updateWeaponButtonIcon();
         });
         
-        // Shoot button
-        shootBtn.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            // Shoot at center of screen or nearest monster
-            const centerX = this.canvas.width / 2;
-            const centerY = this.canvas.height / 2;
-            this.shootAtTarget(centerX, centerY);
-        });
+        // Initialize weapon button icon
+        this.updateWeaponButtonIcon();
         
         // Prevent default touch behaviors
         document.addEventListener('touchstart', (e) => {
@@ -412,6 +406,26 @@ class Game {
                 e.preventDefault();
             }
         }, { passive: false });
+    }
+    
+    updateWeaponButtonIcon() {
+        const weaponBtn = document.getElementById('weaponSwitchBtn');
+        if (!weaponBtn) return;
+        
+        const availableWeapons = this.getAvailableWeapons();
+        const currentIndex = availableWeapons.indexOf(this.weapons[this.currentWeapon]);
+        const nextIndex = (currentIndex + 1) % availableWeapons.length;
+        const nextWeapon = availableWeapons[nextIndex];
+        
+        // Map weapon names to emojis
+        const weaponIcons = {
+            'bullets': '🔫',
+            'sword': '⚔️',
+            'grenades': '💣',
+            'missiles': '🚀'
+        };
+        
+        weaponBtn.textContent = weaponIcons[nextWeapon] || '🔫';
     }
     
     shootAtTarget(targetX, targetY) {
@@ -500,6 +514,11 @@ class Game {
         this.swordBlades.active = (this.weapons[this.currentWeapon] === 'sword');
         
         this.updateUI(); // Update weapon display in status bar
+        
+        // Update mobile weapon button icon if on mobile
+        if (this.isMobile) {
+            this.updateWeaponButtonIcon();
+        }
     }
     
     autoShoot() {
