@@ -9,8 +9,24 @@ class Game {
         this.killedByMonster = null; // Track which monster killed the player
         
         // Version system
-        this.version = "1.2.5";
+        this.version = "1.2.6";
         this.buildDate = "2025-08-27";
+        
+        // Mobile support
+        this.isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        this.touchControls = {
+            joystick: {
+                active: false,
+                startX: 0,
+                startY: 0,
+                currentX: 0,
+                currentY: 0,
+                centerX: 0,
+                centerY: 0,
+                maxDistance: 35
+            },
+            movement: { x: 0, y: 0 }
+        };
         
         // Player
         this.player = {
@@ -94,6 +110,7 @@ class Game {
         this.loadSounds();
         
         this.setupEventListeners();
+        this.setupCanvas();
         this.gameLoop();
     }
     
@@ -238,6 +255,34 @@ class Game {
         }
     }
     
+    setupCanvas() {
+        // Make canvas responsive for mobile
+        if (this.isMobile) {
+            const resizeCanvas = () => {
+                const container = this.canvas.parentElement;
+                const rect = container.getBoundingClientRect();
+                
+                // Set canvas size to fit mobile screen
+                this.canvas.width = Math.min(window.innerWidth, 800);
+                this.canvas.height = Math.min(window.innerHeight * 0.6, 600);
+                
+                // Update player position if needed (keep centered)
+                if (this.player.x > this.canvas.width - this.player.size) {
+                    this.player.x = this.canvas.width / 2;
+                }
+                if (this.player.y > this.canvas.height - this.player.size) {
+                    this.player.y = this.canvas.height / 2;
+                }
+            };
+            
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+            window.addEventListener('orientationchange', () => {
+                setTimeout(resizeCanvas, 100); // Delay for orientation change
+            });
+        }
+    }
+    
     setupEventListeners() {
         // Keyboard controls
         document.addEventListener('keydown', (e) => {
@@ -269,6 +314,104 @@ class Game {
             
             this.shootAtTarget(mouseX, mouseY);
         });
+        
+        // Mobile touch controls
+        if (this.isMobile) {
+            this.setupMobileControls();
+        }
+    }
+    
+    setupMobileControls() {
+        // Virtual joystick setup
+        const joystick = document.getElementById('virtualJoystick');
+        const joystickKnob = document.getElementById('joystickKnob');
+        const weaponBtn = document.getElementById('weaponSwitchBtn');
+        const shootBtn = document.getElementById('shootBtn');
+        
+        if (!joystick || !joystickKnob || !weaponBtn || !shootBtn) return;
+        
+        // Get joystick center position
+        const joystickRect = joystick.getBoundingClientRect();
+        this.touchControls.joystick.centerX = joystickRect.left + joystickRect.width / 2;
+        this.touchControls.joystick.centerY = joystickRect.top + joystickRect.height / 2;
+        
+        // Virtual joystick touch events
+        joystick.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            this.touchControls.joystick.active = true;
+            this.touchControls.joystick.startX = touch.clientX;
+            this.touchControls.joystick.startY = touch.clientY;
+        });
+        
+        document.addEventListener('touchmove', (e) => {
+            if (!this.touchControls.joystick.active) return;
+            e.preventDefault();
+            
+            const touch = e.touches[0];
+            const deltaX = touch.clientX - this.touchControls.joystick.centerX;
+            const deltaY = touch.clientY - this.touchControls.joystick.centerY;
+            
+            const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+            const maxDistance = this.touchControls.joystick.maxDistance;
+            
+            if (distance <= maxDistance) {
+                this.touchControls.joystick.currentX = deltaX;
+                this.touchControls.joystick.currentY = deltaY;
+            } else {
+                const angle = Math.atan2(deltaY, deltaX);
+                this.touchControls.joystick.currentX = Math.cos(angle) * maxDistance;
+                this.touchControls.joystick.currentY = Math.sin(angle) * maxDistance;
+            }
+            
+            // Update knob position
+            joystickKnob.style.transform = `translate(-50%, -50%) translate(${this.touchControls.joystick.currentX}px, ${this.touchControls.joystick.currentY}px)`;
+            
+            // Calculate movement values (-1 to 1)
+            this.touchControls.movement.x = this.touchControls.joystick.currentX / maxDistance;
+            this.touchControls.movement.y = this.touchControls.joystick.currentY / maxDistance;
+        });
+        
+        document.addEventListener('touchend', (e) => {
+            if (this.touchControls.joystick.active) {
+                this.touchControls.joystick.active = false;
+                this.touchControls.joystick.currentX = 0;
+                this.touchControls.joystick.currentY = 0;
+                this.touchControls.movement.x = 0;
+                this.touchControls.movement.y = 0;
+                
+                // Reset knob position
+                joystickKnob.style.transform = 'translate(-50%, -50%)';
+            }
+        });
+        
+        // Weapon switch button
+        weaponBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            this.switchWeapon();
+        });
+        
+        // Shoot button
+        shootBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            // Shoot at center of screen or nearest monster
+            const centerX = this.canvas.width / 2;
+            const centerY = this.canvas.height / 2;
+            this.shootAtTarget(centerX, centerY);
+        });
+        
+        // Prevent default touch behaviors
+        document.addEventListener('touchstart', (e) => {
+            if (e.target.closest('.mobile-controls')) {
+                e.preventDefault();
+            }
+        }, { passive: false });
+        
+        document.addEventListener('touchmove', (e) => {
+            if (e.target.closest('.mobile-controls') || e.target === this.canvas) {
+                e.preventDefault();
+            }
+        }, { passive: false });
     }
     
     shootAtTarget(targetX, targetY) {
@@ -641,6 +784,7 @@ class Game {
     }
     
     updatePlayer() {
+        // Keyboard controls
         if (this.keys['w'] || this.keys['arrowup']) {
             this.player.y = Math.max(this.player.size, this.player.y - this.player.speed);
         }
@@ -652,6 +796,17 @@ class Game {
         }
         if (this.keys['d'] || this.keys['arrowright']) {
             this.player.x = Math.min(this.canvas.width - this.player.size, this.player.x + this.player.speed);
+        }
+        
+        // Mobile touch controls
+        if (this.isMobile && this.touchControls.joystick.active) {
+            const moveX = this.touchControls.movement.x * this.player.speed;
+            const moveY = this.touchControls.movement.y * this.player.speed;
+            
+            this.player.x = Math.max(this.player.size, 
+                Math.min(this.canvas.width - this.player.size, this.player.x + moveX));
+            this.player.y = Math.max(this.player.size, 
+                Math.min(this.canvas.height - this.player.size, this.player.y + moveY));
         }
     }
     
