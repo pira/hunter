@@ -9,8 +9,8 @@ class Game {
         this.killedByMonster = null; // Track which monster killed the player
         
         // Version system
-        this.version = "1.2.10";
-        this.buildDate = "2025-08-27";
+        this.version = "1.2.12";
+        this.buildDate = "2025-08-28";
         
         // Mobile support
         this.isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
@@ -917,9 +917,6 @@ class Game {
                 missile.target.healingTimer = 0; // Reset healing timer when damaged
                 this.missiles.splice(i, 1);
                 
-                if (missile.target.health <= 0) {
-                    // Monster dies - handled in checkCollisions
-                }
             }
             
             // Remove missiles that are too far off screen
@@ -1031,7 +1028,7 @@ class Game {
                 );
                 
                 if (distanceToLine <= monster.size + 2) { // 2 pixel blade width
-                    monster.health -= 2; // Each blade hit does 2 damage
+                    monster.health -= 1; // Each blade hit does 1 damage
                     monster.healingTimer = 0; // Reset healing timer when damaged
                     // Add a small knockback effect
                     const knockbackAngle = Math.atan2(monster.y - this.player.y, monster.x - this.player.x);
