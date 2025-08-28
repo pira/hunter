@@ -9,8 +9,8 @@ class Game {
         this.killedByMonster = null; // Track which monster killed the player
         
         // Version system
-        this.version = "1.2.20";
-        this.buildDate = "2025-08-28";
+        this.version = "1.2.22";
+        this.buildDate = "2025-08-29";
         
         // Mobile support
         this.isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
@@ -60,6 +60,7 @@ class Game {
         this.bombDamage = 8;
         this.missileDamage = 3;
         this.powerupLength = 600; 
+        this.grenadeRange = this.canvas.width / 4;
 
         // counters
         this.autoShootCounter = 0;
@@ -626,7 +627,7 @@ class Game {
         this.weaponCooldowns.missiles = fireRate;
         
         // Create missiles for random targets
-        Array(this.multiShot ? 3 : 5).fill().forEach(() => this.missiles.push({
+        Array(this.multiShot ? 3 : 1).fill().forEach(() => this.missiles.push({
             x: this.player.x,
             y: this.player.y,
             target: this.monsters[Math.floor(Math.random() * this.monsters.length)],
@@ -651,9 +652,6 @@ class Game {
         if (distance > 0) {
             const grenadeCount = this.multiShot ? 4 : 1;
             
-            // Fixed distance: 1/4 of screen width
-            const fixedDistance = this.canvas.width / 4;
-            
             for (let i = 0; i < grenadeCount; i++) {
                 // Add some spread for multiple grenades
                 const spread = grenadeCount > 1 ? (i - 0.5) * 0.3 : 0;
@@ -666,8 +664,7 @@ class Game {
                     vy: Math.sin(angle) * 6,
                     size: 4,
                     color: '#228B22',
-                    timer: 90,
-                    fixedDistance: fixedDistance, // Store for reference
+                    timer: 80,
                     startX: this.player.x, // Track starting position
                     startY: this.player.y
                 };
@@ -951,7 +948,7 @@ class Game {
             );
             
             // Stop grenade if it has reached the fixed distance
-            if (distanceTraveled >= grenade.fixedDistance) {
+            if (distanceTraveled >= this.grenadeRange) {
                 grenade.vx = 0;
                 grenade.vy = 0;
             } else {
