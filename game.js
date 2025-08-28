@@ -9,7 +9,7 @@ class Game {
         this.killedByMonster = null; // Track which monster killed the player
         
         // Version system
-        this.version = "1.2.12";
+        this.version = "1.2.14";
         this.buildDate = "2025-08-28";
         
         // Mobile support
@@ -612,8 +612,7 @@ class Game {
     }
     
     fireMissiles() {
-        // Set cooldown - 1 second normally, 0.33 seconds with rapid fire
-        const fireRate = this.rapidFire ? 50 : 150; // 60fps = 1 sec
+        const fireRate = this.rapidFire ? 40 : 120; // 60fps = 1 sec
         this.weaponCooldowns.missiles = fireRate;
         
         // Find up to 3 closest monsters for homing
@@ -626,7 +625,7 @@ class Game {
                 )
             }))
             .sort((a, b) => a.distance - b.distance)
-            .slice(0, this.multiShot ? 3 : 1) // Triple missiles with multishot
+            .slice(0, this.multiShot ? 4 : 1) // Triple missiles with multishot
             .map(item => item.monster);
         
         // Create missiles for each target
@@ -718,7 +717,7 @@ class Game {
         const monster = {
             x: x,
             y: y,
-            size: type.size + Math.random() * type.sizeVariation,
+            size: type.size + Math.random() * (type.size * 0.25), // 25% size variation
             speed: type.speed + Math.random() * type.speedVariation,
             color: type.color,
             shape: type.shape,
@@ -754,54 +753,55 @@ class Game {
         return 'large';                                                // 10% chance - large monsters
     }
     
+    // All monster definitions
     getMonsterTypes(tier) {
         const monsterTypes = {
             small: [
-                { shape: 'circle', color: '#8B0000', size: 15, sizeVariation: 5, speed: 1.5, speedVariation: 0.5, health: 1, name: 'Imp', points: 10 },
-                { shape: 'square', color: '#4B0082', size: 12, sizeVariation: 4, speed: 1.8, speedVariation: 0.4, health: 1, name: 'Shadow', points: 10 },
-                { shape: 'triangle', color: '#006400', size: 14, sizeVariation: 4, speed: 1.6, speedVariation: 0.5, health: 1, name: 'Goblin', points: 10 },
-                { shape: 'diamond', color: '#8B4513', size: 13, sizeVariation: 4, speed: 1.7, speedVariation: 0.4, health: 1, name: 'Kobold', points: 10 }
+                { shape: 'circle', color: '#8B0000', size: 11, speed: 1.5, speedVariation: 0.5, health: 1, name: 'Imp', points: 10 },
+                { shape: 'square', color: '#4B0082', size: 8, speed: 1.6, speedVariation: 0.4, health: 1, name: 'Shadow', points: 10 },
+                { shape: 'triangle', color: '#006400', size: 9, speed: 1.6, speedVariation: 0.5, health: 1, name: 'Goblin', points: 10 },
+                { shape: 'diamond', color: '#8B4513', size: 10, speed: 1.4, speedVariation: 0.4, health: 1, name: 'Kobold', points: 10 }
             ],
             medium: [
-                { shape: 'star', color: '#DC143C', size: 20, sizeVariation: 6, speed: 1.2, speedVariation: 0.3, health: 2, name: 'Demon', points: 25 },
-                { shape: 'hexagon', color: '#8A2BE2', size: 18, sizeVariation: 5, speed: 1.3, speedVariation: 0.4, health: 2, name: 'Wraith', points: 25 },
-                { shape: 'cross', color: '#228B22', size: 19, sizeVariation: 5, speed: 1.1, speedVariation: 0.3, health: 2, name: 'Troll', points: 25 }
+                { shape: 'star', color: '#DC143C', size: 14, speed: 1.2, speedVariation: 0.3, health: 2, name: 'Demon', points: 25 },
+                { shape: 'hexagon', color: '#8A2BE2', size: 12, speed: 1.3, speedVariation: 0.4, health: 2, name: 'Wraith', points: 25 },
+                { shape: 'cross', color: '#228B22', size: 13, speed: 1.1, speedVariation: 0.3, health: 3, name: 'Troll', points: 25 }
             ],
             large: [
-                { shape: 'boss', color: '#FF4500', size: 35, sizeVariation: 8, speed: 0.8, speedVariation: 0.2, health: 5, name: 'Dragon Lord', points: 100 },
-                { shape: 'giant', color: '#800080', size: 32, sizeVariation: 7, speed: 0.9, speedVariation: 0.2, health: 4, name: 'Ancient One', points: 80 },
-                { shape: 'behemoth', color: '#2F4F4F', size: 30, sizeVariation: 6, speed: 0.7, speedVariation: 0.2, health: 6, name: 'Behemoth', points: 120 }
+                { shape: 'boss', color: '#FF4500', size: 15, speed: 0.8, speedVariation: 0.2, health: 5, name: 'Dragon Lord', points: 100 },
+                { shape: 'giant', color: '#800080', size: 19, speed: 1.0, speedVariation: 0.2, health: 4, name: 'Ancient One', points: 80 },
+                { shape: 'behemoth', color: '#2F4F4F', size: 17, speed: 0.7, speedVariation: 0.2, health: 6, name: 'Behemoth', points: 120 }
             ]
         };
         
         // Add harder monsters every 10 levels
         if (this.level >= 10) {
             monsterTypes.elite = [
-                { shape: 'elite', color: '#FFD700', size: 25, sizeVariation: 8, speed: 1.4, speedVariation: 0.5, health: 3, name: 'Elite Guard', points: 50 }
+                { shape: 'elite', color: '#FFD700', size: 20, speed: 1.4, speedVariation: 0.5, health: 3, name: 'Elite Guard', points: 50 }
             ];
         }
         
         if (this.level >= 20) {
             monsterTypes.legendary = [
-                { shape: 'legendary', color: '#FF1493', size: 40, sizeVariation: 10, speed: 1.5, speedVariation: 0.3, health: 10, name: 'Legendary Beast', points: 150 }
+                { shape: 'legendary', color: '#FF1493', size: 24, speed: 1.5, speedVariation: 0.3, health: 10, name: 'Legendary Beast', points: 150 }
             ];
         }
         
         if (this.level >= 30) {
             monsterTypes.mythic = [
-                { shape: 'mythic', color: '#00FFFF', size: 45, sizeVariation: 12, speed: 1.8, speedVariation: 0.4, health: 14, name: 'Mythic Titan', points: 250 }
+                { shape: 'mythic', color: '#00FFFF', size: 28, speed: 1.8, speedVariation: 0.4, health: 14, name: 'Mythic Titan', points: 250 }
             ];
         }
         
         if (this.level >= 50) {
             monsterTypes.ancient = [
-                { shape: 'ancient', color: '#FF00FF', size: 50, sizeVariation: 15, speed: 2.2, speedVariation: 0.5, health: 20, name: 'Ancient Horror', points: 400 }
+                { shape: 'ancient', color: '#FF00FF', size: 34, speed: 2.2, speedVariation: 0.5, health: 20, name: 'Ancient Horror', points: 400 }
             ];
         }
         
         if (this.level >= 70) {
             monsterTypes.ultimate = [
-                { shape: 'ultimate', color: '#FFFFFF', size: 60, sizeVariation: 20, speed: 2.4, speedVariation: 0.8, health: 50, name: 'Ultimate Destroyer', points: 1000 }
+                { shape: 'ultimate', color: '#FFFFFF', size: 40, speed: 2.4, speedVariation: 0.8, health: 50, name: 'Ultimate Destroyer', points: 1000 }
             ];
         }
         
@@ -1489,10 +1489,13 @@ class Game {
                 break;
         }
         
-        // Draw health bar for monsters with more than 1 HP
-        if (monster.health > 1) {
-            this.drawHealthBar(monster);
+        // Draw freeze effect if freeze powerup is active
+        if (this.freeze) {
+            this.drawFreezeEffect(monster);
         }
+        
+        // Draw health bar for all monsters
+        this.drawHealthBar(monster);
         
         // Monster eyes
         const eyeSize = monster.isBoss ? 3 : 4;
@@ -1526,24 +1529,174 @@ class Game {
         }
     }
     
+    drawFreezeEffect(monster) {
+        // Save current context
+        this.ctx.save();
+        
+        // Create ice-blue tint overlay
+        this.ctx.globalAlpha = 0.3;
+        this.ctx.fillStyle = '#87CEEB'; // Light blue ice color
+        
+        // Draw ice overlay matching monster shape
+        switch(monster.shape) {
+            case 'circle':
+                this.ctx.beginPath();
+                this.ctx.arc(monster.x, monster.y, monster.size, 0, Math.PI * 2);
+                this.ctx.fill();
+                break;
+                
+            case 'square':
+                this.ctx.fillRect(monster.x - monster.size, monster.y - monster.size, monster.size * 2, monster.size * 2);
+                break;
+                
+            case 'triangle':
+                this.ctx.beginPath();
+                this.ctx.moveTo(monster.x, monster.y - monster.size);
+                this.ctx.lineTo(monster.x - monster.size, monster.y + monster.size);
+                this.ctx.lineTo(monster.x + monster.size, monster.y + monster.size);
+                this.ctx.closePath();
+                this.ctx.fill();
+                break;
+                
+            case 'diamond':
+                this.ctx.beginPath();
+                this.ctx.moveTo(monster.x, monster.y - monster.size);
+                this.ctx.lineTo(monster.x + monster.size, monster.y);
+                this.ctx.lineTo(monster.x, monster.y + monster.size);
+                this.ctx.lineTo(monster.x - monster.size, monster.y);
+                this.ctx.closePath();
+                this.ctx.fill();
+                break;
+                
+            default:
+                // For complex shapes (star, hexagon, boss, etc.), draw a circular ice overlay
+                this.ctx.beginPath();
+                this.ctx.arc(monster.x, monster.y, monster.size, 0, Math.PI * 2);
+                this.ctx.fill();
+                break;
+        }
+        
+        // Draw ice crystals/frost patterns
+        this.ctx.globalAlpha = 0.6;
+        this.ctx.strokeStyle = '#B0E0E6'; // Powder blue
+        this.ctx.lineWidth = 1;
+        
+        // Draw frost lines radiating from center
+        const numLines = 6;
+        for (let i = 0; i < numLines; i++) {
+            const angle = (i / numLines) * Math.PI * 2;
+            const startRadius = monster.size * 0.3;
+            const endRadius = monster.size * 0.8;
+            
+            const startX = monster.x + Math.cos(angle) * startRadius;
+            const startY = monster.y + Math.sin(angle) * startRadius;
+            const endX = monster.x + Math.cos(angle) * endRadius;
+            const endY = monster.y + Math.sin(angle) * endRadius;
+            
+            this.ctx.beginPath();
+            this.ctx.moveTo(startX, startY);
+            this.ctx.lineTo(endX, endY);
+            this.ctx.stroke();
+        }
+        
+        // Draw small ice crystals around the monster
+        this.ctx.globalAlpha = 0.8;
+        this.ctx.fillStyle = '#E0F6FF'; // Very light blue
+        const crystalCount = 8;
+        
+        for (let i = 0; i < crystalCount; i++) {
+            const angle = (i / crystalCount) * Math.PI * 2 + (Date.now() * 0.001); // Slowly rotating
+            const distance = monster.size * 1.2;
+            const crystalX = monster.x + Math.cos(angle) * distance;
+            const crystalY = monster.y + Math.sin(angle) * distance;
+            const crystalSize = 2;
+            
+            // Draw small diamond-shaped ice crystals
+            this.ctx.beginPath();
+            this.ctx.moveTo(crystalX, crystalY - crystalSize);
+            this.ctx.lineTo(crystalX + crystalSize, crystalY);
+            this.ctx.lineTo(crystalX, crystalY + crystalSize);
+            this.ctx.lineTo(crystalX - crystalSize, crystalY);
+            this.ctx.closePath();
+            this.ctx.fill();
+        }
+        
+        // Restore context
+        this.ctx.restore();
+    }
+    
     drawHealthBar(monster) {
-        const barWidth = monster.size * 1.5;
+        const pixelsPerHP = 6;
         const barHeight = 4;
         const barY = monster.y - monster.size - 10;
+        const maxBarWidth = monster.size * 1.5; // Maximum width before using stars
         
-        // Background
-        this.ctx.fillStyle = '#333';
-        this.ctx.fillRect(monster.x - barWidth/2, barY, barWidth, barHeight);
+        // Calculate ideal bar width (5 pixels per max HP)
+        const idealBarWidth = monster.maxHealth * pixelsPerHP;
         
-        // Health
-        const healthPercent = monster.health / monster.maxHealth;
-        this.ctx.fillStyle = healthPercent > 0.5 ? '#00FF00' : healthPercent > 0.25 ? '#FFFF00' : '#FF0000';
-        this.ctx.fillRect(monster.x - barWidth/2, barY, barWidth * healthPercent, barHeight);
-        
-        // Border
-        this.ctx.strokeStyle = '#000';
-        this.ctx.lineWidth = 1;
-        this.ctx.strokeRect(monster.x - barWidth/2, barY, barWidth, barHeight);
+        if (idealBarWidth <= maxBarWidth) {
+            // Single bar fits within monster bounds
+            const barWidth = idealBarWidth;
+            const currentBarWidth = monster.health * pixelsPerHP;
+            
+            // Background
+            this.ctx.fillStyle = '#333';
+            this.ctx.fillRect(monster.x - barWidth/2, barY, barWidth, barHeight);
+            
+            // Health
+            const healthPercent = monster.health / monster.maxHealth;
+            this.ctx.fillStyle = healthPercent > 0.5 ? '#00FF00' : healthPercent > 0.25 ? '#FFFF00' : '#FF0000';
+            this.ctx.fillRect(monster.x - barWidth/2, barY, currentBarWidth, barHeight);
+            
+            // Border
+            this.ctx.strokeStyle = '#000';
+            this.ctx.lineWidth = 1;
+            this.ctx.strokeRect(monster.x - barWidth/2, barY, barWidth, barHeight);
+            
+        } else {
+            // Multiple bars needed - use star system
+            const hpPerBar = Math.floor(maxBarWidth / pixelsPerHP);
+            const totalBars = Math.ceil(monster.maxHealth / hpPerBar);
+            const currentBars = Math.ceil(monster.health / hpPerBar);
+            const remainingHP = monster.health % hpPerBar;
+            
+            // Draw the current active bar
+            const activeBarWidth = remainingHP === 0 && monster.health > 0 ? maxBarWidth : remainingHP * pixelsPerHP;
+            
+            // Background for current bar
+            this.ctx.fillStyle = '#333';
+            this.ctx.fillRect(monster.x - maxBarWidth/2, barY, maxBarWidth, barHeight);
+            
+            // Current health in active bar
+            const healthPercent = monster.health / monster.maxHealth;
+            this.ctx.fillStyle = healthPercent > 0.5 ? '#00FF00' : healthPercent > 0.25 ? '#FFFF00' : '#FF0000';
+            this.ctx.fillRect(monster.x - maxBarWidth/2, barY, activeBarWidth, barHeight);
+            
+            // Border for current bar
+            this.ctx.strokeStyle = '#000';
+            this.ctx.lineWidth = 1;
+            this.ctx.strokeRect(monster.x - maxBarWidth/2, barY, maxBarWidth, barHeight);
+            
+            // Draw stars for additional full bars
+            const additionalFullBars = Math.floor((monster.health - 1) / hpPerBar);
+            if (additionalFullBars > 0) {
+                this.ctx.fillStyle = '#FFD700'; // Gold color for stars
+                this.ctx.font = '12px Arial';
+                this.ctx.textAlign = 'center';
+                this.ctx.textBaseline = 'middle';
+                
+                // Position stars above the health bar
+                const starY = barY - 8;
+                const starSpacing = 8;
+                const totalStarWidth = additionalFullBars * starSpacing;
+                const startX = monster.x - totalStarWidth/2 + starSpacing/2;
+                
+                for (let i = 0; i < additionalFullBars; i++) {
+                    const starX = startX + i * starSpacing;
+                    this.ctx.fillText('★', starX, starY);
+                }
+            }
+        }
     }
     
     drawStar(x, y, size) {
@@ -2271,7 +2424,13 @@ class Game {
         
         // Spawn monsters
         this.monsterSpawnCounter++;
-        if (this.monsterSpawnCounter >= this.monsterSpawnRate) {
+        
+        // Always maintain at least 2 monsters - spawn immediately if below threshold
+        if (this.monsters.length < 2) {
+            this.spawnMonster();
+
+        } else if (this.monsterSpawnCounter >= this.monsterSpawnRate) {
+            // Normal timer-based spawning when we have enough monsters
             this.spawnMonster();
             this.monsterSpawnCounter = 0;
         }
