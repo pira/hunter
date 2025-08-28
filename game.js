@@ -9,7 +9,7 @@ class Game {
         this.killedByMonster = null; // Track which monster killed the player
         
         // Version system
-        this.version = "1.2.14";
+        this.version = "1.2.16";
         this.buildDate = "2025-08-28";
         
         // Mobile support
@@ -1629,7 +1629,7 @@ class Game {
         const pixelsPerHP = 6;
         const barHeight = 4;
         const barY = monster.y - monster.size - 10;
-        const maxBarWidth = monster.size * 1.5; // Maximum width before using stars
+        const maxBarWidth = monster.size * 2.2; // Maximum width before using stars
         
         // Calculate ideal bar width (5 pixels per max HP)
         const idealBarWidth = monster.maxHealth * pixelsPerHP;
@@ -1660,8 +1660,15 @@ class Game {
             const currentBars = Math.ceil(monster.health / hpPerBar);
             const remainingHP = monster.health % hpPerBar;
             
-            // Draw the current active bar
-            const activeBarWidth = remainingHP === 0 && monster.health > 0 ? maxBarWidth : remainingHP * pixelsPerHP;
+            // Calculate active bar width - special handling for full health and full bars
+            let activeBarWidth;
+            if (monster.health === monster.maxHealth || remainingHP === 0) {
+                // Undamaged monster or exactly full bar
+                activeBarWidth = maxBarWidth;
+            } else {
+                // Partial bar - show remaining HP in current bar
+                activeBarWidth = remainingHP * pixelsPerHP;
+            }
             
             // Background for current bar
             this.ctx.fillStyle = '#333';
