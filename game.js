@@ -9,7 +9,7 @@ class Game {
         this.killedByMonster = null; // Track which monster killed the player
         
         // Version system
-        this.version = "1.2.18";
+        this.version = "1.2.20";
         this.buildDate = "2025-08-28";
         
         // Mobile support
@@ -525,10 +525,10 @@ class Game {
     getAvailableWeapons() {
         let availableWeapons = ['bullets', 'sword']; // Always available
         
-        if (this.level >= 0) {
+        if (this.level >= 20) {
             availableWeapons.push('grenades');
         }
-        if (this.level >= 0) {
+        if (this.level >= 40) {
             availableWeapons.push('missiles');
         }
         
@@ -625,13 +625,11 @@ class Game {
         const fireRate = this.rapidFire ? 44 : 132; // 60fps = 1 sec
         this.weaponCooldowns.missiles = fireRate;
         
-        const target = this.findClosestMonster()
-        
-        // Create missiles for each target
+        // Create missiles for random targets
         Array(this.multiShot ? 3 : 5).fill().forEach(() => this.missiles.push({
             x: this.player.x,
             y: this.player.y,
-            target: target,
+            target: this.monsters[Math.floor(Math.random() * this.monsters.length)],
             size: 3,
             color: '#FF4500',
             angle: 0, // Direction missile is pointing
@@ -900,14 +898,12 @@ class Game {
             
             // Check if target still exists, if not find a new target
             if (!this.monsters.includes(missile.target)) {
-                const newTarget = this.findClosestMonster(missile.x, missile.y);
-                if (newTarget) {
-                    missile.target = newTarget;
-                } else {
-                    // No monsters available, remove missile
+                const newTarget = this.monsters[Math.floor(Math.random() * this.monsters.length)];
+                if (!newTarget) {
                     this.missiles.splice(i, 1);
                     continue;
                 }
+                missile.target = newTarget;
             }
             
             // Add current position to trail (every few frames for dotted effect)
@@ -918,7 +914,7 @@ class Game {
                 missile.trail.push({x: missile.x, y: missile.y});
                 
                 // Limit trail length
-                if (missile.trail.length > 15) {
+                if (missile.trail.length > 12) {
                     missile.trail.shift();
                 }
             }
