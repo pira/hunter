@@ -9,7 +9,7 @@ class Game {
         this.killedByMonster = null; // Track which monster killed the player
         
         // Version system
-        this.version = "1.2.16";
+        this.version = "1.2.18";
         this.buildDate = "2025-08-28";
         
         // Mobile support
@@ -52,14 +52,19 @@ class Game {
         
         // Game settings
         this.monsterSpawnRate = 110; // frames
-        this.monsterSpawnCounter = 0;
         this.bulletSpeed = 8;
+        this.missileSpeed = 4;
         this.autoShootRate = 60; // 1 shot per second (60 FPS)
-        this.autoShootCounter = 0;
-        this.manualShootCooldown = 0; // Cooldown for manual shooting
         this.monsterTurnBackChance = 0.75; // Chance for monster to turn back when leaving screen
         this.monsterChaseChance = 0.3; // Chance for monster to chase player
         this.bombDamage = 8;
+        this.missileDamage = 3;
+        this.powerupLength = 600; 
+
+        // counters
+        this.autoShootCounter = 0;
+        this.manualShootCooldown = 0; // Cooldown for manual shooting
+        this.monsterSpawnCounter = 0;
 
         // Powerup states
         this.multiShot = false;
@@ -74,7 +79,7 @@ class Game {
         };
         
         // Weapon system
-        this.weapons = ['bullets', 'sword', 'missiles', 'grenades'];
+        this.weapons = ['bullets', 'sword', 'grenades', 'missiles'];
         this.currentWeapon = 0; // Index into weapons array
         this.weaponCooldowns = {
             bullets: 0,
@@ -111,6 +116,7 @@ class Game {
         
         this.setupEventListeners();
         this.setupCanvas();
+        this.updateUI();
         this.gameLoop();
     }
     
@@ -519,10 +525,10 @@ class Game {
     getAvailableWeapons() {
         let availableWeapons = ['bullets', 'sword']; // Always available
         
-        if (this.level >= 20) {
+        if (this.level >= 0) {
             availableWeapons.push('grenades');
         }
-        if (this.level >= 40) {
+        if (this.level >= 0) {
             availableWeapons.push('missiles');
         }
         
@@ -554,16 +560,22 @@ class Game {
     }
     
     autoShoot() {
-        if (this.monsters.length === 0) return;
+        const closestMonster = this.findClosestMonster();
+        if (closestMonster) {
+            this.useWeapon(closestMonster.x, closestMonster.y);
+        }
+    }
+    
+    findClosestMonster(fromX = this.player.x, fromY = this.player.y) {
+        if (this.monsters.length === 0) return null;
         
-        // Find closest monster
         let closestMonster = null;
         let closestDistance = Infinity;
         
         this.monsters.forEach(monster => {
             const distance = Math.sqrt(
-                Math.pow(this.player.x - monster.x, 2) + 
-                Math.pow(this.player.y - monster.y, 2)
+                Math.pow(fromX - monster.x, 2) + 
+                Math.pow(fromY - monster.y, 2)
             );
             if (distance < closestDistance) {
                 closestDistance = distance;
@@ -571,9 +583,7 @@ class Game {
             }
         });
         
-        if (closestMonster) {
-            this.useWeapon(closestMonster.x, closestMonster.y);
-        }
+        return closestMonster;
     }
     
     useWeapon(targetX, targetY) {
@@ -612,38 +622,22 @@ class Game {
     }
     
     fireMissiles() {
-        const fireRate = this.rapidFire ? 40 : 120; // 60fps = 1 sec
+        const fireRate = this.rapidFire ? 44 : 132; // 60fps = 1 sec
         this.weaponCooldowns.missiles = fireRate;
         
-        // Find up to 3 closest monsters for homing
-        const targets = this.monsters
-            .map(monster => ({
-                monster,
-                distance: Math.sqrt(
-                    Math.pow(this.player.x - monster.x, 2) + 
-                    Math.pow(this.player.y - monster.y, 2)
-                )
-            }))
-            .sort((a, b) => a.distance - b.distance)
-            .slice(0, this.multiShot ? 4 : 1) // Triple missiles with multishot
-            .map(item => item.monster);
+        const target = this.findClosestMonster()
         
         // Create missiles for each target
-        targets.forEach(target => {
-            const missile = {
-                x: this.player.x,
-                y: this.player.y,
-                target: target,
-                speed: 4,
-                damage: 3,
-                size: 3,
-                color: '#FF4500',
-                angle: 0, // Direction missile is pointing
-                trail: [] // Store trail positions for dotted effect
-            };
-            this.missiles.push(missile);
-            this.sounds.missile();
-        });
+        Array(this.multiShot ? 3 : 5).fill().forEach(() => this.missiles.push({
+            x: this.player.x,
+            y: this.player.y,
+            target: target,
+            size: 3,
+            color: '#FF4500',
+            angle: 0, // Direction missile is pointing
+            trail: [] // Store trail positions for dotted effect
+        }));
+        this.sounds.missile();
         
     }
     
@@ -834,6 +828,15 @@ class Game {
         this.powerups.push(powerupObj);
     }
     
+    hitMonster(monster, damage) {        
+        monster.health -= damage;
+        monster.healingTimer = 0; // Reset healing timer when damaged
+        
+        if (monster.health <= 0) {
+            this.killMonster(monster);
+        }
+    }
+    
     updatePlayer() {
         // Keyboard controls
         if (this.keys['w'] || this.keys['arrowup']) {
@@ -872,6 +875,22 @@ class Game {
                 bullet.y < 0 || bullet.y > this.canvas.height) {
                 this.bullets.splice(i, 1);
             }
+
+            for (let j = this.monsters.length - 1; j >= 0; j--) {
+                const monster = this.monsters[j];
+                
+                const distance = Math.sqrt(
+                    Math.pow(bullet.x - monster.x, 2) + 
+                    Math.pow(bullet.y - monster.y, 2)
+                );
+                
+                if (distance < bullet.size + monster.size) {
+                    // Hit! Remove bullet and reduce monster health
+                    this.bullets.splice(i, 1);
+                    this.hitMonster(monster, 1)
+                    break;
+                }
+            }
         }
     }
     
@@ -879,10 +898,16 @@ class Game {
         for (let i = this.missiles.length - 1; i >= 0; i--) {
             const missile = this.missiles[i];
             
-            // Check if target still exists
+            // Check if target still exists, if not find a new target
             if (!this.monsters.includes(missile.target)) {
-                this.missiles.splice(i, 1);
-                continue;
+                const newTarget = this.findClosestMonster(missile.x, missile.y);
+                if (newTarget) {
+                    missile.target = newTarget;
+                } else {
+                    // No monsters available, remove missile
+                    this.missiles.splice(i, 1);
+                    continue;
+                }
             }
             
             // Add current position to trail (every few frames for dotted effect)
@@ -907,21 +932,13 @@ class Game {
                 // Update missile angle for pointing direction
                 missile.angle = Math.atan2(dy, dx);
                 
-                missile.x += (dx / distance) * missile.speed;
-                missile.y += (dy / distance) * missile.speed;
+                missile.x += (dx / distance) * this.missileSpeed;
+                missile.y += (dy / distance) * this.missileSpeed;
             }
             
             // Check collision with target
             if (distance < missile.size + missile.target.size) {
-                missile.target.health -= missile.damage;
-                missile.target.healingTimer = 0; // Reset healing timer when damaged
-                this.missiles.splice(i, 1);
-                
-            }
-            
-            // Remove missiles that are too far off screen
-            if (missile.x < -100 || missile.x > this.canvas.width + 100 || 
-                missile.y < -100 || missile.y > this.canvas.height + 100) {
+                this.hitMonster(missile.target, this.missileDamage);
                 this.missiles.splice(i, 1);
             }
         }
@@ -948,7 +965,6 @@ class Game {
             }
             
             // Check collision with monsters
-            let hitMonster = false;
             for (let j = this.monsters.length - 1; j >= 0; j--) {
                 const monster = this.monsters[j];
                 const distance = Math.sqrt(
@@ -1028,8 +1044,7 @@ class Game {
                 );
                 
                 if (distanceToLine <= monster.size + 2) { // 2 pixel blade width
-                    monster.health -= 1; // Each blade hit does 1 damage
-                    monster.healingTimer = 0; // Reset healing timer when damaged
+                    this.hitMonster(monster, 1); // Each blade hit does 1 damage
                     // Add a small knockback effect
                     const knockbackAngle = Math.atan2(monster.y - this.player.y, monster.x - this.player.x);
                     monster.x += Math.cos(knockbackAngle) * 2;
@@ -1098,8 +1113,7 @@ class Game {
             );
             
             if (distance <= explosionRadius + monster.size) {
-                monster.health -= this.bombDamage;
-                monster.healingTimer = 0; // Reset healing timer when damaged
+                this.hitMonster(monster, this.bombDamage);
             }
         });
         
@@ -1237,19 +1251,19 @@ class Game {
                 // Collect powerup
                 if (powerup.type === 'multiShot') {
                     this.multiShot = true;
-                    this.powerupTimers.multiShot += 600; // 10 seconds
+                    this.powerupTimers.multiShot += this.powerupLength;
                     this.sounds.powerup();
                 } else if (powerup.type === 'rapidFire') {
                     this.rapidFire = true;
-                    this.powerupTimers.rapidFire += 600; // 10 seconds
+                    this.powerupTimers.rapidFire += this.powerupLength;
                     this.sounds.powerup();
                 } else if (powerup.type === 'invincible') {
                     this.invincible = true;
-                    this.powerupTimers.invincible += 600;
+                    this.powerupTimers.invincible += this.powerupLength;
                     this.sounds.powerup();
                 } else if (powerup.type === 'freeze') {
                     this.freeze = true;
-                    this.powerupTimers.freeze += 600;
+                    this.powerupTimers.freeze += this.powerupLength;
                     this.sounds.powerup();
                 } else if (powerup.type === 'heart') {
                     // Add extra life (max 3 hearts)
@@ -1294,44 +1308,9 @@ class Game {
             }
         }
     }
-    
-    checkCollisions() {
-        // Check bullet collisions
-        for (let i = this.bullets.length - 1; i >= 0; i--) {
-            const bullet = this.bullets[i];
-            
-            for (let j = this.monsters.length - 1; j >= 0; j--) {
-                const monster = this.monsters[j];
-                
-                const distance = Math.sqrt(
-                    Math.pow(bullet.x - monster.x, 2) + 
-                    Math.pow(bullet.y - monster.y, 2)
-                );
-                
-                if (distance < bullet.size + monster.size) {
-                    // Hit! Remove bullet and reduce monster health
-                    this.bullets.splice(i, 1);
-                    monster.health -= bullet.damage || 1;
-                    monster.healingTimer = 0; // Reset healing timer when damaged
-                    
-                    if (monster.health <= 0) {
-                        this.killMonster(monster, j);
-                    }
-                    break;
-                }
-            }
-        }
         
-        // Check for dead monsters from other weapons (sword, missiles, grenades)
-        for (let j = this.monsters.length - 1; j >= 0; j--) {
-            const monster = this.monsters[j];
-            if (monster.health <= 0) {
-                this.killMonster(monster, j);
-            }
-        }
-    }
-    
-    killMonster(monster, index) {
+    killMonster(monster) {
+        let index = this.monsters.indexOf(monster);
         // Monster dies
         this.monsters.splice(index, 1);
         this.score += monster.points;
@@ -1340,12 +1319,10 @@ class Game {
          // Play monster death sounds
         if (monster.isBoss) {
             this.sounds.monsterBossDeath();
+            this.checkBossPowerupDrop(monster);
         } else {
             this.sounds.monsterDeath(); 
         }
-        
-        // Check if boss aura monster drops powerup
-        this.checkBossPowerupDrop(monster);
     }
     
     updateUI() {
@@ -1355,7 +1332,7 @@ class Game {
         document.getElementById('killsDisplay').textContent = this.monstersKilled;
         
         // Update weapons display
-        const weaponEmojis = ['🔫', '⚔️', '🚀', '💣'];
+        const weaponEmojis = ['🔫', '⚔️', '💣', '🚀'];
         const availableWeapons = this.getAvailableWeapons();
         let weaponsDisplay = '';
         
@@ -1370,11 +1347,11 @@ class Game {
                     weaponsDisplay += emoji + ' ';
                 } else {
                     // Available but not active - slightly dimmed
-                    weaponsDisplay += '<span style="opacity: 0.6;">' + emoji + '</span> ';
+                    weaponsDisplay += '<span style="opacity: 0.55;">' + emoji + '</span> ';
                 }
             } else {
                 // Locked weapon - very dimmed
-                weaponsDisplay += '<span style="opacity: 0.2;">' + emoji + '</span> ';
+                weaponsDisplay += '<span style="opacity: 0.15;">' + emoji + '</span> ';
             }
         }
         
@@ -2403,7 +2380,6 @@ class Game {
         this.updateMonsters();
         this.updatePowerups();
         this.updateFlashEffect(); // Update flash effect
-        this.checkCollisions();
         this.checkLevelUp(); // Check for level up
         
         // Update weapon cooldowns
@@ -2457,20 +2433,7 @@ class Game {
     activateBomb() {
         // Deal damage to all monsters on screen
         for (let i = this.monsters.length - 1; i >= 0; i--) {
-            const monster = this.monsters[i];
-            monster.health -= this.bombDamage;
-            monster.healingTimer = 0; // Reset healing timer when damaged
-            
-            // Remove monster if it dies from bomb damage
-            if (monster.health <= 0) {
-                this.score += monster.points;
-                this.monstersKilled++;
-                this.sounds.monsterDeath();
-                this.monsters.splice(i, 1);
-                
-                // Check if boss monster drops powerup
-                this.checkBossPowerupDrop(monster);
-            }
+            this.hitMonster(this.monsters[i], this.bombDamage);            
         }
         this.updateUI();
         
@@ -2478,7 +2441,6 @@ class Game {
         this.flashEffect.active = true;
         this.flashEffect.timer = this.flashEffect.duration;
         
-        // Play boom sound
         this.sounds.boom();
     }
     
