@@ -86,7 +86,7 @@ def main():
         f'this.buildDate = "{current_date}"',
         game_content
     )
-    
+
     # Write the updated content back to the file
     try:
         with open(game_file_path, 'w', encoding='utf-8') as f:
@@ -94,10 +94,33 @@ def main():
     except IOError:
         print("❌ Error: Could not write to game.js")
         sys.exit(1)
-    
+
+    # Update package.json version to stay in sync
+    package_path = os.path.join(script_dir, 'package.json')
+    package_updated = False
+
+    try:
+        with open(package_path, 'r', encoding='utf-8') as f:
+            package_data = json.load(f)
+
+        if isinstance(package_data, dict):
+            package_data['version'] = new_version
+            with open(package_path, 'w', encoding='utf-8') as f:
+                json.dump(package_data, f, indent=2)
+                f.write('\n')
+            package_updated = True
+    except FileNotFoundError:
+        print("⚠️ Warning: package.json not found; skipped version sync.")
+    except json.JSONDecodeError:
+        print("⚠️ Warning: Could not parse package.json; skipped version sync.")
+    except IOError:
+        print("⚠️ Warning: Could not write to package.json; skipped version sync.")
+
     print("🎮 Monster Hunter Game")
     print(f"📦 Version updated: {current_version} -> {new_version} ({strategy})")
     print(f"📅 Build date updated: {current_date}")
+    if package_updated:
+        print("🧾 package.json version synchronized")
     print("✨ Ready to commit!")
 
 if __name__ == "__main__":
