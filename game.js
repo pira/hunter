@@ -1,3 +1,9 @@
+const GameMath = typeof GameUtils !== 'undefined' ? GameUtils : null;
+
+if (!GameMath) {
+    throw new Error('GameUtils must be loaded before game.js');
+}
+
 class Game {
     constructor() {
         this.canvas = document.getElementById('gameCanvas');
@@ -6,6 +12,7 @@ class Game {
         this.monstersKilled = 0;
         this.gameOver = false;
         this.level = 1;
+        this.nextLevelScore = GameMath.calculateLevelThreshold(this.level);
         this.killedByMonster = null; // Track which monster killed the player
         
         // Version system
@@ -823,13 +830,18 @@ class Game {
         this.powerups.push(powerupObj);
     }
     
-    hitMonster(monster, damage) {        
+    hitMonster(monster, damage, index = this.monsters.indexOf(monster)) {
+        if (!monster) {
+            return false;
+        }
         monster.health -= damage;
         monster.healingTimer = 0; // Reset healing timer when damaged
-        
+
         if (monster.health <= 0) {
-            this.killMonster(monster);
+            this.killMonster(monster, index);
+            return true;
         }
+        return false;
     }
     
     updatePlayer() {
@@ -873,16 +885,13 @@ class Game {
 
             for (let j = this.monsters.length - 1; j >= 0; j--) {
                 const monster = this.monsters[j];
-                
-                const distance = Math.sqrt(
-                    Math.pow(bullet.x - monster.x, 2) + 
-                    Math.pow(bullet.y - monster.y, 2)
-                );
-                
-                if (distance < bullet.size + monster.size) {
+                const collisionRadius = bullet.size + monster.size;
+                const collisionDistanceSq = collisionRadius * collisionRadius;
+
+                if (GameMath.distanceSquared(bullet.x, bullet.y, monster.x, monster.y) < collisionDistanceSq) {
                     // Hit! Remove bullet and reduce monster health
                     this.bullets.splice(i, 1);
-                    this.hitMonster(monster, 1)
+                    this.hitMonster(monster, bullet.damage, j);
                     break;
                 }
             }
@@ -904,51 +913,63 @@ class Game {
             }
             
             // Add current position to trail (every few frames for dotted effect)
-            if (missile.trail.length === 0 || 
-                (missile.trail.length > 0 && 
-                 Math.sqrt(Math.pow(missile.x - missile.trail[missile.trail.length - 1].x, 2) + 
-                          Math.pow(missile.y - missile.trail[missile.trail.length - 1].y, 2)) > 8)) {
+            if (missile.trail.length === 0 ||
+                (missile.trail.length > 0 &&
+                 GameMath.distanceSquared(
+                     missile.x,
+                     missile.y,
+                     missile.trail[missile.trail.length - 1].x,
+                     missile.trail[missile.trail.length - 1].y
+                 ) > 64)) {
                 missile.trail.push({x: missile.x, y: missile.y});
-                
+
                 // Limit trail length
                 if (missile.trail.length > 12) {
                     missile.trail.shift();
                 }
             }
-            
+
             // Home in on target
-            const dx = missile.target.x - missile.x;
-            const dy = missile.target.y - missile.y;
-            const distance = Math.sqrt(dx * dx + dy * dy);
-            
-            if (distance > 0) {
+            let dx = missile.target.x - missile.x;
+            let dy = missile.target.y - missile.y;
+            const normalized = GameMath.normalizeVector(dx, dy);
+
+            if (normalized.x !== 0 || normalized.y !== 0) {
                 // Update missile angle for pointing direction
                 missile.angle = Math.atan2(dy, dx);
-                
-                missile.x += (dx / distance) * this.missileSpeed;
-                missile.y += (dy / distance) * this.missileSpeed;
+
+                missile.x += normalized.x * this.missileSpeed;
+                missile.y += normalized.y * this.missileSpeed;
             }
-            
-            // Check collision with target
-            if (distance < missile.size + missile.target.size) {
-                this.hitMonster(missile.target, this.missileDamage);
+
+            // Recalculate distance after movement for collision detection
+            dx = missile.target.x - missile.x;
+            dy = missile.target.y - missile.y;
+            const distanceSq = dx * dx + dy * dy;
+            const collisionRadius = missile.size + missile.target.size;
+
+            if (distanceSq <= collisionRadius * collisionRadius) {
+                const targetIndex = this.monsters.indexOf(missile.target);
+                this.hitMonster(missile.target, this.missileDamage, targetIndex);
                 this.missiles.splice(i, 1);
             }
         }
     }
-    
+
     updateGrenades() {
         for (let i = this.grenades.length - 1; i >= 0; i--) {
             const grenade = this.grenades[i];
             
             // Check if grenade has traveled the fixed distance before moving
-            const distanceTraveled = Math.sqrt(
-                Math.pow(grenade.x - grenade.startX, 2) + 
-                Math.pow(grenade.y - grenade.startY, 2)
+            const distanceTraveledSq = GameMath.distanceSquared(
+                grenade.x,
+                grenade.y,
+                grenade.startX,
+                grenade.startY
             );
-            
+
             // Stop grenade if it has reached the fixed distance
-            if (distanceTraveled >= this.grenadeRange) {
+            if (distanceTraveledSq >= this.grenadeRange * this.grenadeRange) {
                 grenade.vx = 0;
                 grenade.vy = 0;
             } else {
@@ -956,16 +977,13 @@ class Game {
                 grenade.x += grenade.vx;
                 grenade.y += grenade.vy;
             }
-            
+
             // Check collision with monsters
             for (let j = this.monsters.length - 1; j >= 0; j--) {
                 const monster = this.monsters[j];
-                const distance = Math.sqrt(
-                    Math.pow(grenade.x - monster.x, 2) + 
-                    Math.pow(grenade.y - monster.y, 2)
-                );
-                
-                if (distance < grenade.size + monster.size) {
+                const collisionRadius = grenade.size + monster.size;
+
+                if (GameMath.distanceSquared(grenade.x, grenade.y, monster.x, monster.y) < collisionRadius * collisionRadius) {
                     // Grenade hits monster - stop moving immediately
                     grenade.vx = 0;
                     grenade.vy = 0;
@@ -1021,30 +1039,35 @@ class Game {
         const radius = this.multiShot ? this.swordBlades.baseRadius * 1.25 : this.swordBlades.baseRadius;
         
         // Check collision with monsters
-        this.monsters.forEach(monster => {
+        for (let m = this.monsters.length - 1; m >= 0; m--) {
+            const monster = this.monsters[m];
             for (let i = 0; i < bladeCount; i++) {
                 const angle = this.swordBlades.rotation + (i * Math.PI * 2) / bladeCount;
                 const bladeStartX = this.player.x + Math.cos(angle) * (radius - this.swordBlades.bladeLength);
                 const bladeStartY = this.player.y + Math.sin(angle) * (radius - this.swordBlades.bladeLength);
                 const bladeEndX = this.player.x + Math.cos(angle) * radius;
                 const bladeEndY = this.player.y + Math.sin(angle) * radius;
-                
+
                 // Check if monster intersects with blade line
                 const distanceToLine = this.distancePointToLineSegment(
                     monster.x, monster.y,
                     bladeStartX, bladeStartY,
                     bladeEndX, bladeEndY
                 );
-                
+
                 if (distanceToLine <= monster.size + 2) { // 2 pixel blade width
-                    this.hitMonster(monster, 1); // Each blade hit does 1 damage
+                    const killed = this.hitMonster(monster, 1, m); // Each blade hit does 1 damage
+                    if (killed) {
+                        break;
+                    }
+
                     // Add a small knockback effect
                     const knockbackAngle = Math.atan2(monster.y - this.player.y, monster.x - this.player.x);
                     monster.x += Math.cos(knockbackAngle) * 2;
                     monster.y += Math.sin(knockbackAngle) * 2;
                 }
             }
-        });
+        }
     }
     
     distancePointToLineSegment(px, py, x1, y1, x2, y2) {
@@ -1099,16 +1122,14 @@ class Game {
         const explosionRadius = 40;
         
         // Damage all monsters within explosion radius
-        this.monsters.forEach(monster => {
-            const distance = Math.sqrt(
-                Math.pow(grenade.x - monster.x, 2) + 
-                Math.pow(grenade.y - monster.y, 2)
-            );
-            
-            if (distance <= explosionRadius + monster.size) {
-                this.hitMonster(monster, this.bombDamage);
+        for (let i = this.monsters.length - 1; i >= 0; i--) {
+            const monster = this.monsters[i];
+            const collisionRadius = explosionRadius + monster.size;
+
+            if (GameMath.distanceSquared(grenade.x, grenade.y, monster.x, monster.y) <= collisionRadius * collisionRadius) {
+                this.hitMonster(monster, this.bombDamage, i);
             }
-        });
+        }
         
         // Create visual explosion effect
         const explosion = {
@@ -1152,12 +1173,10 @@ class Game {
             this.updateMonsterMovement(monster);
             
             // Check collision with player
-            const playerDistance = Math.sqrt(
-                Math.pow(this.player.x - monster.x, 2) + 
-                Math.pow(this.player.y - monster.y, 2)
-            );
-            
-            if (playerDistance < this.player.size + monster.size) {
+            const playerCollisionRadius = this.player.size + monster.size;
+
+            if (GameMath.distanceSquared(this.player.x, this.player.y, monster.x, monster.y) <
+                playerCollisionRadius * playerCollisionRadius) {
                 if (!this.invincible && monster.isDangerous) {
                     this.player.health--;
                     this.invincible = true;
@@ -1206,11 +1225,11 @@ class Game {
                 // Chase player
                 const dx = this.player.x - monster.x;
                 const dy = this.player.y - monster.y;
-                const distance = Math.sqrt(dx * dx + dy * dy);
-                
-                if (distance > 0) {
-                    monster.x += (dx / distance) * monster.speed * speedMultiplier;
-                    monster.y += (dy / distance) * monster.speed * speedMultiplier;
+                const direction = GameMath.normalizeVector(dx, dy);
+
+                if (direction.x !== 0 || direction.y !== 0) {
+                    monster.x += direction.x * monster.speed * speedMultiplier;
+                    monster.y += direction.y * monster.speed * speedMultiplier;
                 }
                 break;
                 
@@ -1235,12 +1254,10 @@ class Game {
             const powerup = this.powerups[i];
             
             // Check collision with player
-            const distance = Math.sqrt(
-                Math.pow(this.player.x - powerup.x, 2) + 
-                Math.pow(this.player.y - powerup.y, 2)
-            );
-            
-            if (distance < this.player.size + powerup.size) {
+            const collisionRadius = this.player.size + powerup.size;
+
+            if (GameMath.distanceSquared(this.player.x, this.player.y, powerup.x, powerup.y) <
+                collisionRadius * collisionRadius) {
                 // Collect powerup
                 if (powerup.type === 'multiShot') {
                     this.multiShot = true;
@@ -1302,10 +1319,10 @@ class Game {
         }
     }
         
-    killMonster(monster) {
-        let index = this.monsters.indexOf(monster);
-        // Monster dies
-        this.monsters.splice(index, 1);
+    killMonster(monster, index = this.monsters.indexOf(monster)) {
+        if (index >= 0) {
+            this.monsters.splice(index, 1);
+        }
         this.score += monster.points;
         this.monstersKilled++;
         this.updateUI();
@@ -2426,7 +2443,7 @@ class Game {
     activateBomb() {
         // Deal damage to all monsters on screen
         for (let i = this.monsters.length - 1; i >= 0; i--) {
-            this.hitMonster(this.monsters[i], this.bombDamage);            
+            this.hitMonster(this.monsters[i], this.bombDamage, i);
         }
         this.updateUI();
         
@@ -2447,19 +2464,20 @@ class Game {
     }
     
     checkLevelUp() {
-        // Calculate required score for current level
-        // Level 2: 20 points, Level 3: 50 points (20+30), Level 4: 90 points (20+30+40), etc.
-        let requiredScore = 0;
-        for (let i = 2; i <= this.level + 1; i++) {
-            requiredScore += (i - 1) * 10; // 20, 30, 40, 50, etc.
-        }
-        
-        if (this.score >= requiredScore) {
+        let leveledUp = false;
+
+        while (this.score >= this.nextLevelScore) {
             this.level++;
             // Increase difficulty
             this.monsterSpawnRate = 110 - this.level;
+            this.nextLevelScore = GameMath.calculateLevelThreshold(this.level);
 
             this.sounds.levelUp();
+            leveledUp = true;
+        }
+
+        if (leveledUp) {
+            this.updateUI();
         }
     }
     
