@@ -79,7 +79,33 @@ gameContent = gameContent.replace(
 // Write the updated content back to the file
 fs.writeFileSync(gameFilePath, gameContent, 'utf8');
 
+// Update package.json version to stay in sync
+const packagePath = path.join(__dirname, 'package.json');
+let packageUpdated = false;
+
+try {
+    const packageContent = fs.readFileSync(packagePath, 'utf8');
+    const packageJson = JSON.parse(packageContent);
+
+    if (packageJson && typeof packageJson === 'object') {
+        packageJson.version = newVersion;
+        fs.writeFileSync(packagePath, JSON.stringify(packageJson, null, 2) + '\n', 'utf8');
+        packageUpdated = true;
+    }
+} catch (err) {
+    if (err.code === 'ENOENT') {
+        console.warn('⚠️  Warning: package.json not found; skipped version sync.');
+    } else if (err.name === 'SyntaxError') {
+        console.warn('⚠️  Warning: Could not parse package.json; skipped version sync.');
+    } else {
+        console.warn('⚠️  Warning: Could not write to package.json; skipped version sync.');
+    }
+}
+
 console.log(`🎮 Monster Hunter Game`);
 console.log(`📦 Version updated: ${currentVersion} -> ${newVersion} (${strategy})`);
 console.log(`📅 Build date updated: ${currentDate}`);
+if (packageUpdated) {
+    console.log('🧾 package.json version synchronized');
+}
 console.log(`✨ Ready to commit!`);
