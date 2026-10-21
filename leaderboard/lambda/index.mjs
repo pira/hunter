@@ -127,9 +127,9 @@ async function submit(body, ip) {
     // The claimed run length must fit in the real time since the run started (pause time only adds slack).
     if (elapsed > MAX_RUN_MS || duration * 1000 > elapsed + 15000) return json(403, { error: 'run timing mismatch' });
 
-    // Plausibility: XP (which drives level) never exceeds score, and score per second is bounded.
-    if (level > levelForXp(score)) return json(422, { error: 'implausible level' });
-    if (score > 5000 + duration * 4000 || kills > 60 + duration * 25 || combo > kills) {
+    // Plausibility: XP (which drives level) is at most 2× score (Double XP buff), score per second is bounded.
+    if (level > levelForXp(score * 2) + 1) return json(422, { error: 'implausible level' });
+    if (score > 500 + duration * 4000 || kills > 60 + duration * 25 || combo > kills) {
         return json(422, { error: 'implausible score' });
     }
 

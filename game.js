@@ -16,11 +16,12 @@ const EMOJI_FONT = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans
 const DISPLAY_FONT = '"Lilita One","Arial Rounded MT Bold",system-ui,sans-serif';
 
 const WEAPONS = {
-    bullets: { name: 'Blaster', icon: '🔫', unlock: 1 },
-    sword: { name: 'Blades', icon: '⚔️', unlock: 1 },
-    grenades: { name: 'Grenades', icon: '💣', unlock: 4 },
-    missiles: { name: 'Missiles', icon: '🚀', unlock: 8 }
+    bullets: { name: 'Blaster', icon: '🔫' },
+    sword: { name: 'Blade', icon: '🗡️' },
+    grenades: { name: 'Grenades', icon: '💣' },
+    missiles: { name: 'Missiles', icon: '🚀' }
 };
+const START_WEAPONS = ['bullets', 'sword']; // grenades + missiles are bought in the shop
 const WEAPON_ORDER = ['bullets', 'sword', 'grenades', 'missiles'];
 
 const MONSTER_TYPES = {
@@ -47,53 +48,74 @@ const MONSTER_TYPES = {
     ultimate: [{ shape: 'aura', color: '#FFFFFF', size: 40, speed: 2.4, speedVariation: 0.4, health: 50, name: 'Ultimate Destroyer', points: 1000 }]
 };
 const TIER_UNLOCK = { elite: 6, legendary: 11, mythic: 16, ancient: 22, ultimate: 28 };
-const DROP_CHANCE = { small: 0.006, medium: 0.015, large: 0.07, elite: 0.2, legendary: 0.35, mythic: 0.5, ancient: 0.7, ultimate: 1 };
+const DROP_CHANCE = { small: 0.004, medium: 0.01, large: 0.03, elite: 0.06, legendary: 0.1, mythic: 0.14, ancient: 0.2, ultimate: 0.4 };
+const DROP_COOLDOWN = 480;         // frames between powerup drops from kills
+const MAX_FIELD_POWERUPS = 3;      // never more than this many lying around (boss loot excepted)
+const TIMER_CAP = Math.round(30 * 60 * GAME_SPEED); // a powerup can never stack past 30 real seconds
+// [chance, min, max] coins dropped per kill
+const COIN_DROPS = {
+    small: [0.3, 1, 1], medium: [0.45, 1, 2], large: [0.8, 2, 4], elite: [1, 3, 5],
+    legendary: [1, 4, 6], mythic: [1, 6, 9], ancient: [1, 9, 13], ultimate: [1, 18, 28]
+};
 
 const POWERUPS = {
-    multiShot: { emoji: '🏹', name: 'Multi-Shot', color: '#FF69B4', timed: true },
-    rapidFire: { emoji: '⚡', name: 'Rapid Fire', color: '#00CED1', timed: true },
-    invincible: { emoji: '🛡️', name: 'Invincible', color: '#7CFC00', timed: true },
-    freeze: { emoji: '❄️', name: 'Freeze', color: '#87CEEB', timed: true },
-    heart: { emoji: '❤️', name: 'Extra Life', color: '#FF1493' },
-    bomb: { emoji: '💣', name: 'Bomb', color: '#FF4500' }
+    multiShot: { emoji: '🏹', name: 'Multi-Shot', color: '#FF69B4', timed: true, weight: 1 },
+    rapidFire: { emoji: '⚡', name: 'Rapid Fire', color: '#00CED1', timed: true, weight: 1 },
+    invincible: { emoji: '🛡️', name: 'Invincible', color: '#7CFC00', timed: true, weight: 0.7 },
+    freeze: { emoji: '❄️', name: 'Freeze', color: '#87CEEB', timed: true, weight: 0.8 },
+    coins2: { emoji: '🪙', tag: '×2', name: 'Coins ×2', color: '#FFC300', timed: true, weight: 0.8 },
+    coins3: { emoji: '🪙', tag: '×3', name: 'Coins ×3', color: '#FF8C00', timed: true, weight: 0.4 },
+    heart: { emoji: '❤️', name: 'Extra Life', color: '#FF1493', weight: 1 },
+    bomb: { emoji: '💣', name: 'Bomb', color: '#FF4500', weight: 0.8 }
 };
-const TIMED_POWERUPS = ['multiShot', 'rapidFire', 'invincible', 'freeze'];
+const TIMED_POWERUPS = ['multiShot', 'rapidFire', 'invincible', 'freeze', 'coins2', 'coins3'];
 
+// Shop cards. Price = cost × (1 + 0.75 × rank already owned).
 const UPGRADES = [
-    { id: 'power', icon: '💪', name: 'Power', max: 5, desc: '+20% damage with every weapon' },
-    { id: 'haste', icon: '⏱️', name: 'Haste', max: 5, desc: '+15% attack speed' },
-    { id: 'boots', icon: '👟', name: 'Swift Boots', max: 4, desc: '+10% move speed' },
-    { id: 'vitality', icon: '❤️', name: 'Vitality', max: 3, desc: '+1 max heart and heal 1' },
-    { id: 'crit', icon: '🎯', name: 'Keen Eye', max: 4, desc: '+8% chance to crit for 2.5× damage' },
-    { id: 'streak', icon: '🔥', name: 'Hot Streak', max: 3, desc: 'Combo timer lasts 0.6s longer' },
-    { id: 'luck', icon: '🍀', name: 'Lucky Charm', max: 3, desc: '+40% powerup drops' },
-    { id: 'overtime', icon: '⌛', name: 'Overtime', max: 3, desc: 'Powerups last 30% longer' },
-    { id: 'regen', icon: '🌿', name: 'Regeneration', max: 2, desc: 'Regrow a heart every 40s (25s at rank 2)' },
-    { id: 'nova', icon: '💫', name: 'Static Nova', max: 2, desc: 'Taking a hit blasts nearby monsters' },
-    { id: 'split', icon: '🔱', name: 'Split Shot', max: 3, weapon: 'bullets', desc: 'Blaster fires +1 bullet' },
-    { id: 'pierce', icon: '🏹', name: 'Piercing Rounds', max: 3, weapon: 'bullets', desc: 'Bullets pierce +1 monster' },
-    { id: 'blades', icon: '🌀', name: 'Whirlwind', max: 3, weapon: 'sword', desc: '+1 spinning blade' },
-    { id: 'reach', icon: '🗡️', name: 'Long Blades', max: 3, weapon: 'sword', desc: '+20% blade reach' },
-    { id: 'cluster', icon: '🧨', name: 'Cluster Bombs', max: 3, weapon: 'grenades', desc: '+1 grenade per throw' },
-    { id: 'blast', icon: '💥', name: 'Big Bang', max: 3, weapon: 'grenades', desc: '+30% blast radius' },
-    { id: 'swarm', icon: '🎇', name: 'Swarm', max: 3, weapon: 'missiles', desc: '+1 missile per salvo' }
+    { id: 'unlock_grenades', icon: '💣', name: 'Grenades', max: 1, cost: 30, unlocks: 'grenades', minLevel: 3, weight: 2.5, desc: 'Unlock lobbed grenades (slot 3)' },
+    { id: 'unlock_missiles', icon: '🚀', name: 'Missiles', max: 1, cost: 50, unlocks: 'missiles', minLevel: 6, weight: 2.5, desc: 'Unlock homing missiles (slot 4)' },
+    { id: 'power', icon: '💪', name: 'Power', max: 5, cost: 15, desc: '+20% damage with every weapon' },
+    { id: 'haste', icon: '⏱️', name: 'Haste', max: 5, cost: 15, desc: '+15% attack speed' },
+    { id: 'boots', icon: '👟', name: 'Swift Boots', max: 4, cost: 10, desc: '+10% move speed' },
+    { id: 'vitality', icon: '❤️', name: 'Vitality', max: 3, cost: 25, desc: '+1 max heart and heal 1' },
+    { id: 'crit', icon: '🎯', name: 'Keen Eye', max: 4, cost: 15, desc: '+8% chance to crit for 2.5× damage' },
+    { id: 'streak', icon: '🔥', name: 'Hot Streak', max: 3, cost: 10, desc: 'Combo timer lasts 0.6s longer' },
+    { id: 'luck', icon: '🍀', name: 'Lucky Charm', max: 3, cost: 12, desc: '+30% powerup and coin drops' },
+    { id: 'magnet', icon: '🧲', name: 'Magnet', max: 3, cost: 10, desc: 'Pull coins and pickups from further away' },
+    { id: 'overtime', icon: '⌛', name: 'Overtime', max: 3, cost: 12, desc: 'Powerups last 30% longer (cap 30s)' },
+    { id: 'regen', icon: '🌿', name: 'Regeneration', max: 2, cost: 25, desc: 'Regrow a heart every 40s (25s at rank 2)' },
+    { id: 'nova', icon: '💫', name: 'Static Nova', max: 2, cost: 20, desc: 'Taking a hit blasts nearby monsters' },
+    { id: 'split', icon: '🔱', name: 'Split Shot', max: 3, cost: 18, weapon: 'bullets', desc: 'Blaster fires +1 bullet' },
+    { id: 'pierce', icon: '🏹', name: 'Piercing Rounds', max: 3, cost: 15, weapon: 'bullets', desc: 'Bullets pierce +1 monster' },
+    { id: 'reach', icon: '📏', name: 'Long Blade', max: 3, cost: 12, weapon: 'sword', desc: '+25% stab reach' },
+    { id: 'quick', icon: '💨', name: 'Quick Thrust', max: 3, cost: 15, weapon: 'sword', desc: '+25% stab speed' },
+    { id: 'heavy', icon: '🪓', name: 'Heavy Edge', max: 3, cost: 20, weapon: 'sword', desc: 'First stab hits ×2 harder (10 → 20 → 40 → 80)' },
+    { id: 'cluster', icon: '🧨', name: 'Cluster Bombs', max: 3, cost: 18, weapon: 'grenades', desc: '+1 grenade per throw (max 4)' },
+    { id: 'blast', icon: '💥', name: 'Big Bang', max: 3, cost: 15, weapon: 'grenades', desc: '+30% blast radius' },
+    { id: 'swarm', icon: '🎇', name: 'Swarm', max: 2, cost: 25, weapon: 'missiles', desc: '+1 missile per salvo (max 3)' }
 ];
-const FALLBACK_CARDS = [
-    { id: 'treasure', icon: '💰', name: 'Treasure', max: Infinity, desc: 'Gain 150 × level points' },
-    { id: 'feast', icon: '🍖', name: 'Feast', max: Infinity, desc: 'Fully heal' }
+// One-level buffs: always on sale (also once every permanent card is maxed). Last until the next level-up.
+const LEVEL_BUFFS = [
+    { id: 'xp2', icon: '📘', name: 'Double XP', buff: true, max: Infinity, cost: 18, share: 0.35, weight: 0.6, desc: 'This level: ×2 XP' },
+    { id: 'gold2', icon: '💰', name: 'Double Gold', buff: true, max: Infinity, cost: 15, share: 0.3, weight: 0.6, desc: 'This level: ×2 coins' },
+    { id: 'dmg2', icon: '🗡️', name: 'Double Damage', buff: true, max: Infinity, cost: 25, share: 0.5, weight: 0.6, desc: 'This level: ×2 damage' },
+    { id: 'slow', icon: '🐌', name: 'Slow Mobs', buff: true, max: Infinity, cost: 20, share: 0.4, weight: 0.6, desc: 'This level: monsters 40% slower' },
+    { id: 'feast', icon: '🍖', name: 'Feast', max: Infinity, cost: 15, share: 0.25, weight: 0.4, desc: 'Fully heal' }
 ];
+// Blade: one sword that stabs at the nearest monster; damage doubles with every consecutive hit.
+const STAB = { reach: 80, out: 5, back: 5, cooldown: 10, baseDamage: 10, maxDoublings: 9, chainFrames: 100 };
 
 const BOSSES = [
     { name: 'Bonecrusher', title: 'The Juggernaut', color: '#C0392B', accent: '#F5B041', size: 40, hp: 60, speed: 0.9, pattern: 'charge' },
-    { name: 'Hexweaver', title: 'Witch of the Ninth Moon', color: '#7D3C98', accent: '#F4D03F', size: 36, hp: 85, speed: 1.1, pattern: 'rings' },
-    { name: 'Broodmother', title: 'Queen of the Swarm', color: '#1E8449', accent: '#ABEBC6', size: 46, hp: 110, speed: 0.6, pattern: 'summon' },
-    { name: 'Voidmaw', title: 'Devourer of Light', color: '#1B2631', accent: '#E74C3C', size: 44, hp: 145, speed: 1.0, pattern: 'chaos' }
+    { name: 'Hexweaver', title: 'Witch of the Ninth Moon', color: '#7D3C98', accent: '#F4D03F', size: 36, hp: 60, speed: 1.1, pattern: 'rings' },
+    { name: 'Broodmother', title: 'Queen of the Swarm', color: '#1E8449', accent: '#ABEBC6', size: 46, hp: 80, speed: 0.6, pattern: 'summon' },
+    { name: 'Voidmaw', title: 'Devourer of Light', color: '#1B2631', accent: '#E74C3C', size: 44, hp: 110, speed: 1.0, pattern: 'chaos' }
 ];
 
 class Game {
     constructor() {
         // Version system (bumped by the pre-commit hook, see VERSION-README.md)
-        this.version = "2.1.1";
+        this.version = "2.2.0";
         this.buildDate = "2026-10-21";
 
         this.canvas = document.getElementById('gameCanvas');
@@ -146,8 +168,10 @@ class Game {
             killedBy: $('killedBy'), finalStats: $('finalStats'), nameForm: $('nameForm'), nameInput: $('nameInput'),
             submitStatus: $('submitStatus'), finalBoard: $('finalBoard'), finalBoardTitle: $('finalBoardTitle'),
             againBtn: $('againBtn'), weaponBtn: $('weaponBtn'), pauseBtn: $('pauseBtn'), muteBtn: $('muteBtn'),
-            version: $('version'), newBest: $('newBest')
+            version: $('version'), newBest: $('newBest'), coins: $('coins'), shopCoins: $('shopCoins'),
+            continueBtn: $('continueBtn')
         };
+        this.el.continueBtn.addEventListener('click', () => this.closeShop());
 
         this.el.version.textContent = `v${this.version} · ${this.buildDate}`;
         this.el.playBtn.addEventListener('click', () => this.startRun());
@@ -179,7 +203,7 @@ class Game {
         // Weapon slots in the HUD
         this.el.weapons.innerHTML = WEAPON_ORDER.map((w, i) =>
             `<div class="slot" data-w="${w}"><span class="icon">${WEAPONS[w].icon}</span>` +
-            `<span class="key">${i + 1}</span><span class="lock">Lv${WEAPONS[w].unlock}</span></div>`).join('');
+            `<span class="key">${i + 1}</span><span class="lock">🔒 shop</span></div>`).join('');
         this.el.weapons.querySelectorAll('.slot').forEach(slot =>
             slot.addEventListener('pointerdown', e => {
                 e.preventDefault();
@@ -207,7 +231,8 @@ class Game {
             if (this.state === 'transition') return;
             if (this.state === 'levelup') {
                 const idx = ['1', '2', '3'].indexOf(key);
-                if (idx >= 0) this.chooseCard(idx);
+                if (idx >= 0) this.buyCard(idx);
+                else if (key === 'enter' || key === ' ' || key === 'c') this.closeShop();
                 return;
             }
             if (key === 'm') this.toggleMute();
@@ -342,7 +367,15 @@ class Game {
         this.bossWarning = 0;
         this.boss = null;
         this.pendingLevels = 0;
-        this.pendingReward = false;
+        this.coins = 0;
+        this.coinsEarned = 0;
+        this.levelCoinsStart = 0;
+        this.incomeEMA = 0;
+        this.unlocked = new Set(START_WEAPONS);
+        this.buffs = {};
+        this.dropCd = 0;
+        this.heartCd = 0;
+        this.coinFloat = { n: 0, t: 0 };
 
         this.monsters = [];
         this.bullets = [];
@@ -353,11 +386,12 @@ class Game {
         this.particles = [];
         this.floaters = [];
         this.powerups = [];
+        this.coinDrops = [];
 
         this.weapon = 'bullets';
         this.cooldowns = { bullets: 0, grenades: 30, missiles: 30 };
-        this.blades = { angle: 0, lastSwoosh: 0 };
-        this.timers = { multiShot: 0, rapidFire: 0, invincible: 0, freeze: 0 };
+        this.blade = { phase: 'idle', t: 0, cd: 0, chain: 0, chainT: 0, stabs: [], heat: 0 };
+        this.timers = Object.fromEntries(TIMED_POWERUPS.map(t => [t, 0]));
         this.stacks = {};
         this.spawnClock = 0;
         this.packClock = 12;
@@ -377,7 +411,6 @@ class Game {
         this.bossTrailPct = 1;
         this.edgeWarn = null;
         this.comboPop = 0;
-        this.unlockedNow = null;
         this.submitting = false;
         this.burn = null;
         if (this.el) this.el.levelup.classList.remove('intro');
@@ -510,13 +543,13 @@ class Game {
         this.updateMonsters(false);
         this.updateEnemyShots();
         this.updatePowerups();
+        this.updateCoins();
         this.updateCombo();
         this.updateParticles();
         this.updateSpawning();
         this.sweepDead();
 
         if (this.state === 'playing' && this.pendingLevels > 0) this.beginCards('level');
-        else if (this.state === 'playing' && this.pendingReward) this.beginCards('reward');
     }
 
     // ------------------------------------------------------------------ derived stats
@@ -526,7 +559,20 @@ class Game {
     }
 
     get damageMult() {
-        return 1 + 0.2 * this.stack('power');
+        return (1 + 0.2 * this.stack('power')) * (this.buffs.dmg2 ? 2 : 1);
+    }
+
+    get coinMult() {
+        const timed = this.timers.coins3 > 0 ? 3 : this.timers.coins2 > 0 ? 2 : 1;
+        return timed * (this.buffs.gold2 ? 2 : 1);
+    }
+
+    get mobSpeedMult() {
+        return (this.timers.freeze > 0 ? 0.5 : 1) * (this.buffs.slow ? 0.6 : 1);
+    }
+
+    get magnetRadius() {
+        return 70 + 45 * this.stack('magnet');
     }
 
     get rateMult() {
@@ -542,7 +588,7 @@ class Game {
     }
 
     isUnlocked(weapon) {
-        return this.level >= WEAPONS[weapon].unlock;
+        return this.unlocked.has(weapon);
     }
 
     rollDamage(base) {
@@ -585,6 +631,8 @@ class Game {
 
         if (p.iframes > 0) p.iframes--;
         if (p.contactCd > 0) p.contactCd--;
+        if (this.dropCd > 0) this.dropCd--;
+        if (this.heartCd > 0) this.heartCd--;
 
         const regen = this.stack('regen');
         if (regen > 0 && p.hp < p.maxHp) {
@@ -609,6 +657,7 @@ class Game {
         this.hurtFlash = 1;
         if (this.combo >= 5) this.floater(p.x, p.y - 40, 'COMBO LOST', '#ff5252', 20);
         this.combo = 0;
+        this.blade.chain = 0;
         this.comboTimer = 0;
 
         const nova = this.stack('nova');
@@ -662,12 +711,21 @@ class Game {
     selectWeapon(weapon) {
         if (this.state !== 'playing' || !weapon || !this.isUnlocked(weapon) || weapon === this.weapon) return;
         this.weapon = weapon;
+        this.blade.chain = 0;
+        this.blade.stabs = [];
+        this.blade.phase = 'idle';
         Sfx.tone(660, { duration: 0.06, type: 'triangle', volume: 0.08 });
     }
 
     aimPoint() {
         if (this.mouse.down) return { x: this.mouse.x, y: this.mouse.y };
-        const target = this.nearestMonster(this.player.x, this.player.y);
+        const p = this.player;
+        const target = this.nearestMonster(p.x, p.y);
+        // Boss fight: keep shooting the boss unless something is right on top of you.
+        const b = this.boss;
+        if (b && !b.dying && b.mode !== 'enter' && target && (target === b || Math.hypot(target.x - p.x, target.y - p.y) > 80)) {
+            return { x: b.x, y: b.y };
+        }
         return target ? { x: target.x, y: target.y } : null;
     }
 
@@ -675,7 +733,7 @@ class Game {
         let best = null;
         let bestD = Infinity;
         for (const m of this.monsters) {
-            if (m.dead || (exclude && exclude.has(m))) continue;
+            if (m.dead || m.dying || (exclude && exclude.has(m))) continue;
             if (m.x < -m.size || m.x > this.W + m.size || m.y < -m.size || m.y > this.H + m.size) continue;
             // Bosses count as closer than they are, so auto-aim focuses them.
             const d = U.distanceSquared(x, y, m.x, m.y) * (m.boss ? 0.2 : 1);
@@ -710,10 +768,10 @@ class Game {
         this.cooldowns.bullets = 32;
         const base = Math.atan2(aim.y - p.y, aim.x - p.x);
         const count = 1 + this.stack('split');
+        const dirs = this.timers.multiShot > 0 ? 4 : 1; // multishot: the same volley in 4 directions
         const angles = [];
-        for (let i = 0; i < count; i++) angles.push(base + (i - (count - 1) / 2) * 0.16);
-        if (this.timers.multiShot > 0) {
-            for (let i = 0; i < 16; i++) angles.push(base + (i * TAU) / 16 + TAU / 32);
+        for (let d = 0; d < dirs; d++) {
+            for (let i = 0; i < count; i++) angles.push(base + (d * TAU) / 4 + (i - (count - 1) / 2) * 0.16);
         }
         angles.forEach(a => {
             this.bullets.push({
@@ -729,12 +787,15 @@ class Game {
     throwGrenades(aim) {
         const p = this.player;
         this.cooldowns.grenades = 96;
-        const count = 1 + this.stack('cluster') + (this.timers.multiShot > 0 ? 3 : 0);
+        const count = Math.min(4, 1 + this.stack('cluster'));
+        const dirs = this.timers.multiShot > 0 ? 4 : 1; // multishot quadruples: up to 16
         const base = Math.atan2(aim.y - p.y, aim.x - p.x);
         const range = Math.min(220, Math.hypot(aim.x - p.x, aim.y - p.y) + 10);
-        for (let i = 0; i < count; i++) {
-            const a = base + (i - (count - 1) / 2) * 0.32;
-            this.grenades.push({ x: p.x, y: p.y, sx: p.x, sy: p.y, vx: Math.cos(a) * 6.5, vy: Math.sin(a) * 6.5, range, timer: 64, spin: 0 });
+        for (let d = 0; d < dirs; d++) {
+            for (let i = 0; i < count; i++) {
+                const a = base + (d * TAU) / 4 + (i - (count - 1) / 2) * 0.32;
+                this.grenades.push({ x: p.x, y: p.y, sx: p.x, sy: p.y, vx: Math.cos(a) * 6.5, vy: Math.sin(a) * 6.5, range, timer: 64, spin: 0 });
+            }
         }
         Sfx.play('grenade', { volume: 0.55 });
     }
@@ -743,7 +804,7 @@ class Game {
         if (!this.monsters.some(m => !m.dead)) return;
         this.cooldowns.missiles = 100;
         const p = this.player;
-        const count = (1 + this.stack('swarm')) * (this.timers.multiShot > 0 ? 3 : 1);
+        const count = Math.min(3, 1 + this.stack('swarm')) * (this.timers.multiShot > 0 ? 4 : 1);
         const claimed = new Set();
         for (let i = 0; i < count; i++) {
             let target = this.nearestMonster(p.x, p.y, claimed) || this.nearestMonster(p.x, p.y);
@@ -754,38 +815,86 @@ class Game {
         Sfx.play('missile', { volume: 0.6 });
     }
 
+    get stabReach() {
+        return STAB.reach * (1 + 0.25 * this.stack('reach'));
+    }
+
+    // Damage of the next stab: base doubles per Heavy Edge rank and per consecutive hit.
+    get stabDamage() {
+        return STAB.baseDamage * 2 ** this.stack('heavy') * 2 ** Math.min(this.blade.chain, STAB.maxDoublings);
+    }
+
     updateBlades() {
         const p = this.player;
-        const count = 1 + this.stack('blades') + (this.timers.multiShot > 0 ? 2 : 0);
-        const radius = 46 * (1 + 0.2 * this.stack('reach')) * (this.timers.multiShot > 0 ? 1.25 : 1);
-        const spin = 0.075 * (this.timers.rapidFire > 0 ? 2.5 : 1) * (1 + 0.1 * this.stack('haste'));
-        this.blades.angle += spin;
-        this.blades.count = count;
-        this.blades.radius = radius;
-        if (this.blades.angle - this.blades.lastSwoosh > TAU) {
-            this.blades.lastSwoosh = this.blades.angle;
-            Sfx.play('swoosh', { volume: 0.3, rate: 2.4, duration: 0.4 });
+        const bl = this.blade;
+        const speed = (1 + 0.25 * this.stack('quick')) * (1 + 0.15 * this.stack('haste')) * (this.timers.rapidFire > 0 ? 2 : 1);
+        const outF = Math.max(2, Math.round(STAB.out / speed));
+        const backF = Math.max(2, Math.round(STAB.back / speed));
+        const reach = this.stabReach;
+
+        if (bl.chain > 0 && --bl.chainT <= 0) {
+            if (bl.chain >= 2) this.floater(p.x, p.y - 34, 'blade cooled', '#b0bec5', 13);
+            bl.chain = 0;
+        }
+        bl.heat = U.lerp(bl.heat, Math.min(bl.chain, STAB.maxDoublings) / STAB.maxDoublings, 0.15);
+
+        if (bl.phase === 'idle') {
+            if (bl.cd > 0) {
+                bl.cd--;
+                return;
+            }
+            const taken = new Set();
+            const max = this.timers.multiShot > 0 ? 4 : 1;
+            bl.stabs = [];
+            for (let i = 0; i < max; i++) {
+                const m = this.nearestMonster(p.x, p.y, taken);
+                if (!m || Math.hypot(m.x - p.x, m.y - p.y) - m.size > reach + 4) break;
+                taken.add(m);
+                bl.stabs.push({ angle: Math.atan2(m.y - p.y, m.x - p.x), hits: new Set() });
+            }
+            if (!bl.stabs.length) return;
+            bl.phase = 'out';
+            bl.t = 0;
+            bl.anyHit = false;
+            Sfx.play('swoosh', { volume: 0.28, rate: 2.6, duration: 0.25 });
         }
 
-        for (const m of this.monsters) {
-            if (m.dead || m.bladeCd > 0) continue;
-            if (U.distanceSquared(m.x, m.y, p.x, p.y) > (radius + m.size + 4) ** 2) continue;
-            for (let i = 0; i < count; i++) {
-                const a = this.blades.angle + (i * TAU) / count;
-                const x1 = p.x + Math.cos(a) * 8;
-                const y1 = p.y + Math.sin(a) * 8;
-                const x2 = p.x + Math.cos(a) * radius;
-                const y2 = p.y + Math.sin(a) * radius;
-                if (this.distToSegment(m.x, m.y, x1, y1, x2, y2) <= m.size + 3) {
-                    const n = U.normalizeVector(m.x - p.x, m.y - p.y);
-                    const { dmg, crit } = this.rollDamage(1);
-                    m.bladeCd = 8;
-                    this.damageMonster(m, dmg, { kx: n.x * 3, ky: n.y * 3, crit });
-                    this.spark(m.x - n.x * m.size, m.y - n.y * m.size, '#dfe6e9', 4);
-                    break;
+        bl.t++;
+        if (bl.phase === 'out') {
+            const ext = 12 + reach * Math.min(1, bl.t / outF);
+            for (const st of bl.stabs) {
+                const tx = p.x + Math.cos(st.angle) * ext;
+                const ty = p.y + Math.sin(st.angle) * ext;
+                for (const m of this.monsters) {
+                    if (m.dead || m.dying || st.hits.has(m)) continue;
+                    if (this.distToSegment(m.x, m.y, p.x, p.y, tx, ty) <= m.size + 3) {
+                        st.hits.add(m);
+                        bl.anyHit = true;
+                        const crit = Math.random() < 0.08 * this.stack('crit');
+                        const dmg = this.stabDamage * this.damageMult * (crit ? 2.5 : 1);
+                        this.damageMonster(m, dmg, { kx: Math.cos(st.angle) * 10, ky: Math.sin(st.angle) * 10, crit: false });
+                        const heat = Math.min(bl.chain, STAB.maxDoublings) / STAB.maxDoublings;
+                        this.floater(m.x, m.y - m.size - 8, `${Math.round(dmg)}${crit ? '!' : ''}`, heat > 0.5 ? '#ff5a36' : heat > 0 ? '#ffb199' : '#ffffff', 16 + 12 * heat);
+                        this.spark(m.x - Math.cos(st.angle) * m.size, m.y - Math.sin(st.angle) * m.size, heat > 0.3 ? '#ff7043' : '#eceff1', 6);
+                    }
                 }
             }
+            if (bl.t >= outF) {
+                if (bl.anyHit) {
+                    bl.chain = Math.min(bl.chain + 1, STAB.maxDoublings + 1);
+                    bl.chainT = STAB.chainFrames;
+                    Sfx.tone(520 + 90 * Math.min(bl.chain, 9), { duration: 0.07, type: 'triangle', volume: 0.07 });
+                }
+                bl.phase = 'back';
+                bl.t = 0;
+            }
+        } else if (bl.phase === 'back' && bl.t >= backF) {
+            bl.phase = 'idle';
+            bl.t = 0;
+            bl.cd = Math.round(STAB.cooldown / speed);
         }
+        bl.outF = outF;
+        bl.backF = backF;
     }
 
     distToSegment(px, py, x1, y1, x2, y2) {
@@ -836,7 +945,7 @@ class Game {
             }
             g.timer--;
             if (g.timer <= 0) {
-                const radius = 46 * (1 + 0.3 * this.stack('blast'));
+                const radius = 32 * (1 + 0.3 * this.stack('blast')); // 30% smaller than v2.1
                 this.explode(g.x, g.y, radius, 8);
             }
         }
@@ -852,13 +961,13 @@ class Game {
                 this.damageMonster(m, dmg, { kx: n.x * 6, ky: n.y * 6, crit });
             }
         }
-        this.explosions.push({ x, y, r: radius, t: 0, max: 24 });
-        this.burst(x, y, '#ff9f1c', 16, 6);
-        this.burst(x, y, '#ffe066', 10, 4);
-        for (let i = 0; i < 5; i++) {
-            this.particle({ x, y, vx: (Math.random() - 0.5) * 2, vy: (Math.random() - 0.5) * 2, life: 40, size: 10 + Math.random() * 8, grow: 0.4, color: 'rgba(70,60,60,0.2)', kind: 'smoke' });
+        this.explosions.push({ x, y, r: radius, t: 0, max: 22 });
+        this.burst(x, y, '#ff9f1c', 12, radius / 7);
+        this.burst(x, y, '#ffe066', 8, radius / 10);
+        for (let i = 0; i < 4; i++) {
+            this.particle({ x, y, vx: (Math.random() - 0.5) * 1.5, vy: (Math.random() - 0.5) * 1.5, life: 36, size: radius * 0.25 + Math.random() * 5, grow: 0.3, color: 'rgba(70,60,60,0.2)', kind: 'smoke' });
         }
-        this.shake(7);
+        this.shake(5);
         Sfx.play('boom', { volume: 0.55, rate: 0.9 + Math.random() * 0.2 });
     }
 
@@ -961,8 +1070,8 @@ class Game {
 
     updateSpawning() {
         const alive = this.monsters.length;
-        const cap = Math.min(110, 40 + this.level * 2);
-        const interval = U.spawnInterval(this.level) * (this.boss ? 1.7 : 1);
+        const cap = this.boss ? Math.min(30, 20 + this.level) : Math.min(110, 40 + this.level * 2);
+        const interval = U.spawnInterval(this.level) * (this.boss ? 2.2 : 1);
         this.spawnClock += STEP;
         if (alive < 3 || (this.spawnClock >= interval && alive < cap)) {
             this.spawnMonster();
@@ -979,7 +1088,9 @@ class Game {
 
         this.powerupClock -= STEP;
         if (this.powerupClock <= 0) {
-            this.spawnPowerup(40 + Math.random() * (this.W - 80), 40 + Math.random() * (this.H - 80));
+            if (this.powerups.filter(pu => !pu.loot).length < MAX_FIELD_POWERUPS) {
+                this.spawnPowerup(40 + Math.random() * (this.W - 80), 40 + Math.random() * (this.H - 80));
+            }
             this.powerupClock = 12 + Math.random() * 8;
         }
 
@@ -987,7 +1098,7 @@ class Game {
             this.bossWarning--;
             if (this.bossWarning % 30 === 0) Sfx.tone(220, { duration: 0.25, type: 'sawtooth', volume: 0.08, slide: -80 });
             if (this.bossWarning === 0) this.spawnBoss();
-        } else if (!this.boss && this.bossQueue > 0 && !this.pendingLevels && !this.pendingReward) {
+        } else if (!this.boss && this.bossQueue > 0 && !this.pendingLevels) {
             this.bossQueue--;
             this.startBossWarning();
         }
@@ -996,7 +1107,7 @@ class Game {
 
     updateMonsters(dying) {
         const p = this.player;
-        const freeze = this.timers.freeze > 0 ? 0.5 : 1;
+        const freeze = this.mobSpeedMult;
         for (const m of this.monsters) {
             if (m.dead) continue;
             if (m.spawnT > 0) m.spawnT--;
@@ -1005,7 +1116,10 @@ class Game {
             if (m.contactCd > 0) m.contactCd--;
             m.phase += 0.12;
 
-            if (m.boss) {
+            if (m.dying) {
+                this.updateBossDeath(m);
+                continue;
+            } else if (m.boss) {
                 this.updateBoss(m, freeze);
             } else {
                 if (m.hp < m.maxHp) {
@@ -1022,7 +1136,7 @@ class Game {
             m.kbx *= 0.82;
             m.kby *= 0.82;
 
-            if (dying) continue;
+            if (dying || m.dying) continue;
             const touching = U.distanceSquared(p.x, p.y, m.x, m.y) < (p.r * (this.timers.invincible > 0 ? 1.8 : 1) + m.size) ** 2;
             if (touching && m.spawnT <= 0) {
                 if (this.timers.invincible > 0) {
@@ -1068,7 +1182,7 @@ class Game {
     }
 
     damageMonster(m, dmg, { kx = 0, ky = 0, crit = false } = {}) {
-        if (m.dead) return;
+        if (m.dead || m.dying) return;
         m.hp -= dmg;
         m.healT = 0;
         m.flash = 5;
@@ -1082,7 +1196,70 @@ class Game {
             m.lastNum = this.frameNo;
             this.floater(m.x + (Math.random() - 0.5) * m.size, m.y - m.size - 4, `${Math.round(dmg * 10) / 10}`, '#ffffff', 14);
         }
-        if (m.hp <= 0) this.killMonster(m);
+        if (m.hp <= 0) {
+            if (m.boss) this.startBossDeath(m);
+            else this.killMonster(m);
+        }
+    }
+
+    startBossDeath(b) {
+        b.hp = 0;
+        b.dying = true;
+        b.deathT = 0;
+        b.deathMax = 210; // ~3.9s of falling apart
+        b.coinsTotal = 25 + 15 * this.bossCount;
+        b.coinsOut = 0;
+        b.lootOut = 0;
+        b.cracks = Array.from({ length: 7 }, () => ({ a: Math.random() * TAU, len: 0.5 + Math.random() * 0.5, bend: (Math.random() - 0.5) * 0.8 }));
+        this.enemyShots = [];
+        this.el.bossName.innerHTML = `${b.boss.name} <small>DEFEATED</small>`;
+        this.floater(b.x, b.y - b.size - 14, 'DEFEATED!', '#ffd60a', 30);
+        this.hitStop = 10;
+        this.shake(14);
+        Sfx.play('bossDeath', { volume: 0.9, rate: 0.55 });
+    }
+
+    updateBossDeath(b) {
+        b.deathT++;
+        const q = b.deathT / b.deathMax;
+        b.flash = b.deathT % 9 < 2 ? 2 : 0;
+        // Chunks break off, faster and faster
+        const every = Math.max(3, Math.round(16 - 13 * q));
+        if (b.deathT % every === 0) {
+            const a = Math.random() * TAU;
+            const ex = b.x + Math.cos(a) * b.size * 0.8;
+            const ey = b.y + Math.sin(a) * b.size * 0.8;
+            for (let i = 0; i < 3; i++) {
+                const v = 0.8 + Math.random() * 2.2;
+                this.particle({ x: ex, y: ey, vx: Math.cos(a + (Math.random() - 0.5)) * v, vy: Math.sin(a + (Math.random() - 0.5)) * v, life: 70 + Math.random() * 40, size: 5 + Math.random() * 7, color: Math.random() < 0.6 ? b.boss.color : b.boss.accent, kind: 'chunk', drag: 0.965 });
+            }
+            this.particle({ x: ex, y: ey, vx: 0, vy: -0.3, life: 40, size: 10, grow: 0.5, color: 'rgba(60,40,30,0.25)', kind: 'smoke' });
+            this.explosions.push({ x: ex, y: ey, r: 12 + 10 * q, t: 0, max: 14 });
+            this.shake(2 + 4 * q);
+            Sfx.play('boom', { volume: 0.2 + 0.3 * q, rate: 1.4 - 0.5 * q + Math.random() * 0.2 });
+        }
+        // Gold pours out over the whole sequence
+        const due = Math.floor(b.coinsTotal * Math.min(1, q * 1.1));
+        if (due > b.coinsOut) {
+            this.spawnCoins(b.x, b.y, due - b.coinsOut, 4.5, 6);
+            b.coinsOut = due;
+        }
+        // Powerups pop out at fixed beats: a heart first, then two random ones
+        const beats = [0.3, 0.6, 0.85];
+        while (b.lootOut < beats.length && q >= beats[b.lootOut]) {
+            this.spawnPowerup(b.x, b.y, b.lootOut === 0 ? 'heart' : null, { pop: true, loot: true, speed: 3.5 });
+            b.lootOut++;
+        }
+        if (q >= 1) {
+            this.explosions.push({ x: b.x, y: b.y, r: b.size * 2.4, t: 0, max: 30 });
+            for (let i = 0; i < 4; i++) this.burst(b.x, b.y, [b.boss.color, b.boss.accent, '#ffffff', '#ffd60a'][i], 30, 8);
+            this.ring(b.x, b.y, 220, b.boss.accent, 40);
+            this.flash = { color: '255,255,255', t: 20, max: 20 };
+            this.hitStop = 16;
+            this.shake(26);
+            Sfx.play('boom', { volume: 0.9, rate: 0.6 });
+            this.killMonster(b);
+        }
     }
 
     killMonster(m) {
@@ -1095,10 +1272,10 @@ class Game {
         const mult = U.comboMultiplier(this.combo);
         const points = Math.round(m.points * mult);
         this.score += points;
-        this.gainXp(m.points);
+        this.gainXp(m.points * (this.buffs.xp2 ? 2 : 1));
 
         const big = m.size > 18 || m.boss;
-        this.floater(m.x, m.y - m.size, `+${points}`, mult > 1 ? ['#fff', '#fff', '#7CFC00', '#00e5ff', '#ff4dd2', '#ffd60a'][mult] : '#ffffff', big ? 22 : 16);
+        if (points > 0) this.floater(m.x, m.y - m.size, `+${points}`, mult > 1 ? ['#fff', '#fff', '#7CFC00', '#00e5ff', '#ff4dd2', '#ffd60a'][mult] : '#ffffff', big ? 22 : 16);
         this.burst(m.x, m.y, m.color, big ? 26 : 12, big ? 6 : 4);
         this.burst(m.x, m.y, '#ffffff', big ? 8 : 4, 3);
         if (big) {
@@ -1120,8 +1297,84 @@ class Game {
             Sfx.play('monsterDeath', { volume: 0.5, rate: 1.3 + Math.random() * 0.4 });
         }
 
-        const chance = (DROP_CHANCE[m.tier] || 0) * (1 + 0.4 * this.stack('luck'));
-        if (!m.minion && Math.random() < chance) this.spawnPowerup(m.x, m.y);
+        this.dropLoot(m);
+    }
+
+    dropLoot(m) {
+        const luck = 1 + 0.3 * this.stack('luck');
+        const [cChance, cMin, cMax] = m.minion ? [0.15, 1, 1] : COIN_DROPS[m.tier] || [0, 0, 0];
+        if (Math.random() < cChance * luck) this.spawnCoins(m.x, m.y, cMin + Math.floor(Math.random() * (cMax - cMin + 1)), 2.2);
+        if (m.minion) return;
+
+        // Powerups are throttled: one per DROP_COOLDOWN and never more than a few on the floor.
+        const onField = this.powerups.filter(pu => !pu.loot).length;
+        if (this.dropCd <= 0 && onField < MAX_FIELD_POWERUPS && Math.random() < (DROP_CHANCE[m.tier] || 0) * luck) {
+            this.spawnPowerup(m.x, m.y, null, { pop: true });
+            this.dropCd = DROP_COOLDOWN;
+            return;
+        }
+        // Hearts have their own, more generous roll while you're hurt.
+        const p = this.player;
+        if (p.hp < p.maxHp && this.heartCd <= 0 && Math.random() < (m.size > 14 ? 0.05 : 0.01) * luck) {
+            this.spawnPowerup(m.x, m.y, 'heart', { pop: true });
+            this.heartCd = 600;
+        }
+    }
+
+    // ------------------------------------------------------------------ coins
+
+    spawnCoins(x, y, amount, speed = 2.5, lift = 3) {
+        let left = Math.round(amount);
+        while (left > 0) {
+            const value = left >= 10 ? 5 : 1;
+            left -= value;
+            const a = Math.random() * TAU;
+            const v = speed * (0.35 + Math.random() * 0.75);
+            this.coinDrops.push({
+                x, y, z: 4, vx: Math.cos(a) * v, vy: Math.sin(a) * v, vz: lift * (0.7 + Math.random() * 0.6),
+                value, life: 780, t: 0, spin: Math.random() * TAU
+            });
+        }
+    }
+
+    updateCoins() {
+        const p = this.player;
+        const magnet = this.magnetRadius;
+        for (const c of this.coinDrops) {
+            c.t++;
+            c.life--;
+            c.spin += 0.18;
+            c.x += c.vx;
+            c.y += c.vy;
+            c.vx *= 0.93;
+            c.vy *= 0.93;
+            c.z += c.vz;
+            c.vz -= 0.32;
+            if (c.z <= 0) {
+                c.z = 0;
+                c.vz = Math.abs(c.vz) > 1 ? -c.vz * 0.45 : 0;
+            }
+            c.x = U.clamp(c.x, 8, this.W - 8);
+            c.y = U.clamp(c.y, 8, this.H - 8);
+            const d = Math.hypot(p.x - c.x, p.y - c.y);
+            if (c.t > 18 && d < p.r + 12) {
+                c.life = 0;
+                const gain = c.value * this.coinMult;
+                this.coins += gain;
+                this.coinsEarned += gain;
+                this.coinFloat.n += gain;
+                Sfx.tone(c.value >= 5 ? 1046 : 1568, { duration: 0.06, type: 'square', volume: 0.04 });
+            } else if (c.t > 18 && d < magnet) {
+                const pull = 0.1 + 0.25 * (1 - d / magnet);
+                c.x += (p.x - c.x) * pull;
+                c.y += (p.y - c.y) * pull;
+            }
+        }
+        this.coinDrops = this.coinDrops.filter(c => c.life > 0);
+        if (this.coinFloat.n > 0 && ++this.coinFloat.t >= 14) {
+            this.floater(p.x + 18, p.y - 28, `+${this.coinFloat.n} 🪙`, '#ffd60a', 15);
+            this.coinFloat = { n: 0, t: 0 };
+        }
     }
 
     sweepDead() {
@@ -1141,7 +1394,7 @@ class Game {
         const n = this.bossCount;
         const def = BOSSES[(n - 1) % BOSSES.length];
         const cycle = Math.floor((n - 1) / BOSSES.length);
-        const hp = Math.round(def.hp * (1 + 0.5 * (n - 1)) * (1 + 0.5 * cycle));
+        const hp = Math.round(def.hp * (1 + 0.4 * (n - 1)) * (1 + 0.4 * cycle));
         const b = {
             ...this.makeMonster({ ...def, shape: 'boss', speedVariation: 0, health: hp, points: 0, tier: 'boss' }, this.W / 2, -def.size * 2, 'boss'),
             boss: def, size: def.size, hp, maxHp: hp, speed: def.speed * (1 + 0.1 * cycle),
@@ -1264,13 +1517,13 @@ class Game {
         for (let i = 0; i < count; i++) this.enemyShot(b.x, b.y, offset + (i / count) * TAU, speed, color);
     }
 
-    enemyShot(x, y, angle, speed, color) {
-        this.enemyShots.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, r: 6, life: 400, color });
+    enemyShot(x, y, angle, speed) {
+        this.enemyShots.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, r: 6, life: 400, color: '#ff2d78' });
     }
 
     updateEnemyShots() {
         const p = this.player;
-        const freeze = this.timers.freeze > 0 ? 0.5 : 1;
+        const freeze = this.mobSpeedMult;
         for (const s of this.enemyShots) {
             s.x += s.vx * freeze;
             s.y += s.vy * freeze;
@@ -1294,31 +1547,19 @@ class Game {
         this.el.bossBar.hidden = true;
         const bonus = 300 * this.bossCount;
         this.score += bonus;
-        this.hitStop = 28;
-        this.shake(26);
-        this.flash = { color: '255,255,255', t: 20, max: 20 };
-        for (let i = 0; i < 4; i++) this.burst(b.x, b.y, [b.boss.color, b.boss.accent, '#ffffff', '#ffd60a'][i], 30, 8);
-        this.ring(b.x, b.y, 200, b.boss.accent, 40);
         this.floater(b.x, b.y - b.size - 10, `BOSS SLAIN +${bonus}`, '#ffd60a', 30);
-        this.enemyShots = [];
-        Sfx.play('bossDeath', { volume: 1, rate: 0.7 });
-        Sfx.play('boom', { volume: 0.8, rate: 0.7 });
         Sfx.arpeggio([523, 659, 784, 1046, 1318], 0.09, { type: 'triangle', volume: 0.12 });
-        this.spawnPowerup(b.x - 30, b.y, 'heart');
-        const timed = TIMED_POWERUPS.slice().sort(() => Math.random() - 0.5);
-        this.spawnPowerup(b.x + 30, b.y, timed[0]);
-        this.spawnPowerup(b.x, b.y + 30, timed[1]);
-        this.pendingReward = true;
     }
 
     // ------------------------------------------------------------------ powerups
 
-    spawnPowerup(x, y, type) {
-        if (!type) {
-            const keys = Object.keys(POWERUPS);
-            type = keys[Math.floor(Math.random() * keys.length)];
-        }
-        this.powerups.push({ x: U.clamp(x, 20, this.W - 20), y: U.clamp(y, 20, this.H - 20), type, life: 720, t: 0 });
+    spawnPowerup(x, y, type, { pop = false, loot = false, speed = 2.5 } = {}) {
+        if (!type) type = U.pickWeighted(Object.entries(POWERUPS).map(([k, d]) => ({ k, weight: d.weight }))).k;
+        const a = Math.random() * TAU;
+        this.powerups.push({
+            x: U.clamp(x, 20, this.W - 20), y: U.clamp(y, 20, this.H - 20), type, life: 720, t: 0, loot,
+            vx: pop ? Math.cos(a) * speed : 0, vy: pop ? Math.sin(a) * speed : 0, z: pop ? 4 : 0, vz: pop ? 4.5 : 0
+        });
     }
 
     updatePowerups() {
@@ -1329,14 +1570,28 @@ class Game {
                 if (this.timers[t] === 0) this.floater(p.x, p.y - 36, `${POWERUPS[t].name} over`, '#cccccc', 14);
             }
         });
+        const magnet = this.magnetRadius;
         for (const pu of this.powerups) {
             pu.t++;
             pu.life--;
+            if (pu.vx || pu.vy || pu.z > 0 || pu.vz) {
+                pu.x = U.clamp(pu.x + pu.vx, 20, this.W - 20);
+                pu.y = U.clamp(pu.y + pu.vy, 20, this.H - 20);
+                pu.vx *= 0.92;
+                pu.vy *= 0.92;
+                pu.z += pu.vz;
+                pu.vz -= 0.3;
+                if (pu.z <= 0) {
+                    pu.z = 0;
+                    pu.vz = Math.abs(pu.vz) > 1 ? -pu.vz * 0.4 : 0;
+                }
+                if (Math.abs(pu.vx) < 0.05 && Math.abs(pu.vy) < 0.05) pu.vx = pu.vy = 0;
+            }
             const d2 = U.distanceSquared(p.x, p.y, pu.x, pu.y);
-            if (d2 < (p.r + 26) ** 2) {
+            if (pu.t > 15 && d2 < (p.r + 26) ** 2) {
                 this.collectPowerup(pu);
                 pu.life = 0;
-            } else if (d2 < 70 * 70) {
+            } else if (pu.t > 15 && d2 < magnet * magnet) {
                 // Gentle pull once you're close, so pickups feel snappy.
                 pu.x += (p.x - pu.x) * 0.08;
                 pu.y += (p.y - pu.y) * 0.08;
@@ -1351,7 +1606,7 @@ class Game {
         this.ring(pu.x, pu.y, 40, def.color, 18);
         this.burst(pu.x, pu.y, def.color, 14, 4);
         if (def.timed) {
-            this.timers[pu.type] += this.powerupDuration;
+            this.timers[pu.type] = Math.min(TIMER_CAP, this.timers[pu.type] + this.powerupDuration);
             this.floater(p.x, p.y - 36, def.name.toUpperCase(), def.color, 22);
             Sfx.play('powerup', { volume: 0.5 });
         } else if (pu.type === 'heart') {
@@ -1359,9 +1614,8 @@ class Game {
                 p.hp++;
                 this.floater(p.x, p.y - 36, '+❤️', '#ff6b8a', 22);
             } else {
-                const bonus = 50 * this.level;
-                this.score += bonus;
-                this.floater(p.x, p.y - 36, `+${bonus}`, '#ff6b8a', 20);
+                this.spawnCoins(p.x, p.y, 5, 1.5); // full health: hearts turn into coins
+                this.floater(p.x, p.y - 36, 'Full health → 🪙', '#ffd60a', 16);
             }
             Sfx.play('powerup', { volume: 0.5, rate: 1.2 });
         } else if (pu.type === 'bomb') {
@@ -1398,12 +1652,29 @@ class Game {
             this.level++;
             this.pendingLevels++;
             this.bgKey = null;
-            const unlocked = WEAPON_ORDER.find(w => WEAPONS[w].unlock === this.level);
-            if (unlocked) {
-                this.unlockedNow = unlocked;
-            }
+            this.buffs = {}; // one-level buffs end when the level does
+            const earned = this.coinsEarned - this.levelCoinsStart;
+            this.incomeEMA = this.incomeEMA ? 0.5 * this.incomeEMA + 0.5 * earned : earned;
+            this.levelCoinsStart = this.coinsEarned;
             if (U.isBossLevel(this.level)) this.bossQueue++;
         }
+    }
+
+    // Coins a player can expect to earn during `level` (≈3% of its XP + the level bonus).
+    expectedIncome(level) {
+        return 0.03 * U.xpToNextLevel(level) + this.levelBonus(level);
+    }
+
+    levelBonus(level) {
+        return 5 + level;
+    }
+
+    // Permanent upgrades: static base price, ×(1 + 0.75 per rank owned) — a finite sink.
+    // Level buffs: a share of what this player actually earns per level (smoothed), never below the
+    // curve's expectation — all four together cost ~1.5 levels of income, so they stay a real choice.
+    cardPrice(card) {
+        if (card.share) return Math.max(card.cost, Math.round(card.share * Math.max(this.expectedIncome(this.level), this.incomeEMA)));
+        return Math.round(card.cost * (1 + 0.75 * this.stack(card.id)));
     }
 
     levelProgress() {
@@ -1413,28 +1684,24 @@ class Game {
     }
 
     availableCards() {
-        const pool = UPGRADES.filter(u => this.stack(u.id) < u.max && (!u.weapon || this.isUnlocked(u.weapon)))
+        const permanent = UPGRADES.filter(u => this.stack(u.id) < u.max)
+            .filter(u => !u.weapon || this.isUnlocked(u.weapon))
+            .filter(u => !u.minLevel || this.level >= u.minLevel)
             .filter(u => u.id !== 'vitality' || this.player.maxHp < 6)
-            .map(u => ({ ...u, weight: u.weapon === this.weapon ? 1.6 : 1 }));
-        return pool;
+            .map(u => ({ ...u, weight: u.weight || (u.weapon === this.weapon ? 1.6 : 1) }));
+        const buffs = LEVEL_BUFFS.filter(b => b.id !== 'feast' || this.player.hp < this.player.maxHp);
+        return permanent.concat(buffs);
     }
 
-    cardHeader(mode) {
+    cardHeader() {
         if (this.headerShown) return;
         this.headerShown = true;
-        if (mode === 'level') {
-            this.el.levelupTitle.textContent = `LEVEL ${this.level - this.pendingLevels + 1}!`;
-            const unlock = this.unlockedNow;
-            this.el.levelupSub.innerHTML = unlock
-                ? `New weapon unlocked: <b>${WEAPONS[unlock].icon} ${WEAPONS[unlock].name}</b> — ${this.isTouch ? 'tap its slot' : `press ${WEAPON_ORDER.indexOf(unlock) + 1} or Space`}`
-                : 'Choose an upgrade';
-            this.unlockedNow = null;
-            Sfx.play('levelUp', { volume: 0.6 });
-        } else {
-            this.el.levelupTitle.textContent = 'BOSS TREASURE';
-            this.el.levelupSub.textContent = 'Claim your reward';
-            Sfx.arpeggio([523, 659, 784], 0.08, { type: 'triangle', volume: 0.1 });
-        }
+        const bonus = this.levelBonus(this.level - this.pendingLevels + 1);
+        this.coins += bonus;
+        this.coinsEarned += bonus;
+        this.el.levelupTitle.textContent = `LEVEL ${this.level - this.pendingLevels + 1}!`;
+        this.el.levelupSub.innerHTML = `Spend coins on upgrades · <b class="gold">+${bonus} 🪙</b> level bonus`;
+        Sfx.play('levelUp', { volume: 0.6 });
     }
 
     beginCards(mode) {
@@ -1633,50 +1900,84 @@ class Game {
 
     prepareCards(mode) {
         const pool = this.availableCards();
-        let cards = U.pickWeightedUnique(pool, 3);
-        while (cards.length < 3) cards.push(FALLBACK_CARDS[cards.length % 2 === 0 ? 0 : 1]);
-        this.cardChoices = cards;
+        const cards = U.pickWeightedUnique(pool, 3);
+        this.cardChoices = cards.map(c => ({ ...c, price: this.cardPrice(c), sold: false }));
         this.cardMode = mode;
-        this.cardHeader(mode);
+        this.cardHeader();
 
-        this.el.cards.innerHTML = cards.map((c, i) => {
+        this.el.cards.innerHTML = this.cardChoices.map((c, i) => {
             const rank = this.stack(c.id);
-            const pips = Number.isFinite(c.max)
+            const pips = Number.isFinite(c.max) && c.max > 1
                 ? `<div class="pips">${Array.from({ length: c.max }, (_, k) => `<i class="${k < rank ? 'on' : k === rank ? 'next' : ''}"></i>`).join('')}</div>`
                 : '';
-            const tag = c.weapon ? `<span class="tag">${WEAPONS[c.weapon].icon} ${WEAPONS[c.weapon].name}</span>` : '';
+            const tag = c.weapon ? `<span class="tag">${WEAPONS[c.weapon].icon} ${WEAPONS[c.weapon].name}</span>`
+                : c.buff ? '<span class="tag buff">1 level</span>'
+                : c.unlocks ? '<span class="tag new">NEW WEAPON</span>' : '';
             return `<button class="card" data-i="${i}" style="--d:${i * 70}ms"><span class="num">${i + 1}</span>` +
                 `<span class="cicon">${c.icon}</span><span class="cname">${c.name}</span>${tag}` +
-                `<span class="cdesc">${c.desc}</span>${pips}</button>`;
+                `<span class="cdesc">${c.desc}</span>${pips}<span class="price">🪙 ${c.price}</span></button>`;
         }).join('');
         this.el.cards.querySelectorAll('.card').forEach(btn =>
-            btn.addEventListener('click', () => this.chooseCard(Number(btn.dataset.i))));
+            btn.addEventListener('click', () => this.buyCard(Number(btn.dataset.i))));
+        this.refreshShop();
     }
 
-    chooseCard(i) {
+    refreshShop() {
+        this.el.shopCoins.textContent = `🪙 ${this.coins}`;
+        this.el.cards.querySelectorAll('.card').forEach(btn => {
+            const c = this.cardChoices[Number(btn.dataset.i)];
+            btn.classList.toggle('sold', c.sold);
+            btn.classList.toggle('afford', !c.sold && c.price <= this.coins);
+            btn.classList.toggle('poor', !c.sold && c.price > this.coins);
+            btn.querySelector('.price').textContent = c.sold ? '✓ BOUGHT' : `🪙 ${c.price}`;
+        });
+    }
+
+    buyCard(i) {
         if (this.state !== 'levelup' || performance.now() < this.cardsReadyAt) return;
         const card = this.cardChoices[i];
-        if (!card) return;
+        const btn = this.el.cards.querySelector(`.card[data-i="${i}"]`);
+        if (!card || card.sold) return;
+        if (card.price > this.coins) {
+            Sfx.tone(160, { duration: 0.15, type: 'square', volume: 0.08 });
+            if (btn) {
+                btn.classList.remove('nope');
+                void btn.offsetWidth;
+                btn.classList.add('nope');
+            }
+            return;
+        }
+        this.coins -= card.price;
+        card.sold = true;
         this.applyCard(card);
-        Sfx.arpeggio([659, 880], 0.06, { type: 'triangle', volume: 0.1 });
-        if (this.cardMode === 'level') this.pendingLevels--;
-        else this.pendingReward = false;
+        Sfx.arpeggio([659, 880, 1175], 0.05, { type: 'triangle', volume: 0.1 });
+        this.refreshShop();
+    }
+
+    closeShop() {
+        if (this.state !== 'levelup' || performance.now() < this.cardsReadyAt) return;
+        const bought = this.cardChoices.filter(c => c.sold);
+        this.pendingLevels--;
         this.state = 'playing';
         this.setOverlay(null);
         this.lastTime = performance.now();
         this.cardsClosedAt = performance.now();
-        this.floater(this.player.x, this.player.y - 40, `${card.icon} ${card.name}`, '#ffffff', 20);
+        bought.forEach((c, i) => this.floater(this.player.x, this.player.y - 40 - i * 18, `${c.icon} ${c.name}`, '#ffffff', 18));
     }
 
     applyCard(card) {
         const p = this.player;
-        if (card.id === 'treasure') {
-            this.score += 150 * this.level;
-            return;
-        }
         if (card.id === 'feast') {
             p.hp = p.maxHp;
             return;
+        }
+        if (card.buff) {
+            this.buffs[card.id] = true;
+            return;
+        }
+        if (card.unlocks) {
+            this.unlocked.add(card.unlocks);
+            this.banner(`${WEAPONS[card.unlocks].icon} ${WEAPONS[card.unlocks].name.toUpperCase()}`, `Unlocked — ${this.isTouch ? 'tap its slot' : `press ${WEAPON_ORDER.indexOf(card.unlocks) + 1}`}`);
         }
         this.stacks[card.id] = this.stack(card.id) + 1;
         if (card.id === 'vitality') {
@@ -1777,6 +2078,7 @@ class Game {
         }
 
         this.drawEdgeWarnings(ctx);
+        this.coinDrops.forEach(c => this.drawCoin(ctx, c));
         this.powerups.forEach(pu => this.drawPowerup(ctx, pu));
         this.explosions.forEach(e => this.drawExplosion(ctx, e));
         this.grenades.forEach(g => this.drawGrenade(ctx, g));
@@ -1833,10 +2135,32 @@ class Game {
         ctx.fillRect(...g);
     }
 
+    drawCoin(ctx, c) {
+        if (c.life < 180 && Math.floor(c.life / 6) % 2 === 0) return;
+        const r = c.value >= 5 ? 7 : 5;
+        const sx = Math.max(0.2, Math.abs(Math.cos(c.spin)));
+        ctx.fillStyle = 'rgba(0,0,0,0.2)';
+        ctx.beginPath();
+        ctx.ellipse(c.x, c.y + r * 0.6, r * 0.9, r * 0.35, 0, 0, TAU);
+        ctx.fill();
+        const y = c.y - c.z;
+        ctx.fillStyle = c.value >= 5 ? '#ffb300' : '#ffd60a';
+        ctx.strokeStyle = '#a66a00';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.ellipse(c.x, y, r * sx, r, 0, 0, TAU);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(255,255,255,0.7)';
+        ctx.beginPath();
+        ctx.ellipse(c.x - r * 0.3 * sx, y - r * 0.3, r * 0.3 * sx, r * 0.3, 0, 0, TAU);
+        ctx.fill();
+    }
+
     drawPowerup(ctx, pu) {
         const def = POWERUPS[pu.type];
         if (pu.life < 180 && Math.floor(pu.life / 8) % 2 === 0) return;
-        const bob = Math.sin(pu.t * 0.08) * 3;
+        const bob = Math.sin(pu.t * 0.08) * 3 - (pu.z || 0);
         const pulse = 1 + Math.sin(pu.t * 0.15) * 0.1;
         this.drawShadow(ctx, pu.x, pu.y + 14, 10);
         ctx.globalAlpha = 0.35;
@@ -1853,6 +2177,14 @@ class Game {
         ctx.textBaseline = 'middle';
         ctx.fillStyle = '#000';
         ctx.fillText(def.emoji, pu.x, pu.y + bob + 1);
+        if (def.tag) {
+            ctx.font = `15px ${DISPLAY_FONT}`;
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = '#000';
+            ctx.strokeText(def.tag, pu.x + 10, pu.y + bob + 9);
+            ctx.fillStyle = '#fff';
+            ctx.fillText(def.tag, pu.x + 10, pu.y + bob + 9);
+        }
     }
 
     drawExplosion(ctx, e) {
@@ -2055,8 +2387,14 @@ class Game {
         const def = b.boss;
         const fill = b.flash > 0 ? '#ffffff' : def.color;
         const s = b.size;
+        const q = b.dying ? b.deathT / b.deathMax : 0;
         ctx.save();
         ctx.translate(b.x, b.y);
+        if (b.dying) {
+            const j = 1.5 + 6 * q;
+            ctx.translate((Math.random() - 0.5) * j, (Math.random() - 0.5) * j);
+            ctx.scale(1 - 0.35 * q, 1 - 0.35 * q);
+        }
         if (b.mode === 'windup') {
             ctx.translate((Math.random() - 0.5) * 3, (Math.random() - 0.5) * 3);
             ctx.save();
@@ -2153,6 +2491,42 @@ class Game {
             }
         }
 
+        if (b.dying) {
+            // Darkening body, glowing cracks spreading, X-ed out eyes
+            ctx.globalAlpha = 0.6 * q;
+            ctx.fillStyle = '#140800';
+            ctx.beginPath();
+            ctx.arc(0, 0, s * 1.02, 0, TAU);
+            ctx.fill();
+            ctx.globalAlpha = 1;
+            ctx.lineCap = 'round';
+            for (const c of b.cracks || []) {
+                const len = s * c.len * Math.min(1, q * 1.6);
+                ctx.strokeStyle = `rgba(255,${Math.round(150 + 80 * q)},60,${0.5 + 0.5 * q})`;
+                ctx.lineWidth = 2 + 2 * q;
+                ctx.beginPath();
+                ctx.moveTo(Math.cos(c.a) * s * 0.15, Math.sin(c.a) * s * 0.15);
+                ctx.quadraticCurveTo(Math.cos(c.a + c.bend) * len * 0.6, Math.sin(c.a + c.bend) * len * 0.6, Math.cos(c.a) * len, Math.sin(c.a) * len);
+                ctx.stroke();
+            }
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 4;
+            const ex = s * 0.36;
+            const ey = -s * 0.18;
+            const k = s * 0.13;
+            ctx.beginPath();
+            for (const x of [-ex, ex]) {
+                ctx.moveTo(x - k, ey - k);
+                ctx.lineTo(x + k, ey + k);
+                ctx.moveTo(x + k, ey - k);
+                ctx.lineTo(x - k, ey + k);
+            }
+            ctx.stroke();
+            ctx.lineCap = 'butt';
+            ctx.restore();
+            return;
+        }
+
         // Angry eyes
         const look = U.normalizeVector(this.player.x - b.x, this.player.y - b.y);
         const ex = s * 0.36;
@@ -2178,44 +2552,86 @@ class Game {
         ctx.restore();
     }
 
+    // Steel goes from black to dark red, red, orange and white-hot as the hit chain grows.
+    static bladeColor(h) {
+        const stops = [[0, [28, 31, 36]], [0.25, [110, 14, 14]], [0.55, [214, 40, 30]], [0.8, [255, 112, 40]], [1, [255, 236, 200]]];
+        for (let i = 1; i < stops.length; i++) {
+            if (h <= stops[i][0]) {
+                const [h0, c0] = stops[i - 1];
+                const [h1, c1] = stops[i];
+                const t = (h - h0) / (h1 - h0);
+                return c0.map((v, k) => Math.round(v + (c1[k] - v) * t));
+            }
+        }
+        return stops[stops.length - 1][1];
+    }
+
     drawBlades(ctx) {
         const p = this.player;
-        const count = this.blades.count || 1;
-        const radius = this.blades.radius || 46;
-        // Motion trail
-        ctx.globalAlpha = 0.18;
-        ctx.strokeStyle = '#e8f4ff';
-        ctx.lineWidth = radius * 0.5;
-        for (let i = 0; i < count; i++) {
-            const a = this.blades.angle + (i * TAU) / count;
-            ctx.beginPath();
-            ctx.arc(p.x, p.y, radius * 0.72, a - 0.6, a);
-            ctx.stroke();
+        const bl = this.blade;
+        const heat = bl.heat || 0;
+        const [r, g, b] = Game.bladeColor(heat);
+        const reach = this.stabReach;
+        const bladeLen = 38;
+        const blades = [];
+        if (bl.phase === 'out' || bl.phase === 'back') {
+            const k = bl.phase === 'out' ? Math.min(1, bl.t / (bl.outF || 5)) : 1 - Math.min(1, bl.t / (bl.backF || 5));
+            bl.stabs.forEach(st => blades.push({ angle: st.angle, ext: 24 + (reach - 12) * k, streak: bl.phase === 'out' }));
+        } else {
+            const target = this.nearestMonster(p.x, p.y);
+            const angle = target ? Math.atan2(target.y - p.y, target.x - p.x) : (p.facing > 0 ? 0.35 : Math.PI - 0.35);
+            blades.push({ angle, ext: 26 + Math.sin(this.frameNo * 0.12) * 2, streak: false });
         }
-        ctx.globalAlpha = 1;
-        for (let i = 0; i < count; i++) {
-            const a = this.blades.angle + (i * TAU) / count;
+        for (const bd of blades) {
             ctx.save();
             ctx.translate(p.x, p.y);
-            ctx.rotate(a);
-            ctx.fillStyle = '#cfd8dc';
-            ctx.strokeStyle = '#607d8b';
-            ctx.lineWidth = 1.5;
+            ctx.rotate(bd.angle);
+            if (bd.streak) {
+                ctx.globalAlpha = 0.28;
+                ctx.fillStyle = heat > 0.2 ? `rgb(${r},${g},${b})` : '#e3f2fd';
+                ctx.beginPath();
+                ctx.moveTo(10, -9);
+                ctx.lineTo(bd.ext, -1.5);
+                ctx.lineTo(bd.ext, 1.5);
+                ctx.lineTo(10, 9);
+                ctx.closePath();
+                ctx.fill();
+                ctx.globalAlpha = 1;
+            }
+            const tip = bd.ext;
+            const base = Math.max(8, tip - bladeLen);
+            if (heat > 0.2) {
+                ctx.globalAlpha = 0.25 + 0.35 * heat;
+                ctx.strokeStyle = `rgb(255,${Math.round(90 + 120 * heat)},40)`;
+                ctx.lineWidth = 9;
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                ctx.moveTo(base, 0);
+                ctx.lineTo(tip, 0);
+                ctx.stroke();
+                ctx.globalAlpha = 1;
+                ctx.lineCap = 'butt';
+            }
+            ctx.fillStyle = `rgb(${r},${g},${b})`;
+            ctx.strokeStyle = heat > 0.5 ? '#fff3e0' : '#9aa5ad';
+            ctx.lineWidth = 1.2;
             ctx.beginPath();
-            ctx.moveTo(10, -3.5);
-            ctx.lineTo(radius - 4, -2.5);
-            ctx.lineTo(radius + 4, 0);
-            ctx.lineTo(radius - 4, 2.5);
-            ctx.lineTo(10, 3.5);
+            ctx.moveTo(base, -3.5);
+            ctx.lineTo(tip - 7, -2.6);
+            ctx.lineTo(tip, 0);
+            ctx.lineTo(tip - 7, 2.6);
+            ctx.lineTo(base, 3.5);
             ctx.closePath();
             ctx.fill();
             ctx.stroke();
-            ctx.strokeStyle = '#8d6e63';
+            ctx.strokeStyle = '#6d4c41';
             ctx.lineWidth = 4;
             ctx.beginPath();
-            ctx.moveTo(10, -7);
-            ctx.lineTo(10, 7);
+            ctx.moveTo(base, -8);
+            ctx.lineTo(base, 8);
             ctx.stroke();
+            ctx.fillStyle = '#4e342e';
+            ctx.fillRect(base - 8, -2, 8, 4);
             ctx.restore();
         }
     }
@@ -2298,19 +2714,25 @@ class Game {
             ctx.restore();
         }
 
+        // Boss bullets: magenta orbs with a dark core, so they never read as your own (yellow) shots.
+        const pulse = 1 + 0.15 * Math.sin(this.frameNo * 0.3);
         for (const s of this.enemyShots) {
-            ctx.globalAlpha = 0.35;
-            ctx.fillStyle = s.color;
+            ctx.globalAlpha = 0.3;
+            ctx.fillStyle = '#ff2d78';
             ctx.beginPath();
-            ctx.arc(s.x, s.y, s.r * 1.8, 0, TAU);
+            ctx.arc(s.x, s.y, s.r * 1.9 * pulse, 0, TAU);
             ctx.fill();
             ctx.globalAlpha = 1;
+            ctx.fillStyle = '#ff2d78';
+            ctx.strokeStyle = '#ffd1e3';
+            ctx.lineWidth = 1.5;
             ctx.beginPath();
             ctx.arc(s.x, s.y, s.r, 0, TAU);
             ctx.fill();
-            ctx.fillStyle = '#fff';
+            ctx.stroke();
+            ctx.fillStyle = '#2a0014';
             ctx.beginPath();
-            ctx.arc(s.x, s.y, s.r * 0.45, 0, TAU);
+            ctx.arc(s.x, s.y, s.r * 0.5, 0, TAU);
             ctx.fill();
         }
     }
@@ -2451,8 +2873,21 @@ class Game {
         }
 
         const active = TIMED_POWERUPS.filter(t => this.timers[t] > 0);
-        this.setHtml('powerups', this.el.powerups, active.map(t =>
-            `<span class="pu" style="--c:${POWERUPS[t].color}">${POWERUPS[t].emoji}<b>${Math.ceil(this.timers[t] / 60)}</b></span>`).join(''));
+        const buffs = LEVEL_BUFFS.filter(bf => this.buffs[bf.id]);
+        this.setHtml('powerups', this.el.powerups,
+            active.map(t => `<span class="pu" style="--c:${POWERUPS[t].color}">${POWERUPS[t].emoji}${POWERUPS[t].tag ? `<i>${POWERUPS[t].tag}</i>` : ''}` +
+                `<b>${Math.ceil(this.timers[t] / (60 * GAME_SPEED))}</b></span>`).join('') +
+            buffs.map(bf => `<span class="pu buff" title="${bf.name}">${bf.icon}<b>LV</b></span>`).join(''));
+        this.setText('coins', this.el.coins, `🪙 ${this.coins}`);
+        const swordSlot = this.el.weapons.querySelector('.slot[data-w="sword"]');
+        const dmgLabel = this.weapon === 'sword' ? String(Math.round(this.stabDamage * this.damageMult)) : '';
+        if (this.hud.stab !== dmgLabel) {
+            this.hud.stab = dmgLabel;
+            swordSlot.dataset.dmg = dmgLabel;
+            const heat = Math.min(this.blade.chain, STAB.maxDoublings) / STAB.maxDoublings;
+            const [r, g, b] = Game.bladeColor(Math.max(0.3, heat));
+            swordSlot.style.setProperty('--heat', this.blade.chain ? `rgb(${r},${g},${b})` : '#ffffff');
+        }
 
         if (this.boss) {
             const pct = U.clamp(this.boss.hp / this.boss.maxHp, 0, 1);

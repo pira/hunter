@@ -145,7 +145,7 @@
         #levelup { flex-direction: column; background: rgba(5, 8, 16, .6); transition: background-color .35s, backdrop-filter .35s; }
         #levelup.show { animation: none; } /* title pops on its own; background eases in */
         #levelup.intro { background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; pointer-events: none; }
-        #levelup.intro #levelupSub, #levelup.intro #cards { visibility: hidden; }
+        #levelup.intro #levelupSub, #levelup.intro #cards, #levelup.intro #shopCoins, #levelup.intro #continueBtn, #levelup.intro .shop-hint { visibility: hidden; }
         #levelup.intro #levelupTitle { text-shadow: 0 4px 0 #7c2d12, 0 0 40px rgba(255,140,40,.9); }
         .lu { text-align: center; width: 100%; max-width: 46em; }
         #levelupTitle { font-size: 3em; color: var(--gold); text-shadow: 0 4px 0 #7c2d12; animation: pop .35s ease-out; }
@@ -167,6 +167,28 @@
         .pips i.on { background: var(--gold); }
         .pips i.next { background: #fff; box-shadow: 0 0 8px #fff; animation: throb .5s infinite alternate; }
         body.touch .card .num { display: none; }
+        #coins { font-family: var(--display); font-size: 1.1em; color: var(--gold); text-shadow: 0 2px 0 rgba(0,0,0,.55); }
+        #shopCoins { font-family: var(--display); font-size: 1.6em; color: var(--gold); text-shadow: 0 3px 0 rgba(0,0,0,.5); margin: -.4em 0 .6em; }
+        #levelupSub .gold { color: var(--gold); font-weight: normal; font-family: var(--display); }
+        #continueBtn { margin-top: 1.1em; }
+        .shop-hint { color: var(--muted); font-size: .75em; margin: .6em 0 0; }
+        .card .price { margin-top: auto; padding-top: .4em; font-family: var(--display); font-size: 1.25em; letter-spacing: .5px; }
+        .card.afford .price { color: var(--gold); }
+        .card.afford { border-color: rgba(255,214,10,.45); }
+        .card.poor { cursor: not-allowed; background: linear-gradient(180deg, #161b24, #0c1018); }
+        .card.poor > :not(.price) { filter: grayscale(.9); opacity: .45; }
+        .card.poor:hover { transform: none; border-color: rgba(255,255,255,.18); }
+        .card.poor .price { color: #ff4d4d; text-shadow: 0 0 10px rgba(255,60,60,.35); }
+        .card.sold { opacity: .4; cursor: default; border-color: #4ade80; }
+        .card.sold .price { color: #4ade80; }
+        .card.nope { animation: nope .3s; }
+        @keyframes nope { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+        .tag.buff { color: #a7f3d0; background: rgba(74,222,128,.12); }
+        .tag.new { color: #fecaca; background: rgba(248,113,113,.16); }
+        .pu { position: relative; }
+        .pu i { position: absolute; right: 1px; top: 0; font-style: normal; font-family: var(--display); font-size: .45em; color: #fff; text-shadow: 0 1px 2px #000; }
+        .pu.buff { border-style: dashed; --c: #4ade80; }
+        .slot[data-w="sword"]::after { content: attr(data-dmg); position: absolute; bottom: -1.3em; font-family: var(--display); font-size: .7em; color: var(--heat, #fff); text-shadow: 0 1px 2px #000, 0 0 6px rgba(0,0,0,.6); }
 
         /* Pause + game over */
         .stack { display: flex; flex-direction: column; gap: .7em; margin-top: 1em; }
@@ -190,6 +212,10 @@
 
         .lu { max-height: 100%; overflow-y: auto; touch-action: pan-y; padding: 4px; }
         @media (max-width: 560px) {
+            #powerups { position: absolute; top: 2.7em; right: 0; flex-wrap: wrap; justify-content: flex-end; width: 11em; }
+            #combo { min-width: 6em; }
+            #comboCount { display: none; }
+            .pu { font-size: 1.05em; padding: 1px 4px; }
             #cards { flex-direction: column; align-items: stretch; gap: 10px; }
             .card { max-width: none; flex-direction: row; text-align: left; padding: .8em 1em; flex-wrap: wrap; column-gap: .8em; }
             .cicon { font-size: 2em; }
@@ -215,6 +241,7 @@
             <div class="hud-left">
                 <div id="hearts"></div>
                 <div class="lvl"><span id="levelLabel">LV 1</span><div class="xpbar"><div id="xpFill"></div></div></div>
+                <div id="coins">🪙 0</div>
             </div>
             <div class="hud-center"><div id="score">0</div></div>
             <div class="hud-right">
@@ -252,8 +279,11 @@
         <div id="levelup" class="overlay">
             <div class="lu">
                 <h2 id="levelupTitle">LEVEL 2!</h2>
-                <p id="levelupSub">Choose an upgrade</p>
+                <p id="levelupSub">Spend coins on upgrades</p>
+                <div id="shopCoins">🪙 0</div>
                 <div id="cards"></div>
+                <button id="continueBtn" class="btn primary">CONTINUE ▶</button>
+                <p class="shop-hint desktop-only"><kbd>1</kbd>–<kbd>3</kbd> buy · <kbd>Enter</kbd> continue</p>
             </div>
         </div>
 

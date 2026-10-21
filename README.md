@@ -11,13 +11,19 @@ Kite waves of monsters, chain kills into a combo multiplier, pick an upgrade car
 | Move | WASD / arrow keys | drag anywhere (floating stick) |
 | Shoot | automatic (nearest monster, bosses first); hold click to aim | automatic |
 | Switch weapon | Space / E / Q, 1–4, mouse wheel | tap a weapon slot or the big button |
+| Shop | 1–3 buy, Enter continue | tap a card, tap Continue |
 | Pause / mute | P or Esc / M | ⏸ / 🔊 buttons |
 
-- **Weapons:** 🔫 Blaster and ⚔️ spinning Blades from the start, 💣 Grenades at level 4, 🚀 homing Missiles at level 8.
-- **Combo:** kills within ~2.5 s of each other build a combo; 5/15/30/50 kills give ×2/×3/×4/×5 score. Getting hit resets it.
-- **Upgrade cards:** every level-up pauses the game and offers 3 of 17 upgrades (damage, attack speed, split shot, piercing, extra blades, blast radius, crits, regen, …). Weapon-specific cards appear once that weapon is unlocked.
-- **Bosses:** levels 5, 10, 15, … bring Bonecrusher (telegraphed charges), Hexweaver (bullet rings), Broodmother (summons) and Voidmaw (all of it), scaling up each cycle. Beating one drops loot and a bonus card.
-- **Powerups:** 🏹 Multi-Shot, ⚡ Rapid Fire, 🛡️ Invincible (giant mode — you trample monsters), ❄️ Freeze, ❤️ Extra Life, 💣 Bomb. They despawn after 12 s.
+- **Weapons:** 🔫 Blaster and 🗡️ Blade from the start; 💣 Grenades and 🚀 Missiles are unlocked in the shop.
+  - *Blaster* auto-aims (bosses first). Split Shot adds bullets; Multi-Shot fires the whole volley in 4 directions.
+  - *Blade* stabs the nearest monster in reach. Each consecutive hit doubles the damage (10 → 20 → 40 → …); the chain resets after ~1.5 s without a hit or when you get hurt. The steel glows from black to red to white-hot with the chain.
+  - *Grenades* max 4 per throw (×4 with Multi-Shot), *Missiles* max 3 per salvo (×4 with Multi-Shot).
+- **Combo:** kills within ~2.8 s of each other build a combo; 5/15/30/50 kills give ×2/×3/×4/×5 score. Getting hit resets it.
+- **Coins & shop:** monsters drop 🪙 coins (bigger monsters drop more). Every level-up opens a shop with 3 cards and a level bonus; buy as many as you can afford (gold price = affordable, red = not), then continue.
+  - Permanent upgrades have fixed prices that rise with each rank you own (the set is finite, so it converges).
+  - One-level buffs — Double XP, Double Gold, Double Damage, Slow Mobs — are always on sale (even when everything else is maxed) and cost a share of what you have been earning per level, so they stay a real choice late in a run.
+- **Bosses:** levels 5, 10, 15, … bring Bonecrusher (telegraphed charges), Hexweaver (bullet rings), Broodmother (summons) and Voidmaw (all of it). Boss bullets are magenta. A beaten boss slowly cracks and falls apart, spilling gold coins, a heart and two powerups.
+- **Powerups:** 🏹 Multi-Shot, ⚡ Rapid Fire, 🛡️ Invincible (giant mode — you trample monsters), ❄️ Freeze, 🪙×2 / 🪙×3 coin multipliers, ❤️ Extra Life, 💣 Bomb. Drops are throttled (one every few seconds, at most 3 on the floor) and a timer never stacks past 30 s. Hearts drop more often while you're hurt.
 - **Leaderboard:** after you die, enter a name to submit. Scores go to the global board (AWS) and are also kept on your device; if the API is unreachable the device board is shown instead.
 
 ## Project layout
