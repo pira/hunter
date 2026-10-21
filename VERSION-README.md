@@ -1,105 +1,38 @@
-# 🚀 Automatic Version System
+# Automatic versioning
 
-This project includes an automatic versioning system that updates the game version and build date on every commit.
+The version and build date shown on the start screen (`v2.0.0 · 2026-10-21`) live in `game.js`:
 
-## 📋 How It Works
-
-- **Pre-commit Hook**: Automatically runs before each commit
-- **Version Update**: Increments version number based on strategy
-- **Build Date**: Updates to current date
-- **Auto-add**: Automatically stages the updated `game.js` file
-
-## 🎯 Version Strategies
-
-### Default Strategy (Patch)
-```bash
-git commit -m "Fix bug in monster spawning"
-# 1.2.3 -> 1.2.4
+```js
+this.version = "2.0.0";
+this.buildDate = "2026-10-21";
 ```
 
-### Minor Version Update
-```bash
-git commit -m "Add new weapon [minor]"
-# 1.2.4 -> 1.3.0
-```
+A versioned git hook in `.githooks/pre-commit` bumps them (and `package.json`) on every commit.
 
-### Major Version Update
-```bash
-git commit -m "Complete game overhaul [major]"
-# 1.3.0 -> 2.0.0
-```
-
-### Force Patch Update
-```bash
-git commit -m "Small tweak [patch]"
-# 2.0.0 -> 2.0.1
-```
-
-## ⚙️ Configuration
-
-Edit `version-config.json` to change the default strategy:
-
-```json
-{
-  "strategy": "patch",
-  "comment": "Options: 'patch', 'minor', 'major', 'auto'"
-}
-```
-
-## 🛠️ Files
-
-- **`.git/hooks/pre-commit`**: Git hook that runs on commit
-- **`update-version.py`**: Python script that updates version/date
-- **`update-version.js`**: Node.js alternative (fallback)
-- **`version-config.json`**: Configuration file
-- **`game.js`**: Contains version info (lines 12-13)
-
-## 🎮 In-Game Display
-
-The version appears in the bottom-right corner of the game:
-```
-v1.2.4
-Build: 2025-08-27
-```
-
-## 🔧 Manual Version Update
-
-To manually update version without committing:
-```bash
-python3 update-version.py
-# or
-node update-version.js
-```
-
-## 🚫 Disable Auto-Versioning
-
-To temporarily disable:
-```bash
-chmod -x .git/hooks/pre-commit
-```
-
-To re-enable:
-```bash
-chmod +x .git/hooks/pre-commit
-```
-
-## 🐛 Troubleshooting
-
-- **"Neither Python3 nor Node.js found"**: Install Python 3 or Node.js
-- **"Could not find version in game.js"**: Check version format in constructor
-- **Hook not running**: Ensure `.git/hooks/pre-commit` is executable
-
-## 📝 Example Workflow
+## Setup (once per clone)
 
 ```bash
-# Make changes to your game
-vim game.js
-
-# Commit (version auto-updates)
-git commit -m "Add new monster type [minor]"
-
-# Push to GitHub
-git push origin main
+git config core.hooksPath .githooks
 ```
 
-The version will automatically increment and the build date will update! 🎉
+## Choosing the bump
+
+```bash
+git commit -m "Fix spawn bug"                 # patch: 2.0.0 -> 2.0.1 (default)
+BUMP=minor git commit -m "New boss"           # minor: 2.0.1 -> 2.1.0
+BUMP=major git commit -m "Big rewrite"        # major: 2.1.0 -> 3.0.0
+BUMP=none  git commit -m "Docs only"          # no bump
+```
+
+Manual bump without committing: `python3 update-version.py "[minor]"` (or `node update-version.js "[minor]"`).
+
+## Why it changed (v2.0.0)
+
+The old setup ran the same bump from two untracked hooks in `.git/hooks` (`pre-commit` and `prepare-commit-msg`):
+
+- every commit bumped the version **twice** (1.2.6 → 1.2.8 → 1.2.10 …);
+- the second bump ran after git had already built the commit, so it was left behind as a staged, uncommitted change in `game.js`;
+- `[minor]` / `[major]` were read from `.git/COMMIT_EDITMSG`, i.e. the **previous** commit's message;
+- the hooks weren't in the repo, so other clones (and PRs merged on GitHub) never bumped at all.
+
+The single tracked `pre-commit` hook with a `BUMP` variable fixes all four. `version-config.json` still sets the default strategy.

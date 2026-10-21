@@ -1,0 +1,20 @@
+#!/bin/sh
+# Monster Hunter — bump the game version + build date on every commit.
+# Enable once per clone:   git config core.hooksPath .githooks
+# Pick the bump:           BUMP=minor git commit ...   (patch | minor | major | none)
+# Without BUMP, the "strategy" in version-config.json applies (patch).
+
+[ "$BUMP" = "none" ] && exit 0
+HINT=""
+[ -n "$BUMP" ] && HINT="[$BUMP]"
+
+if command -v python3 >/dev/null 2>&1; then
+    python3 update-version.py "$HINT" || exit 1
+elif command -v node >/dev/null 2>&1; then
+    node update-version.js "$HINT" || exit 1
+else
+    echo "⚠️  Neither python3 nor node found — skipping version bump"
+    exit 0
+fi
+
+git add game.js package.json

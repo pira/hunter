@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+# Deploys (or updates) the leaderboard API: DynamoDB table + IAM role + Lambda with a public function URL.
+# Requires: AWS CLI v2 with credentials, zip. Usage: ./leaderboard/deploy.sh [region]
+set -euo pipefail
+
+REGION="${1:-ap-southeast-1}"
+NAME="monster-hunter-leaderboard"
+TABLE="monster-hunter-scores"
+ORIGINS='["https://oleg.manida.com","http://oleg.manida.com","https://pira.github.io","http://localhost:8000"]'
+HERE="$(cd "$(dirname "$0")" && pwd)"
+export AWS_REGION="$REGION"
+
+if ! aws dynamodb describe-table --table-name "$TABLE" >/dev/null 2>&1; then
+  echo "Creating table $TABLE"
+  aws dynamodb create-table --table-name "$TABLE" \
+    --attribute-definitions AttributeName=pk,AttributeType=S AttributeName=sk,AttributeType=S \
+    --key-schema AttributeName=pk,KeyType=HASH AttributeName=sk,KeyType=RANGE \
+    --billing-mode PAY_PER_REQUEST >/dev/null
+  aws dynamodb wait table-exists --table-name "$TABLE"
+  aws dynamodb update-time-to-live --table-name "$TABLE" \
+    --time-to-live-specification Enabled=true,AttributeName=ttl >/dev/null
+fi
+TABLE_ARN=$(aws dynamodb describe-table --table-name "$TABLE" --query Table.TableArn --output text)
+
+if ! aws iam get-role --role-name "$NAME" >/dev/null 2>&1; then
+  echo "Creating role $NAME"
+  aws iam create-role --role-name "$NAME" --assume-role-policy-document \
+    '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"lambda.amazonaws.com"},"Action":"sts:AssumeRole"}]}' >/dev/null
+  aws iam attach-role-policy --role-name "$NAME" \
+    --policy-arn arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+  sleep 10
+fi
+aws iam put-role-policy --role-name "$NAME" --policy-name table-access --policy-document \
+  "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":[\"dynamodb:Query\",\"dynamodb:PutItem\",\"dynamodb:UpdateItem\"],\"Resource\":\"$TABLE_ARN\"}]}"
+ROLE_ARN=$(aws iam get-role --role-name "$NAME" --query Role.Arn --output text)
+
+ZIP="$(mktemp -d)/lambda.zip"
+(cd "$HERE/lambda" && zip -q "$ZIP" index.mjs)
+
+if aws lambda get-function --function-name "$NAME" >/dev/null 2>&1; then
+  echo "Updating function code"
+  aws lambda update-function-code --function-name "$NAME" --zip-file "fileb://$ZIP" >/dev/null
+else
+  echo "Creating function $NAME"
+  SECRET=$(openssl rand -base64 32)
+  aws lambda create-function --function-name "$NAME" --runtime nodejs22.x --handler index.handler \
+    --role "$ROLE_ARN" --zip-file "fileb://$ZIP" --timeout 10 --memory-size 256 \
+    --environment "Variables={TABLE_NAME=$TABLE,TOKEN_SECRET=$SECRET}" >/dev/null
+  aws lambda wait function-active --function-name "$NAME"
+  aws lambda create-function-url-config --function-name "$NAME" --auth-type NONE \
+    --cors "{\"AllowOrigins\":$ORIGINS,\"AllowMethods\":[\"GET\",\"POST\"],\"AllowHeaders\":[\"content-type\"],\"MaxAge\":86400}" >/dev/null
+  aws lambda add-permission --function-name "$NAME" --statement-id public-url \
+    --action lambda:InvokeFunctionUrl --principal '*' --function-url-auth-type NONE >/dev/null
+  aws lambda add-permission --function-name "$NAME" --statement-id public-invoke \
+    --action lambda:InvokeFunction --principal '*' --invoked-via-function-url >/dev/null
+fi
+
+URL=$(aws lambda get-function-url-config --function-name "$NAME" --query FunctionUrl --output text)
+echo "Leaderboard API: $URL"
+echo "Put it in config.js -> leaderboardUrl"

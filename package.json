@@ -1,8 +1,8 @@
 {
   "name": "hunter",
-  "version": "1.2.22",
-  "description": "",
-  "main": "game-utils.js",
+  "version": "2.0.0",
+  "description": "Monster Hunter \u2014 arcade survival game (GitHub Pages: oleg.manida.com)",
+  "main": "game.js",
   "scripts": {
     "test": "node --test"
   },
