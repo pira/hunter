@@ -18,6 +18,13 @@ The game runs in the browser, so scores can't be made tamper-proof; this only bl
 
 If you change the level curve in `game-utils.js`, change `xpToNextLevel` in `lambda/index.mjs` too.
 
+## Live deployment
+
+- API: `https://76wwgfhngo2igizow7qpuxyhy40ofeom.lambda-url.ap-southeast-1.on.aws` (set in `config.js`)
+- AWS account 318456756271, region `ap-southeast-1`: Lambda `monster-hunter-leaderboard` (Node.js 22, arm64, reserved concurrency 10, logs kept 30 days), DynamoDB table `monster-hunter-scores` (on-demand, TTL on `ttl`), IAM role `monster-hunter-leaderboard`. All tagged `project=monster-hunter`.
+- `monster-hunter-deploy-318456756271` (private S3 bucket) holds the uploaded Lambda zip.
+- `TOKEN_SECRET` is a random value set as a Lambda environment variable; it is not in the repo.
+
 ## Deploy
 
 ```bash

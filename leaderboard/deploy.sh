@@ -44,7 +44,7 @@ else
   echo "Creating function $NAME"
   SECRET=$(openssl rand -base64 32)
   aws lambda create-function --function-name "$NAME" --runtime nodejs22.x --handler index.handler \
-    --role "$ROLE_ARN" --zip-file "fileb://$ZIP" --timeout 10 --memory-size 256 \
+    --role "$ROLE_ARN" --zip-file "fileb://$ZIP" --timeout 10 --memory-size 256 --architectures arm64 \
     --environment "Variables={TABLE_NAME=$TABLE,TOKEN_SECRET=$SECRET}" >/dev/null
   aws lambda wait function-active --function-name "$NAME"
   aws lambda create-function-url-config --function-name "$NAME" --auth-type NONE \
@@ -53,6 +53,10 @@ else
     --action lambda:InvokeFunctionUrl --principal '*' --function-url-auth-type NONE >/dev/null
   aws lambda add-permission --function-name "$NAME" --statement-id public-invoke \
     --action lambda:InvokeFunction --principal '*' --invoked-via-function-url >/dev/null
+  # Cap cost if the public URL gets hammered, and don't keep logs forever.
+  aws lambda put-function-concurrency --function-name "$NAME" --reserved-concurrent-executions 10 >/dev/null
+  aws logs create-log-group --log-group-name "/aws/lambda/$NAME" 2>/dev/null || true
+  aws logs put-retention-policy --log-group-name "/aws/lambda/$NAME" --retention-in-days 30
 fi
 
 URL=$(aws lambda get-function-url-config --function-name "$NAME" --query FunctionUrl --output text)
