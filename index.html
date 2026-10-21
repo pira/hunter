@@ -142,13 +142,18 @@
         #version { color: #475569; font-size: .7em; margin-top: 1em; }
 
         /* Level-up cards */
-        #levelup { flex-direction: column; background: rgba(5, 8, 16, .6); }
+        #levelup { flex-direction: column; background: rgba(5, 8, 16, .6); transition: background-color .35s, backdrop-filter .35s; }
+        #levelup.show { animation: none; } /* title pops on its own; background eases in */
+        #levelup.intro { background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; pointer-events: none; }
+        #levelup.intro #levelupSub, #levelup.intro #cards { visibility: hidden; }
+        #levelup.intro #levelupTitle { text-shadow: 0 4px 0 #7c2d12, 0 0 40px rgba(255,140,40,.9); }
         .lu { text-align: center; width: 100%; max-width: 46em; }
         #levelupTitle { font-size: 3em; color: var(--gold); text-shadow: 0 4px 0 #7c2d12; animation: pop .35s ease-out; }
         #levelupSub { margin: .3em 0 1.2em; color: #e2e8f0; }
         @keyframes pop { from { transform: scale(.5); opacity: 0; } }
         #cards { display: flex; gap: 14px; justify-content: center; }
-        .card { position: relative; flex: 1 1 0; max-width: 14em; display: flex; flex-direction: column; align-items: center; gap: .35em; padding: 1.2em .9em 1em; border-radius: 18px; border: 2px solid rgba(255,255,255,.18); background: linear-gradient(180deg, #1e293b, #0f172a); box-shadow: 0 8px 0 rgba(0,0,0,.35); animation: deal .35s ease-out backwards; animation-delay: var(--d); transition: transform .12s, border-color .12s; }
+        .card { position: relative; flex: 1 1 0; max-width: 14em; display: flex; flex-direction: column; align-items: center; gap: .35em; padding: 1.2em .9em 1em; border-radius: 18px; border: 2px solid rgba(255,255,255,.18); background: linear-gradient(180deg, #1e293b, #0f172a); box-shadow: 0 8px 0 rgba(0,0,0,.35); transition: transform .12s, border-color .12s; }
+        #levelup:not(.intro) .card { animation: deal .35s ease-out backwards; animation-delay: var(--d); }
         .card:hover { transform: translateY(-6px); border-color: var(--gold); }
         .card:active { transform: translateY(2px); }
         @keyframes deal { from { transform: translateY(40px) rotate(-4deg); opacity: 0; } }

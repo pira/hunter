@@ -8,6 +8,9 @@ if (!GameMath) {
 const U = GameMath;
 const TAU = Math.PI * 2;
 const STEP = 1 / 60;
+const GAME_SPEED = 0.9; // whole simulation runs at 90% speed
+const BURN_MS = 1500; // level-up burn transition length
+const ARENA_HUES = [200, 265, 160, 330, 35, 225, 120, 290, 10, 185]; // one arena colour per level, cycling
 const WORLD_AREA = 800 * 600; // Every screen shape gets the same play area, so scores stay comparable.
 const EMOJI_FONT = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
 const DISPLAY_FONT = '"Lilita One","Arial Rounded MT Bold",system-ui,sans-serif';
@@ -81,16 +84,16 @@ const FALLBACK_CARDS = [
 ];
 
 const BOSSES = [
-    { name: 'Bonecrusher', title: 'The Juggernaut', color: '#C0392B', accent: '#F5B041', size: 40, hp: 70, speed: 0.9, pattern: 'charge' },
-    { name: 'Hexweaver', title: 'Witch of the Ninth Moon', color: '#7D3C98', accent: '#F4D03F', size: 36, hp: 100, speed: 1.1, pattern: 'rings' },
-    { name: 'Broodmother', title: 'Queen of the Swarm', color: '#1E8449', accent: '#ABEBC6', size: 46, hp: 130, speed: 0.6, pattern: 'summon' },
-    { name: 'Voidmaw', title: 'Devourer of Light', color: '#1B2631', accent: '#E74C3C', size: 44, hp: 170, speed: 1.0, pattern: 'chaos' }
+    { name: 'Bonecrusher', title: 'The Juggernaut', color: '#C0392B', accent: '#F5B041', size: 40, hp: 60, speed: 0.9, pattern: 'charge' },
+    { name: 'Hexweaver', title: 'Witch of the Ninth Moon', color: '#7D3C98', accent: '#F4D03F', size: 36, hp: 85, speed: 1.1, pattern: 'rings' },
+    { name: 'Broodmother', title: 'Queen of the Swarm', color: '#1E8449', accent: '#ABEBC6', size: 46, hp: 110, speed: 0.6, pattern: 'summon' },
+    { name: 'Voidmaw', title: 'Devourer of Light', color: '#1B2631', accent: '#E74C3C', size: 44, hp: 145, speed: 1.0, pattern: 'chaos' }
 ];
 
 class Game {
     constructor() {
         // Version system (bumped by the pre-commit hook, see VERSION-README.md)
-        this.version = "2.0.0";
+        this.version = "2.1.0";
         this.buildDate = "2026-10-21";
 
         this.canvas = document.getElementById('gameCanvas');
@@ -201,6 +204,7 @@ class Game {
                 this.startRun();
                 return;
             }
+            if (this.state === 'transition') return;
             if (this.state === 'levelup') {
                 const idx = ['1', '2', '3'].indexOf(key);
                 if (idx >= 0) this.chooseCard(idx);
@@ -293,10 +297,14 @@ class Game {
             cssH = vh;
             cssW = vh * aspect;
         }
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const sizeKey = `${Math.round(cssW)}x${Math.round(cssH)}@${dpr}`;
+        if (sizeKey === this.sizeKey) return; // spurious resize (mobile URL bar, screenshots)
+        this.sizeKey = sizeKey;
         this.W = W;
         this.H = H;
         this.scale = cssW / W;
-        this.dpr = Math.min(window.devicePixelRatio || 1, 2);
+        this.dpr = dpr;
         this.canvas.width = Math.round(cssW * this.dpr);
         this.canvas.height = Math.round(cssH * this.dpr);
         this.canvas.style.width = `${cssW}px`;
@@ -305,6 +313,7 @@ class Game {
         this.stage.style.height = `${cssH}px`;
         this.stage.style.setProperty('--ui', Math.max(0.75, Math.min(1.25, cssW / 900)).toFixed(3));
         this.bgKey = null;
+        if (this.burn) this.finishBurn();
         if (this.player) {
             this.player.x = U.clamp(this.player.x, this.player.r, W - this.player.r);
             this.player.y = U.clamp(this.player.y, this.player.r, H - this.player.r);
@@ -370,6 +379,8 @@ class Game {
         this.comboPop = 0;
         this.unlockedNow = null;
         this.submitting = false;
+        this.burn = null;
+        if (this.el) this.el.levelup.classList.remove('intro');
     }
 
     showMenu() {
@@ -441,7 +452,7 @@ class Game {
         this.lastTime = now;
 
         if (this.state === 'playing' || this.state === 'dying') {
-            this.acc += dt * this.timeScale;
+            this.acc += dt * this.timeScale * GAME_SPEED;
             let steps = 0;
             while (this.acc >= STEP && steps < 6) {
                 this.step();
@@ -459,6 +470,7 @@ class Game {
         }
 
         this.render();
+        if (this.state === 'transition') this.drawBurn(now, dt);
         this.updateHud();
     }
 
@@ -489,7 +501,7 @@ class Game {
             return;
         }
 
-        this.time += STEP;
+        this.time += STEP / GAME_SPEED; // survival time in real seconds
         this.updatePlayer();
         this.updateWeapons();
         this.updateBullets();
@@ -503,8 +515,8 @@ class Game {
         this.updateSpawning();
         this.sweepDead();
 
-        if (this.state === 'playing' && this.pendingLevels > 0) this.openCards('level');
-        else if (this.state === 'playing' && this.pendingReward) this.openCards('reward');
+        if (this.state === 'playing' && this.pendingLevels > 0) this.beginCards('level');
+        else if (this.state === 'playing' && this.pendingReward) this.beginCards('reward');
     }
 
     // ------------------------------------------------------------------ derived stats
@@ -629,7 +641,7 @@ class Game {
         this.killer = source;
         this.state = 'dying';
         this.deathTimer = 48;
-        this.timeScale = 0.4;
+        this.timeScale = 0.45;
         this.shake(24);
         const p = this.player;
         this.burst(p.x, p.y, '#ffffff', 40, 7);
@@ -695,7 +707,7 @@ class Game {
 
     fireBullets(aim) {
         const p = this.player;
-        this.cooldowns.bullets = 26;
+        this.cooldowns.bullets = 32;
         const base = Math.atan2(aim.y - p.y, aim.x - p.x);
         const count = 1 + this.stack('split');
         const angles = [];
@@ -975,7 +987,7 @@ class Game {
             this.bossWarning--;
             if (this.bossWarning % 30 === 0) Sfx.tone(220, { duration: 0.25, type: 'sawtooth', volume: 0.08, slide: -80 });
             if (this.bossWarning === 0) this.spawnBoss();
-        } else if (!this.boss && this.bossQueue > 0) {
+        } else if (!this.boss && this.bossQueue > 0 && !this.pendingLevels && !this.pendingReward) {
             this.bossQueue--;
             this.startBossWarning();
         }
@@ -1407,15 +1419,9 @@ class Game {
         return pool;
     }
 
-    openCards(mode) {
-        const pool = this.availableCards();
-        let cards = U.pickWeightedUnique(pool, 3);
-        while (cards.length < 3) cards.push(FALLBACK_CARDS[cards.length % 2 === 0 ? 0 : 1]);
-        this.cardChoices = cards;
-        this.cardMode = mode;
-        this.cardsReadyAt = performance.now() + 450;
-        this.state = 'levelup';
-
+    cardHeader(mode) {
+        if (this.headerShown) return;
+        this.headerShown = true;
         if (mode === 'level') {
             this.el.levelupTitle.textContent = `LEVEL ${this.level - this.pendingLevels + 1}!`;
             const unlock = this.unlockedNow;
@@ -1427,7 +1433,211 @@ class Game {
         } else {
             this.el.levelupTitle.textContent = 'BOSS TREASURE';
             this.el.levelupSub.textContent = 'Claim your reward';
+            Sfx.arpeggio([523, 659, 784], 0.08, { type: 'triangle', volume: 0.1 });
         }
+    }
+
+    beginCards(mode) {
+        // Back-to-back level-ups skip the transition; the first one already set the scene.
+        if (performance.now() - (this.cardsClosedAt || 0) < 400) this.openCards(mode);
+        else this.startBurn(mode);
+    }
+
+    // ---- burning-film transition: the last frame burns away and reveals the new level underneath
+
+    startBurn(mode) {
+        const c = this.canvas;
+        const k = Math.max(4, Math.ceil(c.width / 320));
+        const mw = Math.ceil(c.width / k);
+        const mh = Math.ceil(c.height / k);
+        const mk = () => {
+            const cv = document.createElement('canvas');
+            cv.width = mw;
+            cv.height = mh;
+            const cx = cv.getContext('2d');
+            return { cv, cx, img: cx.createImageData(mw, mh) };
+        };
+        const b = this.burn = { mode, t0: performance.now(), mw, mh, k, mask: mk(), char: mk(), glow: mk(), embers: [], intro: false };
+        for (let i = 0; i < mw * mh; i++) {
+            b.char.img.data[i * 4] = 28;
+            b.char.img.data[i * 4 + 1] = 10;
+        }
+        // Composite at <=1280px / ~0.75MP and upscale once per frame: cheap even on 4K / high-DPI screens.
+        const rs = Math.min(1, 1280 / c.width, Math.sqrt(750000 / (c.width * c.height)));
+        const rw = Math.round(c.width * rs);
+        const rh = Math.round(c.height * rs);
+        b.snap = document.createElement('canvas');
+        b.snap.width = rw;
+        b.snap.height = rh;
+        b.snap.getContext('2d').drawImage(c, 0, 0, rw, rh); // canvas still shows the last frame of the old level
+        b.film = document.createElement('canvas');
+        b.film.width = rw;
+        b.film.height = rh;
+        b.field = Game.burnField(mw, mh);
+        this.headerShown = false;
+        this.state = 'transition';
+        this.releaseStick();
+        Sfx.crackle(BURN_MS / 1000);
+        Sfx.tone(200, { duration: 0.7, type: 'sine', volume: 0.12, slide: -140 });
+    }
+
+    // Normalized burn order per low-res cell: holes start at a few ignition points and spread with noise.
+    static burnField(w, h) {
+        const smooth = t => t * t * (3 - 2 * t);
+        const octave = cell => {
+            const gw = Math.ceil(w / cell) + 2;
+            const gh = Math.ceil(h / cell) + 2;
+            const g = new Float32Array(gw * gh).map(() => Math.random());
+            const out = new Float32Array(w * h);
+            for (let y = 0; y < h; y++) {
+                const fy = y / cell;
+                const iy = Math.floor(fy);
+                const ty = smooth(fy - iy);
+                for (let x = 0; x < w; x++) {
+                    const fx = x / cell;
+                    const ix = Math.floor(fx);
+                    const tx = smooth(fx - ix);
+                    const i = iy * gw + ix;
+                    const top = g[i] + (g[i + 1] - g[i]) * tx;
+                    const bot = g[i + gw] + (g[i + gw + 1] - g[i + gw]) * tx;
+                    out[y * w + x] = top + (bot - top) * ty;
+                }
+            }
+            return out;
+        };
+        const octs = [[w / 3, 0.5], [w / 7, 0.28], [w / 16, 0.14], [w / 40, 0.08]].map(([cell, wt]) => [octave(Math.max(2, cell)), wt]);
+        const sparks = Array.from({ length: 3 }, () => ({ x: w * (0.15 + Math.random() * 0.7), y: h * (0.15 + Math.random() * 0.7) }));
+        const diag = Math.hypot(w, h);
+        const field = new Float32Array(w * h);
+        let min = Infinity;
+        let max = -Infinity;
+        for (let y = 0; y < h; y++) {
+            for (let x = 0; x < w; x++) {
+                const i = y * w + x;
+                let n = 0;
+                for (const [o, wt] of octs) n += o[i] * wt;
+                let d = Infinity;
+                for (const s of sparks) d = Math.min(d, Math.hypot(x - s.x, y - s.y));
+                const v = 0.55 * (d / diag) * 2 + 0.45 * n;
+                field[i] = v;
+                if (v < min) min = v;
+                if (v > max) max = v;
+            }
+        }
+        for (let i = 0; i < field.length; i++) field[i] = (field[i] - min) / (max - min);
+        return field;
+    }
+
+    drawBurn(now, dt) {
+        const b = this.burn;
+        if (!b) return;
+        const p = U.clamp((now - b.t0) / BURN_MS, 0, 1);
+        const e = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+        const t = -0.06 + 1.1 * e; // burn threshold sweeps through the field (done at ~80%, then a short hold)
+        const A = b.mask.img.data;
+        const C = b.char.img.data;
+        const G = b.glow.img.data;
+        const f = b.field;
+        for (let i = 0, j = 3; i < f.length; i++, j += 4) {
+            const d = f[i] - t;
+            const alpha = d <= 0 ? 0 : d >= 0.02 ? 1 : d / 0.02;
+            A[j] = alpha * 255;
+            C[j] = d > 0 && d < 0.12 ? (1 - d / 0.12) * 230 * alpha : 0;
+            const gd = Math.abs(d - 0.004);
+            const g = gd < 0.032 ? 1 - gd / 0.032 : 0;
+            G[j - 3] = 255;
+            G[j - 2] = 70 + 185 * g * g;
+            G[j - 1] = 20 + 160 * g * g * g;
+            G[j] = g * 255;
+        }
+        b.mask.cx.putImageData(b.mask.img, 0, 0);
+        b.char.cx.putImageData(b.char.img, 0, 0);
+        b.glow.cx.putImageData(b.glow.img, 0, 0);
+
+        const rw = b.film.width;
+        const rh = b.film.height;
+        const fc = b.film.getContext('2d');
+        fc.globalCompositeOperation = 'copy';
+        fc.drawImage(b.snap, 0, 0);
+        fc.globalCompositeOperation = 'source-atop';
+        fc.fillStyle = `rgba(255,150,60,${0.1 * e + Math.random() * 0.04})`; // film heats up and flickers
+        fc.fillRect(0, 0, rw, rh);
+        fc.drawImage(b.char.cv, 0, 0, rw, rh);
+        fc.globalCompositeOperation = 'destination-in';
+        fc.drawImage(b.mask.cv, 0, 0, rw, rh);
+        fc.globalCompositeOperation = 'lighter'; // glowing edge straddles film and the holes
+        fc.drawImage(b.glow.cv, 0, 0, rw, rh);
+        fc.globalCompositeOperation = 'source-over';
+
+        const ctx = this.ctx;
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.drawImage(b.film, 0, 0, this.canvas.width, this.canvas.height);
+        ctx.globalCompositeOperation = 'lighter';
+
+        // Embers flying off the burning edge
+        for (let n = 0; n < 50 && p < 0.92; n++) {
+            const i = Math.floor(Math.random() * f.length);
+            if (Math.abs(f[i] - t) < 0.015) {
+                b.embers.push({
+                    x: ((i % b.mw) + Math.random()) * b.k, y: (Math.floor(i / b.mw) + Math.random()) * b.k,
+                    vx: (Math.random() - 0.5) * 40 * this.dpr, vy: -(30 + Math.random() * 90) * this.dpr,
+                    life: 0.4 + Math.random() * 0.6, max: 1, r: (1 + Math.random() * 2) * this.dpr
+                });
+            }
+        }
+        for (const em of b.embers) {
+            em.x += em.vx * dt;
+            em.y += em.vy * dt;
+            em.vy -= 30 * dt * this.dpr;
+            em.life -= dt;
+            const a = U.clamp(em.life / 0.6, 0, 1);
+            ctx.fillStyle = `rgba(255,${150 + Math.floor(Math.random() * 80)},60,${a})`;
+            ctx.beginPath();
+            ctx.arc(em.x, em.y, em.r, 0, TAU);
+            ctx.fill();
+        }
+        b.embers = b.embers.filter(em => em.life > 0);
+        ctx.restore();
+
+        if (p >= 0.45 && !b.intro) {
+            b.intro = true;
+            this.el.levelup.classList.add('intro');
+            this.prepareCards(b.mode);
+            this.setOverlay('levelup');
+        }
+        if (p >= 1) this.finishBurn();
+    }
+
+    finishBurn() {
+        const b = this.burn;
+        if (!b) return;
+        this.burn = null;
+        if (!b.intro) this.prepareCards(b.mode);
+        this.revealCards();
+    }
+
+    openCards(mode) {
+        this.el.levelup.classList.remove('intro');
+        this.prepareCards(mode);
+        this.revealCards();
+    }
+
+    revealCards() {
+        this.el.levelup.classList.remove('intro'); // cards deal in (CSS animation starts now)
+        this.setOverlay('levelup');
+        this.state = 'levelup';
+        this.cardsReadyAt = performance.now() + 450;
+        this.headerShown = false;
+    }
+
+    prepareCards(mode) {
+        const pool = this.availableCards();
+        let cards = U.pickWeightedUnique(pool, 3);
+        while (cards.length < 3) cards.push(FALLBACK_CARDS[cards.length % 2 === 0 ? 0 : 1]);
+        this.cardChoices = cards;
+        this.cardMode = mode;
+        this.cardHeader(mode);
 
         this.el.cards.innerHTML = cards.map((c, i) => {
             const rank = this.stack(c.id);
@@ -1441,7 +1651,6 @@ class Game {
         }).join('');
         this.el.cards.querySelectorAll('.card').forEach(btn =>
             btn.addEventListener('click', () => this.chooseCard(Number(btn.dataset.i))));
-        this.setOverlay('levelup');
     }
 
     chooseCard(i) {
@@ -1455,6 +1664,7 @@ class Game {
         this.state = 'playing';
         this.setOverlay(null);
         this.lastTime = performance.now();
+        this.cardsClosedAt = performance.now();
         this.floater(this.player.x, this.player.y - 40, `${card.icon} ${card.name}`, '#ffffff', 20);
     }
 
@@ -1590,8 +1800,8 @@ class Game {
             bg.height = this.canvas.height;
             const g = bg.getContext('2d');
             const k = this.dpr * this.scale;
-            const hue = (195 + (this.level - 1) * 11) % 360;
-            const light = Math.max(30, 66 - (this.level - 1) * 1.1);
+            const hue = ARENA_HUES[(this.level - 1) % ARENA_HUES.length];
+            const light = Math.max(32, 64 - (this.level - 1) * 0.9);
             g.fillStyle = `hsl(${hue}, 42%, ${light}%)`;
             g.fillRect(0, 0, bg.width, bg.height);
             const tile = 40 * k;

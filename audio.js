@@ -118,6 +118,30 @@
             osc.stop(t + duration + 0.02);
         },
 
+        // Burning-film crackle: filtered hiss with random pops, swelling in and out.
+        crackle(duration = 1.5, volume = 0.35) {
+            if (!this.ctx || this.muted) return;
+            const rate = this.ctx.sampleRate;
+            const len = Math.floor(rate * duration);
+            const buffer = this.ctx.createBuffer(1, len, rate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < len; i++) {
+                const env = Math.sin(Math.PI * (i / len)) ** 0.7;
+                const pop = Math.random() < 0.0015 ? (Math.random() * 2 - 1) * 0.9 : 0;
+                data[i] = ((Math.random() * 2 - 1) * 0.12 + pop) * env;
+            }
+            const source = this.ctx.createBufferSource();
+            source.buffer = buffer;
+            const filter = this.ctx.createBiquadFilter();
+            filter.type = 'bandpass';
+            filter.frequency.value = 1800;
+            filter.Q.value = 0.6;
+            const gain = this.ctx.createGain();
+            gain.gain.value = volume;
+            source.connect(filter).connect(gain).connect(this.master);
+            source.start();
+        },
+
         arpeggio(freqs, step = 0.07, opts = {}) {
             freqs.forEach((f, i) => this.tone(f, { ...opts, delay: i * step }));
         },
