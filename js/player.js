@@ -11,7 +11,12 @@ extendGame({
     },
 
     get damageMult() {
-        return (1 + 0.2 * this.stack('power')) * (this.buffs.dmg2 ? 2 : 1) * this.artefactMult('damage');
+        return (this.buffs.dmg2 ? 2 : 1) * this.artefactMult('damage');
+    },
+
+    /** Power cards: +20% per rank on the basic attack only (bolts, swings, thrown bombs — not supers). */
+    get powerMult() {
+        return 1 + 0.2 * this.stack('power');
     },
 
     get coinMult() {
@@ -24,8 +29,15 @@ extendGame({
         return Math.min(card, this.timers.freeze > 0 ? 0.5 : 1);
     },
 
+    /** Coins (and gems): the Magnet powerup and the Coin Magnet card pull them from the whole map. */
     get magnetRadius() {
         if (this.timers.magnet > 0 || this.buffs.magnetAll || this.phase === 'travel') return 2000;
+        return this.pickupRadius;
+    },
+
+    /** Powerups only come from the Magnet upgrade's radius (and everything glides in during travel). */
+    get pickupRadius() {
+        if (this.phase === 'travel') return 2000;
         return 70 + 45 * this.stack('magnet');
     },
 

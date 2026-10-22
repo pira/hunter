@@ -185,11 +185,15 @@
         return Math.max(1, Math.round(tierBase * hpScale(level) * rand));
     }
 
-    /** Price of a shop card: permanent = static base × (1 + 0.75 × rank); one-level = share of income. */
-    // Permanent (whole-run) cards cost several times their base: they keep paying off all run.
+    /**
+     * Price of a shop card.
+     * Permanent (whole run): cost × 3 × (1 + 0.75 × rank owned) — a finite sink that doesn't inflate.
+     * One level: `cost` is the price at level 2 and grows with the level's expected income, so the
+     * strong ones (Fury II, Double Damage) stay a real choice and the weak ones (Road Brake) stay cheap.
+     */
     const PERMANENT_PRICE_MULT = 3;
-    function cardPrice(card, rank, expected, incomeEMA) {
-        if (card.share) return Math.max(card.cost, Math.round(card.share * Math.max(expected, incomeEMA || 0)));
+    function cardPrice(card, rank, level = 2) {
+        if (card.oneLevel) return Math.max(5, Math.round((card.cost * expectedIncome(Math.max(2, level))) / expectedIncome(2) / 5) * 5);
         return Math.round(card.cost * PERMANENT_PRICE_MULT * (1 + 0.75 * rank));
     }
 

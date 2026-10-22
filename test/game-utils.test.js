@@ -194,14 +194,15 @@ describe('GameUtils economy', () => {
         assert.equal(GameUtils.coinDrop(0.2, 1, 1), 1);
     });
 
-    it('prices permanent cards statically per rank and one-level cards by income', () => {
+    it('prices permanent cards statically per rank and one-level cards by the level', () => {
         const perm = { cost: 20 };
-        assert.equal(GameUtils.cardPrice(perm, 0, 100), 60);
-        assert.equal(GameUtils.cardPrice(perm, 2, 100), 150);
-        const buff = { cost: 10, share: 0.3 };
-        assert.equal(GameUtils.cardPrice(buff, 0, 100, 50), 30);
-        assert.equal(GameUtils.cardPrice(buff, 0, 100, 200), 60);
-        assert.equal(GameUtils.cardPrice(buff, 0, 10, 0), 10);
+        assert.equal(GameUtils.cardPrice(perm, 0, 2), 60);
+        assert.equal(GameUtils.cardPrice(perm, 2, 30), 150);
+        const buff = { cost: 70, oneLevel: true };
+        assert.equal(GameUtils.cardPrice(buff, 0, 2), 70);
+        assert.equal(GameUtils.cardPrice(buff, 0, 1), 70);
+        assert.ok(GameUtils.cardPrice(buff, 0, 12) > 3 * 70);
+        assert.equal(GameUtils.cardPrice({ cost: 20, oneLevel: true }, 0, 2) % 5, 0);
     });
 
     it('expects more income on later levels', () => {

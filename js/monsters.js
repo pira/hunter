@@ -23,7 +23,7 @@ extendGame({
         const levelSpeed = 1 + Math.min(0.45, (this.level - 1) * 0.012);
         const hp = Math.max(1, Math.round(type.health * U.hpScale(this.level)));
         return {
-            x, y, kbx: 0, kby: 0,
+            x, y, kbx: 0, kby: 0, type,
             size: type.size + Math.random() * type.size * 0.25,
             speed: (type.speed + Math.random() * type.speedVariation) * levelSpeed,
             color: type.color, shape: type.shape, name: type.name, tier: type.tier,
@@ -60,6 +60,17 @@ extendGame({
         const m = this.makeMonster(this.pickType(this.pickTier()), pos.x, pos.y);
         this.emerge(m, pos.from);
         this.monsters.push(m);
+        this.pairUp(m);
+    },
+
+    /** Double Trouble card: every non-boss monster gets a twin right next to it. */
+    pairUp(m, extra = {}) {
+        if (!this.buffs.swarm || m.boss || m.gk || m.twin) return null;
+        const t = this.makeMonster({ ...m.type }, m.x + (Math.random() < 0.5 ? -1 : 1) * (m.size * 2 + 6), m.y - m.size - 4, m.behavior);
+        Object.assign(t, extra, { twin: true });
+        if (m.enc) t.enc = m.enc;
+        this.monsters.push(t);
+        return t;
     },
 
     spawnPack() {
@@ -80,6 +91,8 @@ extendGame({
             const m = this.makeMonster(type, x, y, 'chase');
             m.speed *= 0.9;
             this.monsters.push(m);
+            const t = this.pairUp(m);
+            if (t) t.speed = m.speed;
         }
         this.edgeWarn = { side: fromSide ? (left ? 3 : 1) : 0, t: 60 };
     },

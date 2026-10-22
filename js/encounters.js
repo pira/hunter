@@ -239,6 +239,7 @@ extendGame({
         const m = this.makeMonster(this.pickType(tier), x, y, 'chase');
         m.enc = this.encounter;
         this.monsters.push(m);
+        this.pairUp(m);
         return m;
     },
 
@@ -385,6 +386,8 @@ extendGame({
         const m = this.makeMonster(this.pickType(tier), x, y, 'chase');
         Object.assign(m, { ai: 'wave', enc: this.encounter, anchored: true, spawnT: 0, ignoreFloor: true }, extra);
         this.monsters.push(m);
+        // conga links follow the leader's exact trail, so they can't have a side-by-side twin
+        if (extra.kind !== 'conga' && extra.kind !== 'congaHead') this.pairUp(m, { ai: 'wave', anchored: true, spawnT: 0, ignoreFloor: true, ...extra });
         return m;
     },
 

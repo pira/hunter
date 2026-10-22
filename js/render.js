@@ -132,7 +132,11 @@ extendGame({
             this.drawGem(ctx, c.x, c.y - c.z, 8, c.t, c.y);
             return;
         }
-        const r = c.value >= 5 ? 7 : 5;
+        if (c.value > 1) {
+            this.drawPouch(ctx, c);
+            return;
+        }
+        const r = 5;
         const sx = Math.max(0.2, Math.abs(Math.cos(c.spin)));
         ctx.fillStyle = 'rgba(0,0,0,0.2)';
         ctx.beginPath();
@@ -150,6 +154,63 @@ extendGame({
         ctx.beginPath();
         ctx.ellipse(c.x - r * 0.3 * sx, y - r * 0.3, r * 0.3 * sx, r * 0.3, 0, 0, TAU);
         ctx.fill();
+    },
+
+    /** A little coin pouch: brown sack, gold tie, its value on the front. */
+    drawPouch(ctx, c) {
+        const s = c.value >= 5 ? 1.25 : c.value >= 3 ? 1.1 : 1;
+        const x = c.x;
+        const y = c.y - c.z;
+        const wob = Math.sin(c.spin) * 0.12;
+        ctx.fillStyle = 'rgba(0,0,0,0.22)';
+        ctx.beginPath();
+        ctx.ellipse(x, c.y + 6 * s, 7 * s, 2.6 * s, 0, 0, TAU);
+        ctx.fill();
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(wob);
+        ctx.scale(s, s);
+        ctx.lineWidth = 1.4;
+        ctx.strokeStyle = '#5b3410';
+        // sack body
+        ctx.fillStyle = '#b7792f';
+        ctx.beginPath();
+        ctx.moveTo(-3.5, -4);
+        ctx.bezierCurveTo(-9, -2, -9, 7, 0, 7);
+        ctx.bezierCurveTo(9, 7, 9, -2, 3.5, -4);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        // ruffled top
+        ctx.fillStyle = '#c98a3c';
+        ctx.beginPath();
+        ctx.moveTo(-3.5, -4);
+        ctx.lineTo(-5.5, -8.5);
+        ctx.lineTo(-2, -6.5);
+        ctx.lineTo(0, -9);
+        ctx.lineTo(2, -6.5);
+        ctx.lineTo(5.5, -8.5);
+        ctx.lineTo(3.5, -4);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        // gold tie
+        ctx.strokeStyle = '#ffd60a';
+        ctx.lineWidth = 1.8;
+        ctx.beginPath();
+        ctx.moveTo(-3.8, -4);
+        ctx.lineTo(3.8, -4);
+        ctx.stroke();
+        // value
+        ctx.font = `bold 9px ${DISPLAY_FONT}`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.lineWidth = 2.5;
+        ctx.strokeStyle = '#5b3410';
+        ctx.strokeText(String(c.value), 0, 2);
+        ctx.fillStyle = '#ffe066';
+        ctx.fillText(String(c.value), 0, 2);
+        ctx.restore();
     },
 
     /** A faceted blue diamond with a soft glow and a twinkle. */

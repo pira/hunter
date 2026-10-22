@@ -3,7 +3,7 @@
 class Game {
     constructor() {
         // Version system (bumped by the pre-commit hook, see VERSION-README.md)
-        this.version = "3.2.0";
+        this.version = "3.2.1";
         this.buildDate = "2026-10-22";
 
         this.canvas = document.getElementById('gameCanvas');
@@ -139,6 +139,7 @@ class Game {
             const speed = U.clamp(Math.round((c.speed - 2) / 0.65), 1, 5);
             return `<button class="cls" data-cls="${id}" style="--c:${c.color}" aria-label="${c.name}">` +
                 `<canvas width="120" height="120"></canvas><b>${c.name}</b><small>${'❤️'.repeat(c.hearts)}</small>` +
+                `<span class="cdmg" title="Damage per basic hit">⚔️ <b>${Game.fmtDmg(PRIMARY[c.primary].damage)}</b>${c.primary === 'grenade' ? ' <i>area</i>' : c.primary === 'cleave' ? ' <i>sweep</i>' : ''}</span>` +
                 `<span class="cstat" title="Power">💪<span>${pips(c.power)}</span></span><span class="cstat" title="Speed">👟<span>${pips(speed)}</span></span></button>`;
         }).join('');
         this.el.classInfo = document.getElementById('classInfo');

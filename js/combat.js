@@ -68,7 +68,7 @@ extendGame({
         const count = 1 + this.stack('split');
         for (let i = 0; i < count; i++) {
             const a = base + (i - (count - 1) / 2) * 0.16;
-            this.spawnBolt(p.x + Math.cos(a) * 14, p.y - 6 + Math.sin(a) * 14, a, def.speed, def.radius * this.impactMult, def.damage, this.stack('pierce'));
+            this.spawnBolt(p.x + Math.cos(a) * 14, p.y - 6 + Math.sin(a) * 14, a, def.speed, def.radius * this.impactMult, def.damage * this.powerMult, this.stack('pierce'));
         }
         this.particle({ x: p.x + Math.cos(base) * 18, y: p.y - 6 + Math.sin(base) * 18, vx: 0, vy: 0, life: 6, size: 10, color: '#d8b4fe', kind: 'flash' });
         Sfx.fx('zap', 0.16, (d, rate, len, k) => {
@@ -93,7 +93,7 @@ extendGame({
         if (!target || Math.hypot(target.x - p.x, target.y - p.y) - target.size > reach) return;
         const angle = Math.atan2(target.y - p.y, target.x - p.x);
         this.cooldown = PRIMARY.cleave.cooldown / (1 + 0.25 * this.stack('quick'));
-        this.startCleave(angle, reach, PRIMARY.cleave.damage, PRIMARY.cleave.arc);
+        this.startCleave(angle, reach, PRIMARY.cleave.damage * this.powerMult, PRIMARY.cleave.arc);
         Sfx.play('swoosh', { volume: 0.32, rate: 1.5 + Math.random() * 0.2, duration: 0.3 });
     },
 
@@ -159,7 +159,7 @@ extendGame({
                 this.grenades.push({
                     x: p.x, y: p.y, sx: p.x, sy: p.y, z: 6, vx: Math.cos(a) * def.speed, vy: Math.sin(a) * def.speed,
                     vz: GRENADE_G * flight / 2, bounces: 0, timer: fuse, fuse, spin: 0,
-                    radius: this.blastRadius * blastMult, damage: def.damage
+                    radius: this.blastRadius * blastMult, damage: def.damage * (all ? 1 : this.powerMult)
                 });
             }
         }

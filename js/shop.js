@@ -21,7 +21,7 @@ extendGame({
     // Level buffs: a share of what this player actually earns per level (smoothed), never below the
     // curve's expectation — all four together cost ~1.5 levels of income, so they stay a real choice.
     cardPrice(card) {
-        return U.cardPrice(card, this.stack(card.id), this.expectedIncome(this.level), this.incomeEMA);
+        return U.cardPrice(card, this.stack(card.id), this.level);
     },
 
     availableCards() {
@@ -200,7 +200,7 @@ extendGame({
         const a = ARTEFACTS[id];
         return {
             id: `art:${id}`, artefact: id, icon: a.icon, name: a.name, desc: `Keep forever: +${Math.abs(a.values[1])}% ${a.what}. Slot it in your profile; merge 3 to upgrade.`,
-            price: Math.max(40, Math.round(1.5 * Math.max(this.expectedIncome(this.level), this.incomeEMA || 0)))
+            price: Math.max(60, Math.round(1.5 * this.expectedIncome(this.level) / 5) * 5)
         };
     },
 
@@ -218,9 +218,9 @@ extendGame({
             const pips = Number.isFinite(c.max) && c.max > 1
                 ? `<div class="pips">${Array.from({ length: c.max }, (_, k) => `<i class="${k < rank ? 'on' : k === rank ? 'next' : ''}"></i>`).join('')}</div>`
                 : '';
-            const kind = c.artefact ? 'art' : c.share ? 'lvl' : 'perm';
+            const kind = c.artefact ? 'art' : c.oneLevel ? 'lvl' : 'perm';
             const tag = c.artefact ? '<span class="tag art">✨ ARTEFACT</span>'
-                : c.share ? `<span class="tag lvl">${c.buff ? 'THIS LEVEL' : 'NOW'}</span>`
+                : c.oneLevel ? `<span class="tag lvl">${c.buff ? 'THIS LEVEL' : 'NOW'}</span>`
                     : `<span class="tag perm">PERMANENT${c.cls ? ` · ${CLASSES[c.cls].icon}` : ''}</span>`;
             return `<button class="card ${kind}" data-i="${i}" style="--d:${i * 70}ms"><span class="num">${i + 1}</span>` +
                 `<span class="cicon">${c.icon}</span><span class="cname">${c.name}</span>${tag}` +

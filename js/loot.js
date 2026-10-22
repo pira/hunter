@@ -28,7 +28,8 @@ extendGame({
     spawnCoins(x, y, amount, speed = 2.5, lift = 3) {
         let left = Math.round(amount);
         while (left > 0) {
-            const value = left >= 10 ? 5 : 1;
+            // bigger drops come partly as little pouches worth 5, 3 or 2
+            const value = left >= 10 ? 5 : left >= 6 ? 3 : left >= 4 ? 2 : 1;
             left -= value;
             const a = Math.random() * TAU;
             const v = speed * (0.35 + Math.random() * 0.75);
@@ -132,7 +133,7 @@ extendGame({
                 if (this.timers[t] === 0) this.floater(p.x, p.y - 36, `${POWERUPS[t].name} over`, '#cccccc', 14);
             }
         });
-        const magnet = this.magnetRadius;
+        const magnet = this.pickupRadius;
         for (const pu of this.powerups) {
             pu.t++;
             if (!frozen) pu.life--;

@@ -97,41 +97,44 @@ const POISON_RADIUS = 78;
 
 // Permanent shop cards. Price = cost × 3 × (1 + 0.75 × rank already owned) — a finite sink (D3).
 const UPGRADES = [
-    { id: 'power', icon: '💪', name: 'Power', max: 5, cost: 30, desc: '+20% damage' },
-    { id: 'haste', icon: '⏱️', name: 'Haste', max: 5, cost: 30, desc: '+15% attack speed' },
+    { id: 'power', icon: '💪', name: 'Power', max: 5, cost: 40, desc: '+20% basic attack damage' },
+    { id: 'haste', icon: '⏱️', name: 'Haste', max: 5, cost: 40, desc: '+15% attack speed' },
     { id: 'boots', icon: '👟', name: 'Swift Boots', max: 4, cost: 20, desc: '+10% move speed' },
     { id: 'vitality', icon: '❤️', name: 'Vitality', max: 3, cost: 50, desc: '+1 max heart and heal 1' },
-    { id: 'crit', icon: '🎯', name: 'Keen Eye', max: 4, cost: 30, desc: '+8% chance to crit for 2.5× damage' },
-    { id: 'streak', icon: '🔥', name: 'Hot Streak', max: 3, cost: 20, desc: 'Combo timer lasts 0.6s longer' },
-    { id: 'luck', icon: '🍀', name: 'Lucky Charm', max: 3, cost: 24, desc: '+30% powerup drops' },
+    { id: 'crit', icon: '🎯', name: 'Keen Eye', max: 4, cost: 35, desc: '+8% chance to crit for 2.5× damage' },
+    { id: 'streak', icon: '🔥', name: 'Hot Streak', max: 3, cost: 15, desc: 'Combo timer lasts 0.6s longer' },
+    { id: 'luck', icon: '🍀', name: 'Lucky Charm', max: 3, cost: 20, desc: '+30% powerup drops' },
     { id: 'goldrush', icon: '💰', name: 'Gold Rush', max: 4, cost: 25, desc: '+15% coins' },
-    { id: 'magnet', icon: '🧲', name: 'Magnet', max: 3, cost: 20, desc: 'Pull coins and pickups from further away' },
-    { id: 'overtime', icon: '⌛', name: 'Overtime', max: 3, cost: 24, desc: 'Powerups last 30% longer (cap 30s)' },
-    { id: 'regen', icon: '🌿', name: 'Regeneration', max: 2, cost: 50, desc: 'Regrow a heart every 40s (25s at rank 2)' },
-    { id: 'nova', icon: '💫', name: 'Static Nova', max: 2, cost: 40, desc: 'Taking a hit blasts nearby monsters' },
+    { id: 'magnet', icon: '🧲', name: 'Magnet', max: 3, cost: 15, desc: 'Pull coins and pickups from further away' },
+    { id: 'overtime', icon: '⌛', name: 'Overtime', max: 3, cost: 20, desc: 'Powerups last 30% longer (cap 30s)' },
+    { id: 'regen', icon: '🌿', name: 'Regeneration', max: 2, cost: 45, desc: 'Regrow a heart every 40s (25s at rank 2)' },
+    { id: 'nova', icon: '💫', name: 'Static Nova', max: 2, cost: 35, desc: 'Taking a hit blasts nearby monsters' },
     { id: 'impact', icon: '💥', name: 'Impact', max: 3, cost: 30, desc: '+15% bolt size, cleave reach and blast radius' },
-    { id: 'split', icon: '🔱', name: 'Split Shot', max: 3, cost: 36, cls: 'wizard', desc: 'Bolts fire +1 projectile' },
+    { id: 'split', icon: '🔱', name: 'Split Shot', max: 3, cost: 40, cls: 'wizard', desc: 'Bolts fire +1 projectile' },
     { id: 'pierce', icon: '🏹', name: 'Piercing Rounds', max: 3, cost: 30, cls: 'wizard', desc: 'Bolts pierce +1 monster' },
-    { id: 'reach', icon: '📏', name: 'Longer Handle', max: 3, cost: 24, cls: 'barbarian', desc: 'Axe handle +10% longer (10 → 20 → 30%): more reach' },
+    { id: 'reach', icon: '📏', name: 'Longer Handle', max: 3, cost: 25, cls: 'barbarian', desc: 'Axe handle +10% longer (10 → 20 → 30%): more reach' },
     { id: 'quick', icon: '💨', name: 'Quick Swing', max: 3, cost: 30, cls: 'barbarian', desc: '+25% swing speed' },
-    { id: 'cluster', icon: '🧨', name: 'Cluster Bombs', max: 3, cost: 36, cls: 'goblin', desc: '+1 grenade per throw (max 5)' },
+    { id: 'cluster', icon: '🧨', name: 'Cluster Bombs', max: 3, cost: 40, cls: 'goblin', desc: '+1 grenade per throw (max 5)' },
     { id: 'fuse', icon: '⏲️', name: 'Short Fuse', max: 3, cost: 30, cls: 'goblin', desc: 'Grenades burst 20% sooner and throw 10% faster' }
 ];
-// One-level cards: always on sale, last until the next level. Price = share × max(expected, actual) income.
+// One-level cards: last until the next level. `cost` = price at level 2; it grows with the level's
+// expected income (U.cardPrice). Cheap = nice to have, expensive = strong.
 const LEVEL_BUFFS = [
-    { id: 'freeze1', group: 'freeze', icon: '🧊', name: 'Freeze I', buff: true, cost: 10, share: 0.30, weight: 0.5, desc: 'This level: monsters move at 75%' },
-    { id: 'freeze2', group: 'freeze', icon: '❄️', name: 'Freeze II', buff: true, cost: 15, share: 0.50, weight: 0.35, desc: 'This level: monsters move at 50%' },
-    { id: 'fleet1', group: 'fleet', icon: '🏃', name: 'Fleet Foot I', buff: true, cost: 8, share: 0.25, weight: 0.5, desc: 'This level: you run 150% fast' },
-    { id: 'fleet2', group: 'fleet', icon: '🐆', name: 'Fleet Foot II', buff: true, cost: 12, share: 0.40, weight: 0.35, desc: 'This level: you run 200% fast' },
-    { id: 'fury1', group: 'fury', icon: '😤', name: 'Fury I', buff: true, cost: 12, share: 0.35, weight: 0.5, desc: 'This level: attack 150% as often' },
-    { id: 'fury2', group: 'fury', icon: '👹', name: 'Fury II', buff: true, cost: 18, share: 0.60, weight: 0.35, desc: 'This level: attack twice as often' },
-    { id: 'magnetAll', icon: '🧲', name: 'Coin Magnet', buff: true, cost: 6, share: 0.20, weight: 0.5, desc: 'This level: pull coins from the whole screen' },
-    { id: 'brake', icon: '🐢', name: 'Road Brake', buff: true, cost: 8, share: 0.25, weight: 0.5, desc: 'This level: the road moves at 60%' },
-    { id: 'xp2', icon: '📘', name: 'Double Progress', buff: true, cost: 12, share: 0.35, weight: 0.5, desc: 'This level: the level bar fills twice as fast' },
-    { id: 'gold2', icon: '💰', name: 'Double Gold', buff: true, cost: 10, share: 0.30, weight: 0.5, desc: 'This level: ×2 coins' },
-    { id: 'dmg2', icon: '🗡️', name: 'Double Damage', buff: true, cost: 15, share: 0.50, weight: 0.5, desc: 'This level: ×2 damage' },
-    { id: 'feast', icon: '🍖', name: 'Feast', cost: 8, share: 0.25, weight: 0.4, desc: 'Fully heal' }
+    { id: 'brake', icon: '🐢', name: 'Road Brake', buff: true, cost: 20, weight: 0.5, desc: 'This level: the road moves at 60%' },
+    { id: 'magnetAll', icon: '🧲', name: 'Coin Magnet', buff: true, cost: 25, weight: 0.5, desc: 'This level: pull coins from the whole map' },
+    { id: 'fleet1', group: 'fleet', icon: '🏃', name: 'Fleet Foot I', buff: true, cost: 30, weight: 0.5, desc: 'This level: you run 150% fast' },
+    { id: 'fleet2', group: 'fleet', icon: '🐆', name: 'Fleet Foot II', buff: true, cost: 50, weight: 0.35, desc: 'This level: you run 200% fast' },
+    { id: 'feast', icon: '🍖', name: 'Feast', cost: 40, weight: 0.4, desc: 'Fully heal' },
+    { id: 'freeze1', group: 'freeze', icon: '🧊', name: 'Freeze I', buff: true, cost: 45, weight: 0.5, desc: 'This level: monsters move at 75%' },
+    { id: 'gold2', icon: '💰', name: 'Double Gold', buff: true, cost: 60, weight: 0.5, desc: 'This level: ×2 coins' },
+    { id: 'fury1', group: 'fury', icon: '😤', name: 'Fury I', buff: true, cost: 70, weight: 0.5, desc: 'This level: attack 150% as often' },
+    { id: 'swarm', icon: '👯', name: 'Double Trouble', buff: true, cost: 70, weight: 0.45, desc: 'This level: twice the monsters — they all come in pairs. More kills, more coins!' },
+    { id: 'xp2', icon: '📘', name: 'Double Progress', buff: true, cost: 80, weight: 0.5, desc: 'This level: the level bar fills twice as fast' },
+    { id: 'freeze2', group: 'freeze', icon: '❄️', name: 'Freeze II', buff: true, cost: 80, weight: 0.35, desc: 'This level: monsters move at 50%' },
+    { id: 'fury2', group: 'fury', icon: '👹', name: 'Fury II', buff: true, cost: 120, weight: 0.35, desc: 'This level: attack twice as often' },
+    { id: 'dmg2', icon: '🗡️', name: 'Double Damage', buff: true, cost: 120, weight: 0.5, desc: 'This level: ×2 damage' }
 ];
+LEVEL_BUFFS.forEach(b => { b.oneLevel = true; });
 
 // Small bosses (L5, 15, 25 …)
 const BOSSES = [
