@@ -128,7 +128,13 @@ extendGame({
         const p = this.player;
         this.ring(pu.x, pu.y, 40, def.color, 18);
         this.burst(pu.x, pu.y, def.color, 14, 4);
-        if (def.timed) {
+        if (pu.type === 'storm') {
+            // Storm runs a fixed 15 s and strikes immediately, then every 3 s.
+            this.timers.storm = Math.min(TIMER_CAP, this.timers.storm + STORM.duration);
+            this.stormClock = 1;
+            this.floater(p.x, p.y - 36, 'STORM!', def.color, 24);
+            Sfx.play('powerup', { volume: 0.32, rate: 0.9 });
+        } else if (def.timed) {
             this.timers[pu.type] = Math.min(TIMER_CAP, this.timers[pu.type] + this.powerupDuration);
             this.floater(p.x, p.y - 36, def.name.toUpperCase(), def.color, 22);
             Sfx.play('powerup', { volume: 0.32 });
@@ -143,6 +149,11 @@ extendGame({
             Sfx.play('powerup', { volume: 0.32, rate: 1.2 });
         } else if (pu.type === 'bomb') {
             this.activateBomb();
+        } else if (pu.type === 'overcharge') {
+            this.floater(p.x, p.y - 36, 'OVERCHARGE!', def.color, 22);
+            this.superMeter = 99.9;
+            this.addCharge(1);
+            Sfx.play('powerup', { volume: 0.32, rate: 1.4 });
         }
     },
 

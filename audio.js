@@ -18,7 +18,6 @@
         powerup: { src: 'sfx/powerup.mp3', poly: 2, priority: 2 },
         boom: { src: 'sfx/boom.mp3', poly: 3, throttle: 60 },
         grenade: { src: 'sfx/grenade.mp3', poly: 2, throttle: 90 },
-        missile: { src: 'sfx/missile.mp3', poly: 2, throttle: 90 },
         gameOver: { src: 'sfx/game-over.mp3', bus: 'music', poly: 1, priority: 3 },
         levelUp: { src: 'sfx/level-up.mp3', bus: 'ui', poly: 1, priority: 3 }
     };
@@ -339,7 +338,7 @@
 
         // ---- voice manager
 
-        startVoice(buffer, { name, volume = 1, rate = 1, duration, bus = 'sfx', poly = 4, priority = 1, filter } = {}) {
+        startVoice(buffer, { name, volume = 1, rate = 1, duration, bus = 'sfx', poly = 4, priority = 1, filter, loop = false } = {}) {
             const ctx = this.ctx;
             if (!ctx || this.muted || !buffer || ctx.state === 'closed') return null;
             const t = ctx.currentTime;
@@ -362,6 +361,7 @@
             const src = ctx.createBufferSource();
             src.buffer = buffer;
             src.playbackRate.value = rate;
+            src.loop = loop;
             const gain = ctx.createGain();
             gain.gain.value = volume;
             let head = src;
@@ -635,6 +635,32 @@
                 fill(d, sr, len, { osc, biquad, reverb, normalize, rng });
             });
             return this.startVoice(buf, { name: `fx:${name}`, volume, bus, poly, priority, rate });
+        },
+
+        /** A looping synth sound (e.g. the whirlwind); stop it with fadeOut(voice). */
+        loopFx(name, seconds, fill, { volume = 0.5, bus = 'sfx' } = {}) {
+            if (!this.ctx || this.muted) return null;
+            const buf = this.render(`loop:${name}`, seconds, (d, sr, len) => {
+                fill(d, sr, len, { osc, biquad, reverb, normalize, rng });
+                const x = Math.floor(sr * 0.02); // crossfade the seam
+                for (let i = 0; i < x; i++) {
+                    const t = i / x;
+                    d[i] = d[i] * t + d[len - x + i] * (1 - t);
+                }
+            });
+            const v = this.startVoice(buf, { name: `loop:${name}`, volume: 0.0001, bus, poly: 1, priority: 2, loop: true });
+            if (v) v.gain.gain.setTargetAtTime(volume, this.ctx.currentTime, 0.08);
+            return v;
+        },
+
+        fadeOut(voice, seconds = 0.3) {
+            if (!voice || !this.ctx || voice.released) return;
+            try {
+                const t = this.ctx.currentTime;
+                voice.gain.gain.cancelScheduledValues(t);
+                voice.gain.gain.setTargetAtTime(0, t, seconds / 3);
+                voice.src.stop(t + seconds + 0.05);
+            } catch (e) { /* already stopped */ }
         },
 
         toggleMute() {

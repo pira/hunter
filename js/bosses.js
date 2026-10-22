@@ -208,7 +208,7 @@ extendGame({
             s.life--;
             if (s.x < -20 || s.x > this.W + 20 || s.y < -20 || s.y > this.H + 20) s.life = 0;
             if (s.life > 0 && U.distanceSquared(s.x, s.y, p.x, p.y) < (s.r + p.r * 0.7) ** 2) {
-                if (this.timers.invincible > 0) {
+                if (this.untouchable) {
                     this.spark(s.x, s.y, s.color, 5);
                 } else {
                     this.hurtPlayer(this.boss || { name: 'a stray curse', shape: 'circle', color: s.color, size: 12 });

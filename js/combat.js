@@ -1,22 +1,6 @@
-/* Monster Hunter — combat: weapons, projectiles, explosions, damage pipeline. Extends Game (js/core.js). */
+/* Monster Hunter — combat: class weapons, supers, Storm, projectiles, explosions. Extends Game (js/core.js). */
 
 extendGame({
-    cycleWeapon(dir) {
-        if (this.state !== 'playing') return;
-        const available = WEAPON_ORDER.filter(w => this.isUnlocked(w));
-        const idx = available.indexOf(this.weapon);
-        this.selectWeapon(available[(idx + dir + available.length) % available.length]);
-    },
-
-    selectWeapon(weapon) {
-        if (this.state !== 'playing' || !weapon || !this.isUnlocked(weapon) || weapon === this.weapon) return;
-        this.weapon = weapon;
-        this.blade.chain = 0;
-        this.blade.stabs = [];
-        this.blade.phase = 'idle';
-        Sfx.tone(660, { duration: 0.06, type: 'triangle', volume: 0.08 });
-    },
-
     aimPoint() {
         if (this.mouse.down) return { x: this.mouse.x, y: this.mouse.y };
         const p = this.player;
@@ -29,14 +13,14 @@ extendGame({
         return target ? { x: target.x, y: target.y } : null;
     },
 
-    nearestMonster(x, y, exclude) {
+    nearestMonster(x, y, exclude, maxDist = Infinity, bossBias = 0.2) {
         let best = null;
-        let bestD = Infinity;
+        let bestD = maxDist === Infinity ? Infinity : maxDist * maxDist;
         for (const m of this.monsters) {
             if (m.dead || m.dying || (exclude && exclude.has(m))) continue;
             if (m.x < -m.size || m.x > this.W + m.size || m.y < -m.size || m.y > this.H + m.size) continue;
             // Bosses count as closer than they are, so auto-aim focuses them.
-            const d = U.distanceSquared(x, y, m.x, m.y) * (m.boss ? 0.2 : 1);
+            const d = U.distanceSquared(x, y, m.x, m.y) * (m.boss ? bossBias : 1);
             if (d < bestD) {
                 bestD = d;
                 best = m;
@@ -45,188 +29,138 @@ extendGame({
         return best;
     },
 
-    updateWeapons() {
-        Object.keys(this.cooldowns).forEach(w => {
-            if (this.cooldowns[w] > 0) this.cooldowns[w] -= this.rateMult;
-        });
+    get impactMult() {
+        return 1 + 0.15 * this.stack('impact');
+    },
 
-        if (this.weapon === 'sword') {
-            this.updateBlades();
+    get cleaveReach() {
+        return PRIMARY.cleave.reach * (1 + 0.25 * this.stack('reach')) * this.impactMult;
+    },
+
+    get blastRadius() {
+        return PRIMARY.grenade.radius * this.impactMult;
+    },
+
+    updateWeapons() {
+        if (this.cooldown > 0) this.cooldown -= this.rateMult;
+        this.updateSuper();
+        this.updateCleaves();
+        if (this.whirl > 0) return; // the whirlwind replaces the barbarian's normal swings
+        if (this.cooldown > 0) return;
+        const primary = CLASSES[this.cls].primary;
+        if (primary === 'cleave') {
+            this.tryCleave();
             return;
         }
-        if (this.cooldowns[this.weapon] > 0) return;
-        const aim = this.weapon === 'missiles' ? null : this.aimPoint();
-        if (this.weapon !== 'missiles' && !aim) return;
-
-        if (this.weapon === 'bullets') this.fireBullets(aim);
-        else if (this.weapon === 'grenades') this.throwGrenades(aim);
-        else if (this.weapon === 'missiles') this.fireMissiles();
+        const aim = this.aimPoint();
+        if (!aim) return;
+        if (primary === 'bolt') this.fireBolts(aim);
+        else this.throwGrenades(aim);
     },
 
-    fireBullets(aim) {
+    // ---- wizard: magic bolts
+
+    fireBolts(aim) {
         const p = this.player;
-        this.cooldowns.bullets = 32;
+        const def = PRIMARY.bolt;
+        this.cooldown = def.cooldown;
         const base = Math.atan2(aim.y - p.y, aim.x - p.x);
         const count = 1 + this.stack('split');
-        const dirs = this.timers.multiShot > 0 ? 4 : 1; // multishot: the same volley in 4 directions
-        const angles = [];
-        for (let d = 0; d < dirs; d++) {
-            for (let i = 0; i < count; i++) angles.push(base + (d * TAU) / 4 + (i - (count - 1) / 2) * 0.16);
+        for (let i = 0; i < count; i++) {
+            const a = base + (i - (count - 1) / 2) * 0.16;
+            this.spawnBolt(p.x + Math.cos(a) * 14, p.y - 6 + Math.sin(a) * 14, a, def.speed, def.radius * this.impactMult, def.damage, this.stack('pierce'));
         }
-        angles.forEach(a => {
-            this.bullets.push({
-                x: p.x + Math.cos(a) * 12, y: p.y + Math.sin(a) * 12,
-                vx: Math.cos(a) * 9, vy: Math.sin(a) * 9, r: 4.5,
-                pierce: this.stack('pierce'), hits: new Set(), life: 120
-            });
-        });
-        this.particle({ x: p.x + Math.cos(base) * 16, y: p.y + Math.sin(base) * 16, vx: 0, vy: 0, life: 5, size: 9, color: '#fff6a0', kind: 'flash' });
-        Sfx.play('shoot', { volume: 0.25, rate: 0.95 + Math.random() * 0.15, duration: 0.35 });
+        this.particle({ x: p.x + Math.cos(base) * 18, y: p.y - 6 + Math.sin(base) * 18, vx: 0, vy: 0, life: 6, size: 10, color: '#d8b4fe', kind: 'flash' });
+        Sfx.fx('zap', 0.16, (d, rate, len, k) => {
+            k.osc(len, rate, 'sawtooth', 1400, 380, d, 0.5);
+            k.osc(len, rate, 'square', 2100, 900, d, 0.25);
+            for (let i = 0; i < len; i++) d[i] *= Math.pow(1 - i / len, 2.2);
+            k.biquad(d, rate, 'bandpass', t => 2600 - 1800 * t, 1.2);
+            k.normalize(d, 0.8);
+        }, { volume: 0.2, poly: 3, rate: 0.92 + Math.random() * 0.16 });
     },
 
-    throwGrenades(aim) {
+    spawnBolt(x, y, angle, speed, r, damage, pierce, big = false) {
+        this.bullets.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, r, damage, pierce, hits: new Set(), life: 130, big, trail: [] });
+    },
+
+    // ---- barbarian: cleave
+
+    tryCleave() {
         const p = this.player;
-        this.cooldowns.grenades = 96;
+        const reach = this.cleaveReach;
+        const target = this.nearestMonster(p.x, p.y, null, Infinity, 1);
+        if (!target || Math.hypot(target.x - p.x, target.y - p.y) - target.size > reach) return;
+        const angle = Math.atan2(target.y - p.y, target.x - p.x);
+        this.cooldown = PRIMARY.cleave.cooldown / (1 + 0.25 * this.stack('quick'));
+        this.startCleave(angle, reach, PRIMARY.cleave.damage, PRIMARY.cleave.arc);
+        Sfx.play('swoosh', { volume: 0.32, rate: 1.5 + Math.random() * 0.2, duration: 0.3 });
+    },
+
+    startCleave(angle, reach, damage, arc, opts = {}) {
+        const speed = (1 + 0.25 * this.stack('quick')) * (this.timers.rapidFire > 0 ? 1.5 : 1);
+        const dur = Math.max(6, Math.round(PRIMARY.cleave.swing / speed));
+        const dir = this.player.facing >= 0 ? 1 : -1;
+        this.cleaves.push({ angle, reach, damage, arc, t: 0, dur, dir, hits: new Set(), full: Boolean(opts.full) });
+    },
+
+    updateCleaves() {
+        const p = this.player;
+        for (const c of this.cleaves) {
+            c.t++;
+            // Damage lands as the blade sweeps through: everything inside the swept part of the arc.
+            const sweep = Math.min(1, c.t / (c.dur * 0.55));
+            const from = c.full ? 0 : -c.arc;
+            const to = c.full ? TAU : -c.arc + 2 * c.arc * sweep;
+            let hit = false;
+            for (const m of this.monsters) {
+                if (m.dead || m.dying || c.hits.has(m)) continue;
+                const dx = m.x - p.x;
+                const dy = m.y - p.y;
+                const dist = Math.hypot(dx, dy);
+                if (dist - m.size > c.reach) continue;
+                const rel = U.angleDelta(c.angle, Math.atan2(dy, dx)) * c.dir;
+                const slack = Math.atan2(m.size, Math.max(1, dist));
+                const inside = c.full ? true : rel >= from - slack && rel <= to + slack;
+                if (!inside) continue;
+                c.hits.add(m);
+                hit = true;
+                const n = U.normalizeVector(dx, dy);
+                const { dmg, crit } = this.rollDamage(c.damage);
+                this.damageMonster(m, dmg, { kx: n.x * 11, ky: n.y * 11, crit, sound: 'slash' });
+                this.spark(m.x - n.x * m.size, m.y - n.y * m.size, '#ffe0b2', 5);
+            }
+            if (hit && !c.shook) {
+                c.shook = true;
+                this.shake(3);
+                this.hitStop = Math.max(this.hitStop, 2);
+            }
+        }
+        this.cleaves = this.cleaves.filter(c => c.t < c.dur);
+    },
+
+    // ---- goblin: grenades
+
+    throwGrenades(aim, { all = false, blastMult = 1 } = {}) {
+        const p = this.player;
+        const def = PRIMARY.grenade;
+        this.cooldown = def.cooldown * Math.pow(0.9, this.stack('fuse'));
         const count = Math.min(4, 1 + this.stack('cluster'));
-        const dirs = this.timers.multiShot > 0 ? 4 : 1; // multishot quadruples: up to 16
-        const base = Math.atan2(aim.y - p.y, aim.x - p.x);
-        const range = Math.min(220, Math.hypot(aim.x - p.x, aim.y - p.y) + 10);
+        const dirs = all ? 4 : 1;
+        const base = aim ? Math.atan2(aim.y - p.y, aim.x - p.x) : -Math.PI / 2;
+        const range = all ? def.range : Math.min(def.range, Math.hypot(aim.x - p.x, aim.y - p.y) + 10);
+        const fuse = Math.round(def.fuse * Math.pow(0.8, this.stack('fuse')));
         for (let d = 0; d < dirs; d++) {
             for (let i = 0; i < count; i++) {
                 const a = base + (d * TAU) / 4 + (i - (count - 1) / 2) * 0.32;
-                this.grenades.push({ x: p.x, y: p.y, sx: p.x, sy: p.y, vx: Math.cos(a) * 6.5, vy: Math.sin(a) * 6.5, range, timer: 64, spin: 0 });
+                this.grenades.push({
+                    x: p.x, y: p.y, sx: p.x, sy: p.y, vx: Math.cos(a) * 6.5, vy: Math.sin(a) * 6.5,
+                    range: range * (all ? 0.75 + 0.25 * Math.random() : 1), timer: fuse, fuse, spin: 0,
+                    radius: this.blastRadius * blastMult, damage: def.damage
+                });
             }
         }
-        Sfx.play('grenade', { volume: 0.8 });
-    },
-
-    fireMissiles() {
-        if (!this.monsters.some(m => !m.dead)) return;
-        this.cooldowns.missiles = 100;
-        const p = this.player;
-        const count = Math.min(3, 1 + this.stack('swarm')) * (this.timers.multiShot > 0 ? 4 : 1);
-        const claimed = new Set();
-        for (let i = 0; i < count; i++) {
-            let target = this.nearestMonster(p.x, p.y, claimed) || this.nearestMonster(p.x, p.y);
-            if (target) claimed.add(target);
-            const a = -Math.PI / 2 + (i - (count - 1) / 2) * 0.5 + (Math.random() - 0.5) * 0.3;
-            this.missiles.push({ x: p.x, y: p.y, angle: a, speed: 3, target, trail: [], life: 240 });
-        }
-        Sfx.play('missile', { volume: 0.6 });
-    },
-
-    get stabReach() {
-        return STAB.reach * (1 + 0.25 * this.stack('reach'));
-    },
-
-    // Damage of the next stab: base doubles per Heavy Edge rank and per consecutive hit.
-    get stabDamage() {
-        return STAB.baseDamage * 2 ** this.stack('heavy') * 2 ** Math.min(this.blade.chain, STAB.maxDoublings);
-    },
-
-    updateBlades() {
-        const p = this.player;
-        const bl = this.blade;
-        const speed = (1 + 0.25 * this.stack('quick')) * (1 + 0.15 * this.stack('haste')) * (this.timers.rapidFire > 0 ? 2 : 1);
-        const outF = Math.max(2, Math.round(STAB.out / speed));
-        const backF = Math.max(2, Math.round(STAB.back / speed));
-        const reach = this.stabReach;
-
-        if (bl.chain > 0 && --bl.chainT <= 0) {
-            if (bl.chain >= 2) this.floater(p.x, p.y - 34, 'blade cooled', '#b0bec5', 13);
-            bl.chain = 0;
-        }
-        bl.heat = U.lerp(bl.heat, Math.min(bl.chain, STAB.maxDoublings) / STAB.maxDoublings, 0.15);
-
-        if (bl.phase === 'idle') {
-            if (bl.cd > 0) {
-                bl.cd--;
-                return;
-            }
-            const taken = new Set();
-            const max = this.timers.multiShot > 0 ? 4 : 1;
-            bl.stabs = [];
-            for (let i = 0; i < max; i++) {
-                const m = this.nearestMonster(p.x, p.y, taken);
-                if (!m || Math.hypot(m.x - p.x, m.y - p.y) - m.size > reach + 4) break;
-                taken.add(m);
-                bl.stabs.push({ angle: Math.atan2(m.y - p.y, m.x - p.x), hits: new Set() });
-            }
-            if (!bl.stabs.length) return;
-            bl.phase = 'out';
-            bl.t = 0;
-            bl.anyHit = false;
-            Sfx.play('swoosh', { volume: 0.28, rate: 2.6, duration: 0.25 });
-        }
-
-        bl.t++;
-        if (bl.phase === 'out') {
-            const ext = 12 + reach * Math.min(1, bl.t / outF);
-            for (const st of bl.stabs) {
-                const tx = p.x + Math.cos(st.angle) * ext;
-                const ty = p.y + Math.sin(st.angle) * ext;
-                for (const m of this.monsters) {
-                    if (m.dead || m.dying || st.hits.has(m)) continue;
-                    if (this.distToSegment(m.x, m.y, p.x, p.y, tx, ty) <= m.size + 3) {
-                        st.hits.add(m);
-                        bl.anyHit = true;
-                        const crit = Math.random() < 0.08 * this.stack('crit');
-                        const dmg = this.stabDamage * this.damageMult * (crit ? 2.5 : 1);
-                        this.damageMonster(m, dmg, { kx: Math.cos(st.angle) * 10, ky: Math.sin(st.angle) * 10, crit: false });
-                        const heat = Math.min(bl.chain, STAB.maxDoublings) / STAB.maxDoublings;
-                        this.floater(m.x, m.y - m.size - 8, `${Math.round(dmg)}${crit ? '!' : ''}`, heat > 0.5 ? '#ff5a36' : heat > 0 ? '#ffb199' : '#ffffff', 16 + 12 * heat);
-                        this.spark(m.x - Math.cos(st.angle) * m.size, m.y - Math.sin(st.angle) * m.size, heat > 0.3 ? '#ff7043' : '#eceff1', 6);
-                    }
-                }
-            }
-            if (bl.t >= outF) {
-                if (bl.anyHit) {
-                    bl.chain = Math.min(bl.chain + 1, STAB.maxDoublings + 1);
-                    bl.chainT = STAB.chainFrames;
-                    Sfx.tone(520 + 90 * Math.min(bl.chain, 9), { duration: 0.07, type: 'triangle', volume: 0.07 });
-                }
-                bl.phase = 'back';
-                bl.t = 0;
-            }
-        } else if (bl.phase === 'back' && bl.t >= backF) {
-            bl.phase = 'idle';
-            bl.t = 0;
-            bl.cd = Math.round(STAB.cooldown / speed);
-        }
-        bl.outF = outF;
-        bl.backF = backF;
-    },
-
-    distToSegment(px, py, x1, y1, x2, y2) {
-        const cx = x2 - x1;
-        const cy = y2 - y1;
-        const lenSq = cx * cx + cy * cy;
-        const t = lenSq ? U.clamp(((px - x1) * cx + (py - y1) * cy) / lenSq, 0, 1) : 0;
-        return Math.hypot(px - (x1 + t * cx), py - (y1 + t * cy));
-    },
-
-    updateBullets() {
-        for (const b of this.bullets) {
-            b.x += b.vx;
-            b.y += b.vy;
-            b.life--;
-            if (b.x < -10 || b.x > this.W + 10 || b.y < -10 || b.y > this.H + 10) b.life = 0;
-            if (b.life <= 0) continue;
-            for (const m of this.monsters) {
-                if (m.dead || b.hits.has(m)) continue;
-                if (U.distanceSquared(b.x, b.y, m.x, m.y) < (b.r + m.size) ** 2) {
-                    b.hits.add(m);
-                    const { dmg, crit } = this.rollDamage(1);
-                    this.damageMonster(m, dmg, { kx: b.vx * 0.25, ky: b.vy * 0.25, crit });
-                    this.spark(b.x, b.y, '#ffe066', 3);
-                    if (b.pierce-- <= 0) {
-                        b.life = 0;
-                        break;
-                    }
-                }
-            }
-        }
-        this.bullets = this.bullets.filter(b => b.life > 0);
+        Sfx.play('grenade', { volume: 0.7, rate: 0.95 + Math.random() * 0.1 });
     },
 
     updateGrenades() {
@@ -244,10 +178,7 @@ extendGame({
                 }
             }
             g.timer--;
-            if (g.timer <= 0) {
-                const radius = 32 * (1 + 0.3 * this.stack('blast')); // 30% smaller than v2.1
-                this.explode(g.x, g.y, radius, 8);
-            }
+            if (g.timer <= 0) this.explode(g.x, g.y, g.radius, g.damage);
         }
         this.grenades = this.grenades.filter(g => g.timer > 0);
     },
@@ -258,7 +189,7 @@ extendGame({
             if (U.distanceSquared(x, y, m.x, m.y) <= (radius + m.size) ** 2) {
                 const n = U.normalizeVector(m.x - x, m.y - y);
                 const { dmg, crit } = this.rollDamage(baseDamage);
-                this.damageMonster(m, dmg, { kx: n.x * 6, ky: n.y * 6, crit });
+                this.damageMonster(m, dmg, { kx: n.x * 6, ky: n.y * 6, crit, sound: false });
             }
         }
         this.explosions.push({ x, y, r: radius, t: 0, max: 22 });
@@ -267,36 +198,237 @@ extendGame({
         for (let i = 0; i < 4; i++) {
             this.particle({ x, y, vx: (Math.random() - 0.5) * 1.5, vy: (Math.random() - 0.5) * 1.5, life: 36, size: radius * 0.25 + Math.random() * 5, grow: 0.3, color: 'rgba(70,60,60,0.2)', kind: 'smoke' });
         }
+        this.decal(x, y, radius * 0.7, 'scorch');
         this.shake(5);
-        Sfx.play('boom', { volume: 0.55, rate: 0.9 + Math.random() * 0.2 });
+        Sfx.play('boom', { volume: 0.5, rate: 0.9 + Math.random() * 0.2 });
     },
 
-    updateMissiles() {
-        for (const ms of this.missiles) {
-            if (!ms.target || ms.target.dead) ms.target = this.nearestMonster(ms.x, ms.y);
-            ms.life--;
-            ms.speed = Math.min(6.5, ms.speed + 0.12);
-            if (ms.target) {
-                const desired = Math.atan2(ms.target.y - ms.y, ms.target.x - ms.x);
-                ms.angle += U.clamp(U.angleDelta(ms.angle, desired), -0.14, 0.14);
-            }
-            ms.x += Math.cos(ms.angle) * ms.speed;
-            ms.y += Math.sin(ms.angle) * ms.speed;
+    distToSegment(px, py, x1, y1, x2, y2) {
+        const cx = x2 - x1;
+        const cy = y2 - y1;
+        const lenSq = cx * cx + cy * cy;
+        const t = lenSq ? U.clamp(((px - x1) * cx + (py - y1) * cy) / lenSq, 0, 1) : 0;
+        return Math.hypot(px - (x1 + t * cx), py - (y1 + t * cy));
+    },
+
+    updateBullets() {
+        for (const b of this.bullets) {
+            b.x += b.vx;
+            b.y += b.vy;
+            b.life--;
             if (this.frameNo % 2 === 0) {
-                ms.trail.push({ x: ms.x, y: ms.y });
-                if (ms.trail.length > 14) ms.trail.shift();
+                b.trail.push(b.x, b.y);
+                if (b.trail.length > (b.big ? 12 : 8)) b.trail.splice(0, 2);
             }
-            const t = ms.target;
-            if (t && !t.dead && U.distanceSquared(ms.x, ms.y, t.x, t.y) < (t.size + 4) ** 2) {
-                const { dmg, crit } = this.rollDamage(3);
-                this.damageMonster(t, dmg, { kx: Math.cos(ms.angle) * 4, ky: Math.sin(ms.angle) * 4, crit });
-                this.burst(ms.x, ms.y, '#ff6b35', 8, 4);
-                this.explosions.push({ x: ms.x, y: ms.y, r: 18, t: 0, max: 14 });
-                this.shake(2);
-                ms.life = 0;
+            if (b.x < -20 || b.x > this.W + 20 || b.y < -20 || b.y > this.H + 20) b.life = 0;
+            if (b.life <= 0) continue;
+            for (const m of this.monsters) {
+                if (m.dead || b.hits.has(m)) continue;
+                if (U.distanceSquared(b.x, b.y, m.x, m.y) < (b.r + m.size) ** 2) {
+                    b.hits.add(m);
+                    const { dmg, crit } = this.rollDamage(b.damage);
+                    this.damageMonster(m, dmg, { kx: b.vx * 0.25, ky: b.vy * 0.25, crit, sound: 'zap' });
+                    this.spark(b.x, b.y, b.big ? '#f0abfc' : '#c4b5fd', b.big ? 6 : 3);
+                    if (b.pierce-- <= 0) {
+                        b.life = 0;
+                        break;
+                    }
+                }
             }
-            if (ms.life <= 0 && !ms.exploded) ms.exploded = true;
         }
-        this.missiles = this.missiles.filter(ms => ms.life > 0);
+        this.bullets = this.bullets.filter(b => b.life > 0);
+    },
+
+    // ---- super meter + supers
+
+    addCharge(amount) {
+        if (this.whirl > 0 || amount <= 0) return;
+        const before = this.superMeter;
+        this.superMeter = U.superCharge(this.superMeter, amount, this.chargeMult || 1);
+        if (before < 100 && this.superMeter >= 100) {
+            this.floater(this.player.x, this.player.y - 46, 'SUPER READY!', '#facc15', 24);
+            Sfx.arpeggio([784, 988, 1175, 1568], 0.06, { type: 'triangle', volume: 0.1 });
+        }
+    },
+
+    activateSuper() {
+        if (this.state !== 'playing' || this.superMeter < 100) return;
+        this.superMeter = 0;
+        const p = this.player;
+        const cls = CLASSES[this.cls];
+        this.banner(cls.superName.toUpperCase() + '!', '', 'super');
+        this.flash = { color: cls.color === '#22c55e' ? '120,255,140' : cls.color === '#f97316' ? '255,170,80' : '200,160,255', t: 14, max: 14 };
+        this.shake(10);
+        this.ring(p.x, p.y, 120, cls.color, 24);
+        this.burst(p.x, p.y, cls.color, 24, 6);
+        this.superSting(this.cls);
+        if (this.cls === 'wizard') {
+            this.novaQueue = [0, 11, 22]; // three rings, 0.2 s apart
+            this.novaT = 0;
+        } else if (this.cls === 'barbarian') {
+            this.whirl = WHIRLWIND_STEPS;
+            this.whirlT = 0;
+            this.whirlVoice = Sfx.loopFx('whirl', 1.2, (d, rate, len, k) => {
+                const r = k.rng(5);
+                for (let i = 0; i < len; i++) d[i] = (r() * 2 - 1) * (0.6 + 0.4 * Math.sin(TAU * 6.66 * i / rate));
+                k.biquad(d, rate, 'bandpass', t => 700 + 500 * Math.sin(TAU * 3 * t), 1.6);
+                k.normalize(d, 0.7);
+            }, { volume: 0.4 });
+        } else {
+            this.throwGrenades(this.aimPoint(), { all: true, blastMult: 1.5 });
+            this.cooldown = 30;
+        }
+    },
+
+    updateSuper() {
+        const p = this.player;
+        if (this.novaQueue && this.novaQueue.length) {
+            this.novaT++;
+            while (this.novaQueue.length && this.novaT >= this.novaQueue[0]) {
+                const ring = 3 - this.novaQueue.length;
+                this.novaQueue.shift();
+                for (let i = 0; i < 12; i++) {
+                    const a = (i / 12) * TAU + ring * (TAU / 36);
+                    this.spawnBolt(p.x, p.y - 6, a, 7, 9 * this.impactMult, 2, this.stack('pierce') + 2, true);
+                }
+                this.ring(p.x, p.y, 70, '#e9d5ff', 16);
+                Sfx.tone(523 * (1 + ring * 0.26), { duration: 0.18, type: 'triangle', volume: 0.12, slide: 400, bus: 'sfx' });
+            }
+        }
+        if (this.whirl > 0) {
+            this.whirl--;
+            this.whirlT++;
+            if (this.whirlT % 8 === 0) {
+                this.cleaves.push({ angle: 0, reach: this.cleaveReach, damage: PRIMARY.cleave.damage, arc: Math.PI, t: 0, dur: 6, dir: 1, hits: new Set(), full: true, whirl: true });
+                if (this.whirlT % 16 === 0) Sfx.play('swoosh', { volume: 0.18, rate: 1.8 + Math.random() * 0.3, duration: 0.2 });
+            }
+            if (this.frameNo % 2 === 0) {
+                const a = this.whirlT * 0.5;
+                this.particle({ x: p.x + Math.cos(a) * 34, y: p.y + Math.sin(a) * 34, vx: -Math.sin(a) * 2, vy: Math.cos(a) * 2, life: 14, size: 3, color: 'rgba(255,237,213,0.8)', kind: 'spark' });
+            }
+            if (this.whirl === 0) {
+                Sfx.fadeOut(this.whirlVoice, 0.4);
+                this.whirlVoice = null;
+                this.floater(p.x, p.y - 40, 'phew!', '#fed7aa', 16);
+            }
+        }
+    },
+
+    superSting(cls) {
+        const notes = { wizard: [523, 659, 784, 1046, 1318], barbarian: [196, 247, 294, 392], goblin: [330, 415, 494, 659] }[cls];
+        const type = { wizard: 'triangle', barbarian: 'sawtooth', goblin: 'square' }[cls];
+        Sfx.arpeggio(notes, 0.055, { type, volume: 0.11 });
+        Sfx.fx(`sting:${cls}`, 0.7, (d, rate, len, k) => {
+            const r = k.rng(9);
+            for (let i = 0; i < len; i++) d[i] = (r() * 2 - 1) * Math.pow(1 - i / len, 3);
+            k.biquad(d, rate, 'lowpass', t => 4000 * (1 - t) + 200, 0.8);
+            k.osc(len, rate, 'sine', cls === 'barbarian' ? 90 : 150, 50, d, 0.8);
+            k.normalize(d, 0.8);
+        }, { volume: 0.4, priority: 2 });
+    },
+
+    // ---- Storm: chain lightning every 3 s while the timer runs
+
+    updateStorm() {
+        if (!(this.timers.storm > 0)) return;
+        if (--this.stormClock <= 0) {
+            this.stormClock = STORM.every;
+            this.stormStrike();
+        }
+    },
+
+    stormStrike() {
+        const p = this.player;
+        const first = this.nearestMonster(p.x, p.y, null, STORM.range, 1);
+        if (!first) return;
+        const hit = new Set();
+        const chain = [first];
+        hit.add(first);
+        let cur = first;
+        for (let j = 1; j <= STORM.jumps; j++) {
+            const next = this.nearestMonster(cur.x, cur.y, hit, STORM.jump, 1);
+            if (!next) break;
+            hit.add(next);
+            chain.push(next);
+            cur = next;
+        }
+        const points = [{ x: first.x + (Math.random() - 0.5) * 60, y: Math.max(-20, first.y - 170) }];
+        chain.forEach((m, j) => {
+            points.push({ x: m.x, y: m.y });
+            const dmg = U.stormDamage(this.level, j, STORM.damage, STORM.falloff, this.damageMult);
+            this.damageMonster(m, dmg, { kx: (Math.random() - 0.5) * 4, ky: -2, sound: false });
+            this.spark(m.x, m.y, '#e0f2fe', 8);
+            this.spark(m.x, m.y, '#38bdf8', 6);
+            this.decal(m.x, m.y + m.size * 0.6, 10 + m.size * 0.5, 'scorch');
+        });
+        this.lightning.push({ points, t: 0, max: 12, segs: null });
+        this.flash = { color: '190,230,255', t: 3, max: 3 };
+        this.shake(4);
+        Sfx.fx('thunder', 1.1, (d, rate, len, k) => {
+            const r = k.rng(77);
+            const crack = Math.floor(rate * 0.06);
+            for (let i = 0; i < len; i++) {
+                const t = i / len;
+                const n = r() * 2 - 1;
+                d[i] = i < crack ? n * (1 - i / crack) : n * 0.55 * Math.pow(1 - t, 1.6) * (0.6 + 0.4 * Math.sin(TAU * 7 * t));
+            }
+            k.biquad(d, rate, 'lowpass', t => (t < 0.06 ? 7000 : 900 - 600 * t), 0.9);
+            k.osc(Math.floor(rate * 0.25), rate, 'sine', 900, 120, d, 0.5);
+            k.normalize(d, 0.85);
+        }, { volume: 0.5, poly: 2, priority: 2 });
+    },
+
+    // Midpoint-displacement bolt between two points; ~30% chance of a short fork.
+    static_lightningPath(x1, y1, x2, y2, depth = 4) {
+        let pts = [[x1, y1], [x2, y2]];
+        let disp = Math.hypot(x2 - x1, y2 - y1) * 0.22;
+        const forks = [];
+        for (let d = 0; d < depth; d++) {
+            const next = [pts[0]];
+            for (let i = 1; i < pts.length; i++) {
+                const [ax, ay] = pts[i - 1];
+                const [bx, by] = pts[i];
+                const len = Math.hypot(bx - ax, by - ay) || 1;
+                const off = (Math.random() - 0.5) * 2 * disp;
+                const mx = (ax + bx) / 2 - ((by - ay) / len) * off;
+                const my = (ay + by) / 2 + ((bx - ax) / len) * off;
+                next.push([mx, my], [bx, by]);
+                if (d === 1 && Math.random() < 0.3 / pts.length * 2) {
+                    const a = Math.atan2(by - ay, bx - ax) + (Math.random() < 0.5 ? 0.6 : -0.6);
+                    const fl = len * (0.5 + Math.random() * 0.4);
+                    forks.push([[mx, my], [mx + Math.cos(a) * fl * 0.5 + (Math.random() - 0.5) * 8, my + Math.sin(a) * fl * 0.5], [mx + Math.cos(a) * fl, my + Math.sin(a) * fl]]);
+                }
+            }
+            pts = next;
+            disp *= 0.55;
+        }
+        return [pts, ...forks];
+    },
+
+    updateLightning() {
+        for (const l of this.lightning) {
+            if (l.t % 2 === 0) {
+                // re-jitter every 2 steps
+                l.segs = [];
+                for (let i = 1; i < l.points.length; i++) {
+                    const a = l.points[i - 1];
+                    const b = l.points[i];
+                    l.segs.push(...this.static_lightningPath(a.x, a.y, b.x, b.y, i === 1 ? 5 : 4));
+                }
+            }
+            l.t++;
+        }
+        this.lightning = this.lightning.filter(l => l.t < l.max);
+    },
+
+    // Ground marks (scorch, cracks). Drawn under everything; they fade out.
+    decal(x, y, r, kind) {
+        if (this.decals.length > 60) this.decals.shift();
+        this.decals.push({ x, y, r, kind, life: 600, max: 600, rot: Math.random() * TAU });
+    },
+
+    updateDecals() {
+        for (const d of this.decals) d.life--;
+        this.decals = this.decals.filter(d => d.life > 0);
     }
 });

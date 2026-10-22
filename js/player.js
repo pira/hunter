@@ -34,8 +34,9 @@ extendGame({
         return Math.round(600 * (1 + 0.3 * this.stack('overtime')));
     },
 
-    isUnlocked(weapon) {
-        return this.unlocked.has(weapon);
+    /** True while nothing can hurt the player (Invincible powerup or the barbarian's Whirlwind). */
+    get untouchable() {
+        return this.timers.invincible > 0 || this.whirl > 0;
     },
 
     rollDamage(base) {
@@ -61,7 +62,7 @@ extendGame({
             iy = this.stick.dy;
         }
 
-        const speed = p.baseSpeed * (1 + 0.1 * this.stack('boots'));
+        const speed = p.baseSpeed * (1 + 0.1 * this.stack('boots')) * (this.whirl > 0 ? 1.3 : 1);
         p.vx = U.lerp(p.vx, ix * speed, 0.3);
         p.vy = U.lerp(p.vy, iy * speed, 0.3);
         p.x = U.clamp(p.x + p.vx, p.r, this.W - p.r);
@@ -94,7 +95,7 @@ extendGame({
 
     hurtPlayer(source) {
         const p = this.player;
-        if (this.state !== 'playing' || p.iframes > 0 || this.timers.invincible > 0) return;
+        if (this.state !== 'playing' || p.iframes > 0 || this.untouchable) return;
         p.hp--;
         p.iframes = 90;
         this.shake(14);
@@ -102,7 +103,6 @@ extendGame({
         this.hurtFlash = 1;
         if (this.combo >= 5) this.floater(p.x, p.y - 40, 'COMBO LOST', '#ff5252', 20);
         this.combo = 0;
-        this.blade.chain = 0;
         this.comboTimer = 0;
 
         const nova = this.stack('nova');

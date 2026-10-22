@@ -41,7 +41,7 @@ extendGame({
             behavior: behavior || (Math.random() < 0.3 + Math.min(0.3, this.level * 0.01) ? 'chase' : 'random'),
             dir: Math.atan2(this.H / 2 - y, this.W / 2 - x) + (Math.random() - 0.5) * 1.2,
             dirT: 0, dirRate: 100 + Math.random() * 100,
-            healT: 0, spawnT: 75, flash: 0, bladeCd: 0, contactCd: 0,
+            healT: 0, spawnT: 75, flash: 0, contactCd: 0,
             phase: Math.random() * TAU, dead: false
         };
     },
@@ -111,7 +111,6 @@ extendGame({
             if (m.dead) continue;
             if (m.spawnT > 0) m.spawnT--;
             if (m.flash > 0) m.flash--;
-            if (m.bladeCd > 0) m.bladeCd--;
             if (m.contactCd > 0) m.contactCd--;
             m.phase += 0.12;
 
@@ -136,9 +135,9 @@ extendGame({
             m.kby *= 0.82;
 
             if (dying || m.dying) continue;
-            const touching = U.distanceSquared(p.x, p.y, m.x, m.y) < (p.r * (this.timers.invincible > 0 ? 1.8 : 1) + m.size) ** 2;
+            const touching = U.distanceSquared(p.x, p.y, m.x, m.y) < (p.r * (this.untouchable ? 1.8 : 1) + m.size) ** 2;
             if (touching && m.spawnT <= 0) {
-                if (this.timers.invincible > 0) {
+                if (this.untouchable) {
                     if (m.contactCd <= 0) {
                         m.contactCd = 10;
                         const n = U.normalizeVector(m.x - p.x, m.y - p.y);
@@ -180,7 +179,7 @@ extendGame({
         }
     },
 
-    damageMonster(m, dmg, { kx = 0, ky = 0, crit = false } = {}) {
+    damageMonster(m, dmg, { kx = 0, ky = 0, crit = false, sound = 'thwack' } = {}) {
         if (m.dead || m.dying) return;
         m.hp -= dmg;
         m.healT = 0;
@@ -199,7 +198,7 @@ extendGame({
             if (m.boss) this.startBossDeath(m);
             else this.killMonster(m);
         } else {
-            Sfx.hit(m.size, { volume: m.boss ? 0.3 : 0.22 });
+            if (sound) Sfx.hit(m.size, { volume: m.boss ? 0.3 : 0.22, flavor: sound });
         }
     },
 
@@ -214,6 +213,7 @@ extendGame({
         const points = Math.round(m.points * mult);
         this.score += points;
         this.gainXp(m.points * (this.buffs.xp2 ? 2 : 1));
+        this.addCharge(m.minion ? 1 : SUPER_CHARGE[m.boss ? 'boss' : m.tier] || 2);
 
         const big = m.size > 18 || m.boss;
         if (points > 0) this.floater(m.x, m.y - m.size, `+${points}`, mult > 1 ? ['#fff', '#fff', '#7CFC00', '#00e5ff', '#ff4dd2', '#ffd60a'][mult] : '#ffffff', big ? 22 : 16);

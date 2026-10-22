@@ -111,6 +111,8 @@ extendGame({
         const p = res.player;
         const esc = v => String(v ?? '').replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
         el.profileName.textContent = p.name || 'Hunter';
+        const cls = (res.mine && this.cls) || (res.runs && res.runs[0] && res.runs[0].cls) || p.cls || 'wizard';
+        this.drawAvatar(el.profileAvatar, CLASSES[cls] ? cls : 'wizard', res.mine ? this.equippedSkin && this.equippedSkin(cls) : p.skin);
         el.profileSince.textContent = `${p.createdAt ? `Hunting since ${new Date(p.createdAt).toLocaleDateString()}` : ''}${res.source === 'local' ? ' · offline (this device)' : ''}`;
         const stats = [
             ['Best score', (p.bestScore || 0).toLocaleString(), 'hero'],

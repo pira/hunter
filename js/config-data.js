@@ -2,7 +2,7 @@
 const GameMath = typeof GameUtils !== 'undefined' ? GameUtils : null;
 
 if (!GameMath) {
-    throw new Error('GameUtils must be loaded before game.js');
+    throw new Error('GameUtils must be loaded before js/config-data.js');
 }
 
 const U = GameMath;
@@ -15,14 +15,31 @@ const WORLD_AREA = 800 * 600; // Every screen shape gets the same play area, so 
 const EMOJI_FONT = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
 const DISPLAY_FONT = '"Lilita One","Arial Rounded MT Bold",system-ui,sans-serif';
 
-const WEAPONS = {
-    bullets: { name: 'Blaster', icon: '🔫' },
-    sword: { name: 'Blade', icon: '🗡️' },
-    grenades: { name: 'Grenades', icon: '💣' },
-    missiles: { name: 'Missiles', icon: '🚀' }
+// Player classes: one primary weapon each, plus a super charged by kills (Space / SUPER button).
+const CLASSES = {
+    wizard: {
+        name: 'Wizard', icon: '🧙', hearts: 3, speed: 4.4, primary: 'bolt', color: '#8b5cf6',
+        weapon: 'Magic Bolt', blurb: 'Auto-aiming magic bolts', superName: 'Arcane Nova', superBlurb: 'Rings of giant piercing bolts'
+    },
+    barbarian: {
+        name: 'Barbarian', icon: '🪓', hearts: 4, speed: 4.2, primary: 'cleave', color: '#f97316',
+        weapon: 'Cleave', blurb: 'Huge axe swings hit everything in front', superName: 'Whirlwind', superBlurb: '5 s of invincible spinning havoc'
+    },
+    goblin: {
+        name: 'Goblin', icon: '💣', hearts: 3, speed: 4.8, primary: 'grenade', color: '#22c55e',
+        weapon: 'Grenades', blurb: 'Lobbed bombs with a big boom', superName: 'Bombardment', superBlurb: 'Bombs in all four directions'
+    }
 };
-const START_WEAPONS = ['bullets', 'sword']; // grenades + missiles are bought in the shop
-const WEAPON_ORDER = ['bullets', 'sword', 'grenades', 'missiles'];
+const CLASS_ORDER = ['wizard', 'barbarian', 'goblin'];
+const PRIMARY = {
+    bolt: { cooldown: 32, damage: 1, speed: 9, radius: 4.5 },
+    cleave: { cooldown: 64, damage: 10, reach: 80, arc: (70 * Math.PI) / 180, swing: 12 },
+    grenade: { cooldown: 96, damage: 8, radius: 32, range: 220, fuse: 64 }
+};
+// Super meter charge per kill (0–100). Gatekeeper/boss values are used by the encounter system.
+const SUPER_CHARGE = { small: 2, medium: 3, large: 5, elite: 6, legendary: 10, mythic: 12, ancient: 15, ultimate: 25, gatekeeper: 35, boss: 100 };
+const WHIRLWIND_STEPS = Math.round(5 * 60 * GAME_SPEED);
+const STORM = { duration: Math.round(15 * 60 * GAME_SPEED), every: Math.round(3 * 60 * GAME_SPEED), range: 260, jump: 120, jumps: 5, damage: 6, falloff: 0.65 };
 
 const MONSTER_TYPES = {
     small: [
@@ -59,7 +76,8 @@ const COIN_DROPS = {
 };
 
 const POWERUPS = {
-    multiShot: { emoji: '🏹', name: 'Multi-Shot', color: '#FF69B4', timed: true, weight: 1 },
+    storm: { emoji: '🌩️', name: 'Storm', color: '#7dd3fc', timed: true, weight: 0.8 },
+    overcharge: { emoji: '🔋', name: 'Overcharge', color: '#facc15', weight: 0.5 },
     rapidFire: { emoji: '⚡', name: 'Rapid Fire', color: '#00CED1', timed: true, weight: 1 },
     invincible: { emoji: '🛡️', name: 'Invincible', color: '#7CFC00', timed: true, weight: 0.7 },
     freeze: { emoji: '❄️', name: 'Freeze', color: '#87CEEB', timed: true, weight: 0.8 },
@@ -68,12 +86,10 @@ const POWERUPS = {
     heart: { emoji: '❤️', name: 'Extra Life', color: '#FF1493', weight: 1 },
     bomb: { emoji: '💣', name: 'Bomb', color: '#FF4500', weight: 0.8 }
 };
-const TIMED_POWERUPS = ['multiShot', 'rapidFire', 'invincible', 'freeze', 'coins2', 'coins3'];
+const TIMED_POWERUPS = ['storm', 'rapidFire', 'invincible', 'freeze', 'coins2', 'coins3'];
 
 // Shop cards. Price = cost × (1 + 0.75 × rank already owned).
 const UPGRADES = [
-    { id: 'unlock_grenades', icon: '💣', name: 'Grenades', max: 1, cost: 30, unlocks: 'grenades', minLevel: 3, weight: 2.5, desc: 'Unlock lobbed grenades (slot 3)' },
-    { id: 'unlock_missiles', icon: '🚀', name: 'Missiles', max: 1, cost: 50, unlocks: 'missiles', minLevel: 6, weight: 2.5, desc: 'Unlock homing missiles (slot 4)' },
     { id: 'power', icon: '💪', name: 'Power', max: 5, cost: 15, desc: '+20% damage with every weapon' },
     { id: 'haste', icon: '⏱️', name: 'Haste', max: 5, cost: 15, desc: '+15% attack speed' },
     { id: 'boots', icon: '👟', name: 'Swift Boots', max: 4, cost: 10, desc: '+10% move speed' },
@@ -85,14 +101,13 @@ const UPGRADES = [
     { id: 'overtime', icon: '⌛', name: 'Overtime', max: 3, cost: 12, desc: 'Powerups last 30% longer (cap 30s)' },
     { id: 'regen', icon: '🌿', name: 'Regeneration', max: 2, cost: 25, desc: 'Regrow a heart every 40s (25s at rank 2)' },
     { id: 'nova', icon: '💫', name: 'Static Nova', max: 2, cost: 20, desc: 'Taking a hit blasts nearby monsters' },
-    { id: 'split', icon: '🔱', name: 'Split Shot', max: 3, cost: 18, weapon: 'bullets', desc: 'Blaster fires +1 bullet' },
-    { id: 'pierce', icon: '🏹', name: 'Piercing Rounds', max: 3, cost: 15, weapon: 'bullets', desc: 'Bullets pierce +1 monster' },
-    { id: 'reach', icon: '📏', name: 'Long Blade', max: 3, cost: 12, weapon: 'sword', desc: '+25% stab reach' },
-    { id: 'quick', icon: '💨', name: 'Quick Thrust', max: 3, cost: 15, weapon: 'sword', desc: '+25% stab speed' },
-    { id: 'heavy', icon: '🪓', name: 'Heavy Edge', max: 3, cost: 20, weapon: 'sword', desc: 'First stab hits ×2 harder (10 → 20 → 40 → 80)' },
-    { id: 'cluster', icon: '🧨', name: 'Cluster Bombs', max: 3, cost: 18, weapon: 'grenades', desc: '+1 grenade per throw (max 4)' },
-    { id: 'blast', icon: '💥', name: 'Big Bang', max: 3, cost: 15, weapon: 'grenades', desc: '+30% blast radius' },
-    { id: 'swarm', icon: '🎇', name: 'Swarm', max: 2, cost: 25, weapon: 'missiles', desc: '+1 missile per salvo (max 3)' }
+    { id: 'impact', icon: '💥', name: 'Impact', max: 3, cost: 15, desc: '+15% bolt size, cleave reach and blast radius' },
+    { id: 'split', icon: '🔱', name: 'Split Shot', max: 3, cost: 18, cls: 'wizard', desc: 'Bolts fire +1 projectile' },
+    { id: 'pierce', icon: '🏹', name: 'Piercing Rounds', max: 3, cost: 15, cls: 'wizard', desc: 'Bolts pierce +1 monster' },
+    { id: 'reach', icon: '📏', name: 'Long Reach', max: 3, cost: 12, cls: 'barbarian', desc: '+25% cleave reach' },
+    { id: 'quick', icon: '💨', name: 'Quick Swing', max: 3, cost: 15, cls: 'barbarian', desc: '+25% swing speed' },
+    { id: 'cluster', icon: '🧨', name: 'Cluster Bombs', max: 3, cost: 18, cls: 'goblin', desc: '+1 grenade per throw (max 4)' },
+    { id: 'fuse', icon: '⏲️', name: 'Short Fuse', max: 3, cost: 15, cls: 'goblin', desc: 'Grenades burst 20% sooner and throw 10% faster' }
 ];
 // One-level buffs: always on sale (also once every permanent card is maxed). Last until the next level-up.
 const LEVEL_BUFFS = [
@@ -102,8 +117,6 @@ const LEVEL_BUFFS = [
     { id: 'slow', icon: '🐌', name: 'Slow Mobs', buff: true, max: Infinity, cost: 20, share: 0.4, weight: 0.6, desc: 'This level: monsters 40% slower' },
     { id: 'feast', icon: '🍖', name: 'Feast', max: Infinity, cost: 15, share: 0.25, weight: 0.4, desc: 'Fully heal' }
 ];
-// Blade: one sword that stabs at the nearest monster; damage doubles with every consecutive hit.
-const STAB = { reach: 80, out: 5, back: 5, cooldown: 10, baseDamage: 10, maxDoublings: 9, chainFrames: 100 };
 
 const BOSSES = [
     { name: 'Bonecrusher', title: 'The Juggernaut', color: '#C0392B', accent: '#F5B041', size: 40, hp: 60, speed: 0.9, pattern: 'charge' },

@@ -152,7 +152,25 @@
         return delta;
     }
 
+    /** Monster HP multiplier at a level (+30% every 6 levels). */
+    function hpScale(level) {
+        return 1 + Math.floor((Math.max(1, level) - 1) / 6) * 0.3;
+    }
+
+    /** Super meter gain for a kill: table value × multiplier, never above what is left to 100. */
+    function superCharge(meter, tierCharge, mult = 1) {
+        return Math.min(100, meter + Math.max(0, tierCharge) * mult);
+    }
+
+    /** Storm chain-lightning damage at a jump index (0 = first target). */
+    function stormDamage(level, jump, base = 6, falloff = 0.65, damageMult = 1) {
+        return base * hpScale(level) * damageMult * Math.pow(falloff, jump);
+    }
+
     return {
+        hpScale,
+        superCharge,
+        stormDamage,
         distanceSquared,
         isWithinRadius,
         vectorMagnitude,

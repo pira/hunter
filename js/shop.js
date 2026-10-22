@@ -48,10 +48,10 @@ extendGame({
 
     availableCards() {
         const permanent = UPGRADES.filter(u => this.stack(u.id) < u.max)
-            .filter(u => !u.weapon || this.isUnlocked(u.weapon))
+            .filter(u => !u.cls || u.cls === this.cls)
             .filter(u => !u.minLevel || this.level >= u.minLevel)
             .filter(u => u.id !== 'vitality' || this.player.maxHp < 6)
-            .map(u => ({ ...u, weight: u.weight || (u.weapon === this.weapon ? 1.6 : 1) }));
+            .map(u => ({ ...u, weight: u.weight || (u.cls ? 1.6 : 1) }));
         const buffs = LEVEL_BUFFS.filter(b => b.id !== 'feast' || this.player.hp < this.player.maxHp);
         return permanent.concat(buffs);
     },
@@ -225,9 +225,8 @@ extendGame({
             const pips = Number.isFinite(c.max) && c.max > 1
                 ? `<div class="pips">${Array.from({ length: c.max }, (_, k) => `<i class="${k < rank ? 'on' : k === rank ? 'next' : ''}"></i>`).join('')}</div>`
                 : '';
-            const tag = c.weapon ? `<span class="tag">${WEAPONS[c.weapon].icon} ${WEAPONS[c.weapon].name}</span>`
-                : c.buff ? '<span class="tag buff">1 level</span>'
-                : c.unlocks ? '<span class="tag new">NEW WEAPON</span>' : '';
+            const tag = c.cls ? `<span class="tag">${CLASSES[c.cls].icon} ${CLASSES[c.cls].name}</span>`
+                : c.buff ? '<span class="tag buff">1 level</span>' : '';
             return `<button class="card" data-i="${i}" style="--d:${i * 70}ms"><span class="num">${i + 1}</span>` +
                 `<span class="cicon">${c.icon}</span><span class="cname">${c.name}</span>${tag}` +
                 `<span class="cdesc">${c.desc}</span>${pips}<span class="price">🪙 ${c.price}</span></button>`;
@@ -289,10 +288,6 @@ extendGame({
         if (card.buff) {
             this.buffs[card.id] = true;
             return;
-        }
-        if (card.unlocks) {
-            this.unlocked.add(card.unlocks);
-            this.banner(`${WEAPONS[card.unlocks].icon} ${WEAPONS[card.unlocks].name.toUpperCase()}`, `Unlocked — ${this.isTouch ? 'tap its slot' : `press ${WEAPON_ORDER.indexOf(card.unlocks) + 1}`}`);
         }
         this.stacks[card.id] = this.stack(card.id) + 1;
         if (card.id === 'vitality') {

@@ -149,3 +149,24 @@ describe('GameUtils.formatTime / angleDelta', () => {
         assert.ok(Math.abs(GameUtils.angleDelta(0.1, Math.PI * 2 - 0.1) + 0.2) < 1e-9);
     });
 });
+
+describe('GameUtils v3 helpers', () => {
+    it('scales monster HP by 30% every 6 levels', () => {
+        assert.equal(GameUtils.hpScale(1), 1);
+        assert.equal(GameUtils.hpScale(6), 1);
+        assert.equal(GameUtils.hpScale(7), 1.3);
+        assert.ok(Math.abs(GameUtils.hpScale(13) - 1.6) < 1e-9);
+    });
+
+    it('charges the super meter and caps it at 100', () => {
+        assert.equal(GameUtils.superCharge(0, 2), 2);
+        assert.equal(GameUtils.superCharge(90, 25), 100);
+        assert.equal(GameUtils.superCharge(10, 5, 1.1), 15.5);
+    });
+
+    it('decays storm damage per chain jump', () => {
+        assert.equal(GameUtils.stormDamage(1, 0), 6);
+        assert.ok(Math.abs(GameUtils.stormDamage(1, 2) - 6 * 0.65 * 0.65) < 1e-9);
+        assert.ok(Math.abs(GameUtils.stormDamage(7, 0, 6, 0.65, 2) - 6 * 1.3 * 2) < 1e-9);
+    });
+});

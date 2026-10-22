@@ -54,14 +54,15 @@ class Game {
         this.el = {
             hud: $('hud'), hearts: $('hearts'), level: $('levelLabel'), xpFill: $('xpFill'),
             score: $('score'), combo: $('combo'), comboMult: $('comboMult'), comboCount: $('comboCount'),
-            comboFill: $('comboFill'), weapons: $('weapons'), powerups: $('powerups'),
+            comboFill: $('comboFill'), powerups: $('powerups'), superBar: $('superBar'), superFill: $('superFill'), superBtn: $('superBtn'),
+            classPicker: $('classPicker'),
             bossBar: $('bossBar'), bossName: $('bossName'), bossFill: $('bossFill'), bossTrail: $('bossTrail'),
             banner: $('banner'), menu: $('menu'), menuBoard: $('menuBoard'), menuBoardTitle: $('menuBoardTitle'),
             playBtn: $('playBtn'), levelup: $('levelup'), levelupTitle: $('levelupTitle'), levelupSub: $('levelupSub'),
             cards: $('cards'), pauseOverlay: $('pause'), gameover: $('gameover'), killerIcon: $('killerIcon'),
             killedBy: $('killedBy'), finalStats: $('finalStats'),
             submitStatus: $('submitStatus'), finalBoard: $('finalBoard'), finalBoardTitle: $('finalBoardTitle'),
-            againBtn: $('againBtn'), weaponBtn: $('weaponBtn'), pauseBtn: $('pauseBtn'), muteBtn: $('muteBtn'),
+            againBtn: $('againBtn'), pauseBtn: $('pauseBtn'), muteBtn: $('muteBtn'),
             version: $('version'), newBest: $('newBest'), coins: $('coins'), shopCoins: $('shopCoins'),
             continueBtn: $('continueBtn'), fsBtn: $('fsBtn'), menuFsBtn: $('menuFsBtn'), soundChip: $('soundChip'),
             iosHint: $('iosHint'), iosHintClose: $('iosHintClose')
@@ -84,22 +85,44 @@ class Game {
             e.currentTarget.blur();
             this.toggleMute();
         });
-        this.el.weaponBtn.addEventListener('pointerdown', e => {
+        this.el.superBtn.addEventListener('pointerdown', e => {
             e.preventDefault();
-            this.cycleWeapon(1);
+            e.stopPropagation();
+            this.activateSuper();
         });
         this.bindIdentity();
+        this.bindClassPicker();
         this.el.muteBtn.textContent = Sfx.muted ? '🔇' : '🔊';
+    }
 
-        // Weapon slots in the HUD
-        this.el.weapons.innerHTML = WEAPON_ORDER.map((w, i) =>
-            `<div class="slot" data-w="${w}"><span class="icon">${WEAPONS[w].icon}</span>` +
-            `<span class="key">${i + 1}</span><span class="lock">🔒 shop</span></div>`).join('');
-        this.el.weapons.querySelectorAll('.slot').forEach(slot =>
-            slot.addEventListener('pointerdown', e => {
-                e.preventDefault();
-                this.selectWeapon(slot.dataset.w);
-            }));
+    // Class picker on the menu: remembered between visits, changeable before every run.
+    bindClassPicker() {
+        const saved = this.storeGet('hunter.class');
+        this.cls = CLASSES[saved] ? saved : 'wizard';
+        this.el.classPicker.innerHTML = CLASS_ORDER.map(id => {
+            const c = CLASSES[id];
+            return `<button class="cls" data-cls="${id}" style="--c:${c.color}" aria-label="${c.name}">` +
+                `<canvas width="120" height="120"></canvas><b>${c.name}</b><small>${'❤️'.repeat(c.hearts)}</small></button>`;
+        }).join('');
+        this.el.classInfo = document.getElementById('classInfo');
+        this.el.classPicker.querySelectorAll('.cls').forEach(btn => {
+            btn.addEventListener('click', () => this.pickClass(btn.dataset.cls));
+            const cv = btn.querySelector('canvas');
+            this.drawPortrait(cv, btn.dataset.cls);
+        });
+        this.pickClass(this.cls, true);
+    }
+
+    pickClass(id, quiet = false) {
+        if (!CLASSES[id]) return;
+        this.cls = id;
+        this.storeSet('hunter.class', id);
+        const c = CLASSES[id];
+        this.el.classPicker.querySelectorAll('.cls').forEach(btn => btn.classList.toggle('on', btn.dataset.cls === id));
+        this.el.classInfo.innerHTML = `<b style="color:${c.color}">${c.weapon}</b> — ${c.blurb}<br><b class="sup">⚡ ${c.superName}</b> — ${c.superBlurb}`;
+        if (this.el.whoAvatar) this.drawAvatar(this.el.whoAvatar, id, this.equippedSkin ? this.equippedSkin(id) : '');
+        this.drawPortrait(document.getElementById('logoHero'), id, this.equippedSkin ? this.equippedSkin(id) : '');
+        if (!quiet) Sfx.tone({ wizard: 784, barbarian: 392, goblin: 587 }[id], { duration: 0.09, type: 'triangle', volume: 0.1 });
     }
 
     setupInput() {
@@ -137,9 +160,7 @@ class Game {
                 return;
             }
             if (this.state !== 'playing') return;
-            if (key === ' ' || key === 'e') this.cycleWeapon(1);
-            else if (key === 'q') this.cycleWeapon(-1);
-            else if (['1', '2', '3', '4'].includes(key)) this.selectWeapon(WEAPON_ORDER[Number(key) - 1]);
+            if (key === ' ' || key === 'e' || key === 'shift') this.activateSuper();
             this.keys[key] = true;
         });
         window.addEventListener('keyup', e => {
@@ -195,9 +216,6 @@ class Game {
         window.addEventListener('pointerup', release);
         window.addEventListener('pointercancel', release);
         this.canvas.addEventListener('contextmenu', e => e.preventDefault());
-        this.canvas.addEventListener('wheel', e => {
-            if (this.state === 'playing') this.cycleWeapon(e.deltaY > 0 ? 1 : -1);
-        }, { passive: true });
     }
 
     setupPlatform() {
@@ -388,9 +406,12 @@ class Game {
     }
 
     resetRun() {
+        if (!CLASSES[this.cls]) this.cls = 'wizard';
+        const cls = CLASSES[this.cls];
+        this.skin = this.equippedSkin ? this.equippedSkin(this.cls) : '';
         this.player = {
-            x: this.W / 2, y: this.H / 2, r: 15, vx: 0, vy: 0, baseSpeed: 4.4,
-            hp: 3, maxHp: 3, iframes: 0, facing: 1, moveT: 0, contactCd: 0
+            x: this.W / 2, y: this.H / 2, r: 15, vx: 0, vy: 0, baseSpeed: cls.speed,
+            hp: cls.hearts, maxHp: cls.hearts, iframes: 0, facing: 1, moveT: 0, contactCd: 0
         };
         this.score = 0;
         this.xp = 0;
@@ -411,7 +432,6 @@ class Game {
         this.coinsEarned = 0;
         this.levelCoinsStart = 0;
         this.incomeEMA = 0;
-        this.unlocked = new Set(START_WEAPONS);
         this.buffs = {};
         this.dropCd = 0;
         this.heartCd = 0;
@@ -420,7 +440,9 @@ class Game {
         this.monsters = [];
         this.bullets = [];
         this.enemyShots = [];
-        this.missiles = [];
+        this.cleaves = [];
+        this.lightning = [];
+        this.decals = [];
         this.grenades = [];
         this.explosions = [];
         this.particles = [];
@@ -428,9 +450,15 @@ class Game {
         this.powerups = [];
         this.coinDrops = [];
 
-        this.weapon = 'bullets';
-        this.cooldowns = { bullets: 0, grenades: 30, missiles: 30 };
-        this.blade = { phase: 'idle', t: 0, cd: 0, chain: 0, chainT: 0, stabs: [], heat: 0 };
+        this.cooldown = 20;
+        this.superMeter = 0;
+        this.chargeMult = 1;
+        this.whirl = 0;
+        this.whirlT = 0;
+        if (this.whirlVoice) Sfx.fadeOut(this.whirlVoice, 0.1);
+        this.whirlVoice = null;
+        this.novaQueue = null;
+        this.stormClock = 0;
         this.timers = Object.fromEntries(TIMED_POWERUPS.map(t => [t, 0]));
         this.stacks = {};
         this.spawnClock = 0;
@@ -577,6 +605,7 @@ class Game {
             this.deathTimer--;
             this.updateMonsters(true);
             this.updateParticles();
+            this.updateLightning();
             if (this.deathTimer <= 0) this.showGameOver();
             return;
         }
@@ -586,7 +615,9 @@ class Game {
         this.updateWeapons();
         this.updateBullets();
         this.updateGrenades();
-        this.updateMissiles();
+        this.updateStorm();
+        this.updateLightning();
+        this.updateDecals();
         this.updateMonsters(false);
         this.updateEnemyShots();
         this.updatePowerups();

@@ -80,6 +80,7 @@ extendGame({
             return;
         }
 
+        this.drawDecals(ctx);
         this.drawEdgeWarnings(ctx);
         this.coinDrops.forEach(c => this.drawCoin(ctx, c));
         this.powerups.forEach(pu => this.drawPowerup(ctx, pu));
@@ -87,9 +88,11 @@ extendGame({
         this.grenades.forEach(g => this.drawGrenade(ctx, g));
         this.monsters.forEach(m => this.drawShadow(ctx, m.x, m.y + m.size * 0.85, m.size));
         this.monsters.forEach(m => (m.boss ? this.drawBoss(ctx, m) : this.drawMonster(ctx, m)));
-        if (this.weapon === 'sword' && this.state !== 'dying') this.drawBlades(ctx);
-        if (this.state !== 'dying' && this.state !== 'gameover') this.drawPlayer(ctx);
+        const alive = this.state !== 'dying' && this.state !== 'gameover';
+        if (alive) this.drawPlayer(ctx);
+        if (alive) this.drawCleaves(ctx);
         this.drawProjectiles(ctx);
+        this.drawLightning(ctx);
         this.drawParticles(ctx);
         this.drawFloaters(ctx);
         this.drawScreenFx(ctx);
@@ -226,7 +229,7 @@ extendGame({
         ctx.strokeStyle = urgent ? (Math.floor(g.timer / 3) % 2 ? '#ff3b30' : '#fff') : '#ffd60a';
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.arc(g.x, g.y, 9, -Math.PI / 2, -Math.PI / 2 + TAU * (g.timer / 64));
+        ctx.arc(g.x, g.y, 9, -Math.PI / 2, -Math.PI / 2 + TAU * (g.timer / (g.fuse || 64)));
         ctx.stroke();
     },
 
@@ -474,101 +477,42 @@ extendGame({
         ctx.restore();
     },
 
-    drawBlades(ctx) {
-        const p = this.player;
-        const bl = this.blade;
-        const heat = bl.heat || 0;
-        const [r, g, b] = Game.bladeColor(heat);
-        const reach = this.stabReach;
-        const bladeLen = 38;
-        const blades = [];
-        if (bl.phase === 'out' || bl.phase === 'back') {
-            const k = bl.phase === 'out' ? Math.min(1, bl.t / (bl.outF || 5)) : 1 - Math.min(1, bl.t / (bl.backF || 5));
-            bl.stabs.forEach(st => blades.push({ angle: st.angle, ext: 24 + (reach - 12) * k, streak: bl.phase === 'out' }));
-        } else {
-            const target = this.nearestMonster(p.x, p.y);
-            const angle = target ? Math.atan2(target.y - p.y, target.x - p.x) : (p.facing > 0 ? 0.35 : Math.PI - 0.35);
-            blades.push({ angle, ext: 26 + Math.sin(this.frameNo * 0.12) * 2, streak: false });
-        }
-        for (const bd of blades) {
-            ctx.save();
-            ctx.translate(p.x, p.y);
-            ctx.rotate(bd.angle);
-            if (bd.streak) {
-                ctx.globalAlpha = 0.28;
-                ctx.fillStyle = heat > 0.2 ? `rgb(${r},${g},${b})` : '#e3f2fd';
-                ctx.beginPath();
-                ctx.moveTo(10, -9);
-                ctx.lineTo(bd.ext, -1.5);
-                ctx.lineTo(bd.ext, 1.5);
-                ctx.lineTo(10, 9);
-                ctx.closePath();
-                ctx.fill();
-                ctx.globalAlpha = 1;
-            }
-            const tip = bd.ext;
-            const base = Math.max(8, tip - bladeLen);
-            if (heat > 0.2) {
-                ctx.globalAlpha = 0.25 + 0.35 * heat;
-                ctx.strokeStyle = `rgb(255,${Math.round(90 + 120 * heat)},40)`;
-                ctx.lineWidth = 9;
-                ctx.lineCap = 'round';
-                ctx.beginPath();
-                ctx.moveTo(base, 0);
-                ctx.lineTo(tip, 0);
-                ctx.stroke();
-                ctx.globalAlpha = 1;
-                ctx.lineCap = 'butt';
-            }
-            ctx.fillStyle = `rgb(${r},${g},${b})`;
-            ctx.strokeStyle = heat > 0.5 ? '#fff3e0' : '#9aa5ad';
-            ctx.lineWidth = 1.2;
-            ctx.beginPath();
-            ctx.moveTo(base, -3.5);
-            ctx.lineTo(tip - 7, -2.6);
-            ctx.lineTo(tip, 0);
-            ctx.lineTo(tip - 7, 2.6);
-            ctx.lineTo(base, 3.5);
-            ctx.closePath();
-            ctx.fill();
-            ctx.stroke();
-            ctx.strokeStyle = '#6d4c41';
-            ctx.lineWidth = 4;
-            ctx.beginPath();
-            ctx.moveTo(base, -8);
-            ctx.lineTo(base, 8);
-            ctx.stroke();
-            ctx.fillStyle = '#4e342e';
-            ctx.fillRect(base - 8, -2, 8, 4);
-            ctx.restore();
-        }
-    },
 
     drawPlayer(ctx) {
         const p = this.player;
         if (p.iframes > 0 && Math.floor(p.iframes / 5) % 2 === 0) return;
         const giant = this.timers.invincible > 0;
-        const size = p.r * 2.4 * (giant ? 1.8 : 1);
-        const bob = p.moveT ? Math.abs(Math.sin(p.moveT * 0.25)) * -3 : Math.sin(this.frameNo * 0.06) * 1.2;
-        this.drawShadow(ctx, p.x, p.y + size * 0.42, size * 0.4);
+        const scale = giant ? 1.6 : 1;
+        const moving = p.moveT > 0;
+        const frame = moving ? 1 + (Math.floor(p.moveT / 6) % 4) : 0;
+        const breathe = moving ? 0 : Math.sin(this.frameNo * 0.06) * 0.6;
+        const feetY = p.y + 14 * scale;
+        this.drawShadow(ctx, p.x, feetY, 12 * scale);
         if (giant) {
             ctx.globalAlpha = 0.3 + 0.15 * Math.sin(this.frameNo * 0.3);
             ctx.fillStyle = '#7CFC00';
             ctx.beginPath();
-            ctx.arc(p.x, p.y, size * 0.6, 0, TAU);
+            ctx.arc(p.x, p.y, 30 * scale, 0, TAU);
             ctx.fill();
             ctx.globalAlpha = 1;
         }
-        ctx.save();
-        ctx.translate(p.x, p.y + bob);
-        ctx.scale(-p.facing, 1); // the emoji faces left by default
-        ctx.font = `${size}px ${EMOJI_FONT}`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillStyle = '#000'; // emoji glyphs inherit the fill alpha
-        ctx.fillText('🧙‍♂️', 0, 0);
-        ctx.restore();
-        if (this.mouse.down && this.weapon !== 'missiles' && this.weapon !== 'sword') {
+        if (this.whirl > 0) {
+            this.drawWhirlwind(ctx);
+            return;
+        }
+        // While swinging, the barbarian's axe is drawn separately along the arc.
+        const swinging = this.cls === 'barbarian' && this.cleaves.some(c => !c.whirl);
+        this.blitSprite(ctx, this.cls, this.skin, frame, p.x, feetY + breathe, scale, p.facing, swinging ? 'noweapon' : '');
+        if (this.superMeter >= 100) {
+            // a little crackle around the hero when the super is ready
+            const a = this.frameNo * 0.2;
+            ctx.strokeStyle = `rgba(250,204,21,${0.5 + 0.3 * Math.sin(a * 2)})`;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.ellipse(p.x, feetY - 1, 16 * scale, 5 * scale, 0, a, a + Math.PI * 1.2);
+            ctx.stroke();
+        }
+        if (this.mouse.down && this.cls !== 'barbarian') {
             ctx.strokeStyle = 'rgba(255,255,255,0.6)';
             ctx.lineWidth = 1.5;
             ctx.beginPath();
@@ -581,48 +525,154 @@ extendGame({
         }
     },
 
+    drawCleaves(ctx) {
+        const p = this.player;
+        const pal = this.palette('barbarian', this.skin);
+        for (const c of this.cleaves) {
+            if (c.whirl) continue;
+            const t = c.t / c.dur;
+            const sweep = Math.min(1, c.t / (c.dur * 0.55));
+            const a0 = c.angle - c.arc * c.dir;
+            const a1 = c.angle + (-c.arc + 2 * c.arc * sweep) * c.dir;
+            const fade = 1 - Math.max(0, (t - 0.55) / 0.45);
+            // crescent swoosh
+            ctx.save();
+            ctx.globalAlpha = 0.85 * fade;
+            const grad = ctx.createRadialGradient(p.x, p.y, c.reach * 0.35, p.x, p.y, c.reach);
+            grad.addColorStop(0, 'rgba(255,255,255,0)');
+            grad.addColorStop(0.75, 'rgba(255,237,213,0.55)');
+            grad.addColorStop(1, 'rgba(255,255,255,0.95)');
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, c.reach, Math.min(a0, a1), Math.max(a0, a1));
+            ctx.arc(p.x, p.y, c.reach * 0.45, Math.max(a0, a1), Math.min(a0, a1), true);
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, c.reach, Math.min(a0, a1), Math.max(a0, a1));
+            ctx.stroke();
+            ctx.restore();
+            // the axe itself, riding the leading edge
+            if (sweep < 1 || t < 0.8) {
+                const hx = p.x + Math.cos(a1) * 10;
+                const hy = p.y - 4 + Math.sin(a1) * 10;
+                Game.drawAxe(ctx, pal, hx, hy, a1 + Math.PI / 2, Math.min(1.25, c.reach / 70));
+            }
+        }
+    },
+
+    drawWhirlwind(ctx) {
+        const p = this.player;
+        const t = this.whirlT;
+        const reach = this.cleaveReach;
+        const pal = this.palette('barbarian', this.skin);
+        const fade = Math.min(1, this.whirl / 30);
+        // wind rings
+        ctx.save();
+        for (let i = 0; i < 3; i++) {
+            ctx.globalAlpha = (0.35 - i * 0.1) * fade;
+            ctx.strokeStyle = '#ffedd5';
+            ctx.lineWidth = 6 - i * 1.5;
+            const a = t * (0.35 + i * 0.07);
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, reach * (0.55 + i * 0.2), a, a + Math.PI * 1.3);
+            ctx.stroke();
+        }
+        ctx.restore();
+        // spinning hero (sprite squashed on alternate frames for a blur feel) + two axes
+        const spin = t * 0.45;
+        const face = Math.cos(spin) >= 0 ? 1 : -1;
+        this.blitSprite(ctx, 'barbarian', this.skin, 0, p.x, p.y + 14, 1, face * Math.max(0.35, Math.abs(Math.cos(spin))), 'noweapon');
+        for (const off of [0, Math.PI]) {
+            const a = spin + off;
+            Game.drawAxe(ctx, pal, p.x + Math.cos(a) * 12, p.y - 6 + Math.sin(a) * 12, a + Math.PI / 2, reach / 70);
+        }
+    },
+
+    drawLightning(ctx) {
+        for (const l of this.lightning) {
+            if (!l.segs) continue;
+            const fade = 1 - l.t / l.max;
+            ctx.save();
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            const strokes = [[10, `rgba(56,189,248,${0.15 * fade})`], [4, `rgba(125,211,252,${0.5 * fade})`], [1.5, `rgba(255,255,255,${fade})`]];
+            for (const [w, color] of strokes) {
+                ctx.strokeStyle = color;
+                ctx.lineWidth = w;
+                ctx.beginPath();
+                for (const seg of l.segs) {
+                    seg.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+                }
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+    },
+
+    drawDecals(ctx) {
+        for (const d of this.decals) {
+            const a = Math.min(1, d.life / 120) * 0.45;
+            ctx.save();
+            ctx.translate(d.x, d.y);
+            ctx.rotate(d.rot);
+            if (d.kind === 'crack') {
+                ctx.strokeStyle = `rgba(30,20,10,${a * 1.4})`;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                for (let i = 0; i < 5; i++) {
+                    const ang = (i / 5) * TAU;
+                    ctx.moveTo(0, 0);
+                    ctx.lineTo(Math.cos(ang) * d.r * 0.5, Math.sin(ang) * d.r * 0.5 + 3);
+                    ctx.lineTo(Math.cos(ang + 0.2) * d.r, Math.sin(ang + 0.2) * d.r);
+                }
+                ctx.stroke();
+            } else {
+                const g = ctx.createRadialGradient(0, 0, 0, 0, 0, d.r);
+                g.addColorStop(0, `rgba(20,14,10,${a})`);
+                g.addColorStop(0.6, `rgba(40,28,18,${a * 0.6})`);
+                g.addColorStop(1, 'rgba(40,28,18,0)');
+                ctx.fillStyle = g;
+                ctx.scale(1, 0.6);
+                ctx.beginPath();
+                ctx.arc(0, 0, d.r, 0, TAU);
+                ctx.fill();
+            }
+            ctx.restore();
+        }
+    },
+
     drawProjectiles(ctx) {
-        ctx.fillStyle = '#ffe066';
-        ctx.strokeStyle = 'rgba(255,170,0,0.6)';
-        ctx.lineWidth = 4;
+        // Magic bolts: glowing violet orbs with a fading trail (big super bolts are pink).
         ctx.lineCap = 'round';
         for (const b of this.bullets) {
+            const core = b.big ? '#fdf4ff' : '#f5f3ff';
+            const glow = b.big ? '236,72,153' : '139,92,246';
+            for (let i = 0; i < b.trail.length; i += 2) {
+                const k = (i + 2) / (b.trail.length + 2);
+                ctx.fillStyle = `rgba(${glow},${0.35 * k})`;
+                ctx.beginPath();
+                ctx.arc(b.trail[i], b.trail[i + 1], b.r * (0.4 + 0.6 * k), 0, TAU);
+                ctx.fill();
+            }
+            ctx.fillStyle = `rgba(${glow},0.35)`;
             ctx.beginPath();
-            ctx.moveTo(b.x - b.vx * 1.2, b.y - b.vy * 1.2);
-            ctx.lineTo(b.x, b.y);
-            ctx.stroke();
+            ctx.arc(b.x, b.y, b.r * 1.9, 0, TAU);
+            ctx.fill();
+            ctx.fillStyle = `rgb(${glow})`;
             ctx.beginPath();
             ctx.arc(b.x, b.y, b.r, 0, TAU);
+            ctx.fill();
+            ctx.fillStyle = core;
+            ctx.beginPath();
+            ctx.arc(b.x - b.r * 0.2, b.y - b.r * 0.2, b.r * 0.5, 0, TAU);
             ctx.fill();
         }
         ctx.lineCap = 'butt';
 
-        for (const ms of this.missiles) {
-            ms.trail.forEach((t, i) => {
-                ctx.globalAlpha = (i / ms.trail.length) * 0.5;
-                ctx.fillStyle = '#ffb385';
-                ctx.beginPath();
-                ctx.arc(t.x, t.y, 1.5 + i * 0.25, 0, TAU);
-                ctx.fill();
-            });
-            ctx.globalAlpha = 1;
-            ctx.save();
-            ctx.translate(ms.x, ms.y);
-            ctx.rotate(ms.angle);
-            ctx.fillStyle = '#ff4500';
-            ctx.beginPath();
-            ctx.ellipse(0, 0, 7, 3, 0, 0, TAU);
-            ctx.fill();
-            ctx.fillStyle = '#ffd60a';
-            ctx.beginPath();
-            ctx.moveTo(-6, 0);
-            ctx.lineTo(-11 - Math.random() * 4, -2);
-            ctx.lineTo(-11 - Math.random() * 4, 2);
-            ctx.fill();
-            ctx.restore();
-        }
-
-        // Boss bullets: magenta orbs with a dark core, so they never read as your own (yellow) shots.
+        // Boss bullets: magenta orbs with a dark core, so they never read as your own shots.
         const pulse = 1 + 0.15 * Math.sin(this.frameNo * 0.3);
         for (const s of this.enemyShots) {
             ctx.globalAlpha = 0.3;
@@ -816,19 +866,5 @@ Object.assign(Game, {
             default:
                 circle();
         }
-    },
-
-    // Steel goes from black to dark red, red, orange and white-hot as the hit chain grows.
-    bladeColor(h) {
-        const stops = [[0, [28, 31, 36]], [0.25, [110, 14, 14]], [0.55, [214, 40, 30]], [0.8, [255, 112, 40]], [1, [255, 236, 200]]];
-        for (let i = 1; i < stops.length; i++) {
-            if (h <= stops[i][0]) {
-                const [h0, c0] = stops[i - 1];
-                const [h1, c1] = stops[i];
-                const t = (h - h0) / (h1 - h0);
-                return c0.map((v, k) => Math.round(v + (c1[k] - v) * t));
-            }
-        }
-        return stops[stops.length - 1][1];
     }
 });

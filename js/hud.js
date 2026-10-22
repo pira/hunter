@@ -42,14 +42,18 @@ extendGame({
         this.el.comboFill.style.width = `${(this.comboTimer / this.comboWindow) * 100}%`;
         this.el.combo.style.transform = `translateX(-50%) scale(${1 + (this.comboPop || 0) * 0.25})`;
 
-        const weaponState = WEAPON_ORDER.map(w => `${w}:${this.isUnlocked(w)}:${this.weapon === w}`).join('|');
-        if (this.hud.weapons !== weaponState) {
-            this.hud.weapons = weaponState;
-            this.el.weapons.querySelectorAll('.slot').forEach(slot => {
-                slot.classList.toggle('active', slot.dataset.w === this.weapon);
-                slot.classList.toggle('locked', !this.isUnlocked(slot.dataset.w));
-            });
-            this.el.weaponBtn.textContent = WEAPONS[this.weapon].icon;
+        // Super meter: bar fills with kills; the button lights up when it's ready (or counts down a Whirlwind).
+        const ready = this.superMeter >= 100 && this.whirl <= 0;
+        const pct = this.whirl > 0 ? (this.whirl / WHIRLWIND_STEPS) * 100 : this.superMeter;
+        this.el.superFill.style.width = `${pct.toFixed(1)}%`;
+        const superState = `${ready}:${this.whirl > 0}:${this.cls}`;
+        if (this.hud.super !== superState) {
+            this.hud.super = superState;
+            this.el.superBar.classList.toggle('ready', ready);
+            this.el.superBar.classList.toggle('active', this.whirl > 0);
+            this.el.superBtn.classList.toggle('ready', ready);
+            this.el.superBtn.dataset.cls = this.cls;
+            this.el.superBtn.innerHTML = `<span>${CLASSES[this.cls].icon}</span><b>${ready ? 'SUPER!' : 'SUPER'}</b>`;
         }
 
         const active = TIMED_POWERUPS.filter(t => this.timers[t] > 0);
@@ -59,15 +63,6 @@ extendGame({
                 `<b>${Math.ceil(this.timers[t] / (60 * GAME_SPEED))}</b></span>`).join('') +
             buffs.map(bf => `<span class="pu buff" title="${bf.name}">${bf.icon}<b>LV</b></span>`).join(''));
         this.setText('coins', this.el.coins, `🪙 ${this.coins}`);
-        const swordSlot = this.el.weapons.querySelector('.slot[data-w="sword"]');
-        const dmgLabel = this.weapon === 'sword' ? String(Math.round(this.stabDamage * this.damageMult)) : '';
-        if (this.hud.stab !== dmgLabel) {
-            this.hud.stab = dmgLabel;
-            swordSlot.dataset.dmg = dmgLabel;
-            const heat = Math.min(this.blade.chain, STAB.maxDoublings) / STAB.maxDoublings;
-            const [r, g, b] = Game.bladeColor(Math.max(0.3, heat));
-            swordSlot.style.setProperty('--heat', this.blade.chain ? `rgb(${r},${g},${b})` : '#ffffff');
-        }
 
         if (this.boss) {
             const pct = U.clamp(this.boss.hp / this.boss.maxHp, 0, 1);
@@ -140,7 +135,7 @@ extendGame({
         const name = (id && id.name) || 'Hunter';
         this.el.submitStatus.textContent = 'Saving your hunt…';
         const entry = {
-            name, score: this.score, level: this.level, kills: this.kills,
+            name, cls: this.cls, score: this.score, level: this.level, kills: this.kills,
             combo: this.bestCombo, bosses: this.bossesSlain, duration: Math.max(1, Math.round(this.time))
         };
         const runId = this.runId;
