@@ -95,7 +95,7 @@ extendGame({
             b.y += 1.6;
             b.spawnT = 2;
             b.t++;
-            if (b.y >= this.H * 0.22) {
+            if (b.y >= Math.max(this.H * 0.22, this.topSafe + b.size * 0.6)) {
                 b.mode = 'fight';
                 b.modeT = 0;
             }
@@ -215,7 +215,7 @@ extendGame({
             b.y += n.y * Math.min(d, speed * freeze);
         };
         if (!b.wp || U.distanceSquared(b.x, b.y, b.wp.x, b.wp.y) < 64) {
-            b.wp = { x: this.roadLeft + (this.roadRight - this.roadLeft) * (0.2 + Math.random() * 0.6), y: this.H * (0.14 + Math.random() * 0.16) };
+            b.wp = { x: this.roadLeft + (this.roadRight - this.roadLeft) * (0.2 + Math.random() * 0.6), y: Math.max(this.H * 0.14, this.topSafe + b.size * 0.6) + Math.random() * this.H * 0.16 };
         }
         const pat = b.boss.pattern;
         if (pat === 'gravelord') {
@@ -241,7 +241,7 @@ extendGame({
                 b.alpha = b.tele.t < 24 ? 1 - b.tele.t / 24 : (b.tele.t - 24) / 24;
                 if (b.tele.t === 24) {
                     b.x = this.roadLeft + (this.roadRight - this.roadLeft) * (0.15 + Math.random() * 0.7);
-                    b.y = this.H * (0.12 + Math.random() * 0.2);
+                    b.y = Math.max(this.H * 0.12, this.topSafe + b.size * 0.6) + Math.random() * this.H * 0.16;
                     b.wp = null;
                 }
                 if (b.tele.t >= 48) {
@@ -270,7 +270,7 @@ extendGame({
             }
         } else if (pat === 'hydra') {
             b.x += (this.W / 2 + Math.sin(b.t * 0.008) * 40 - b.x) * 0.05;
-            b.y += (this.H * 0.18 - b.y) * 0.05;
+            b.y += (Math.max(this.H * 0.18, this.topSafe + b.size * 0.4) - b.y) * 0.05;
             for (const r of b.regrow || []) {
                 if (--r.t <= 0 && !b.dying) {
                     this.growHead(b, r.idx, 0.5);
@@ -732,7 +732,7 @@ extendGame({
         const x = U.clamp(b.x, w / 2 + 6, this.W - w / 2 - 6);
         // above the boss, unless that would sit under the boss bar — then below it
         const above = b.y - b.size * 1.5 - 18;
-        const below = above - h < 130 * (this.H / 600);
+        const below = above - h < this.topSafe + 20;
         const y = below ? b.y + b.size * 1.6 + h + 18 : above;
         ctx.globalAlpha = k;
         ctx.translate(x, y);

@@ -85,6 +85,13 @@ class Game {
             e.currentTarget.blur();
             this.toggleMute();
         });
+        // the "+n" chip in the upgrade strip opens the pause screen, which lists everything owned
+        this.el.powerups.addEventListener('pointerdown', e => {
+            if (e.target.closest('[data-more]')) {
+                e.preventDefault();
+                this.pause();
+            }
+        });
         this.el.superBtn.addEventListener('pointerdown', e => {
             e.preventDefault();
             e.stopPropagation();
@@ -92,6 +99,12 @@ class Game {
         });
         this.bindIdentity();
         this.bindClassPicker();
+        document.getElementById('boardTabs').addEventListener('click', e => {
+            const btn = e.target.closest('button[data-board]');
+            if (!btn) return;
+            document.querySelectorAll('#boardTabs button').forEach(b => b.classList.toggle('on', b === btn));
+            this.loadBoard(this.el.menuBoard, this.el.menuBoardTitle, btn.dataset.board);
+        });
         this.el.muteBtn.textContent = Sfx.muted ? '🔇' : '🔊';
     }
 
@@ -509,6 +522,7 @@ class Game {
         this.el.bossBar.hidden = true;
         this.attract = [];
         for (let i = 0; i < 9; i++) this.attract.push(this.makeMonster(this.pickType(['small', 'medium', 'large'][i % 3]), Math.random() * this.W, Math.random() * this.H, 'random'));
+        document.querySelectorAll('#boardTabs button').forEach(b => b.classList.toggle('on', b.dataset.board === Leaderboard.board));
         this.loadBoard(this.el.menuBoard, this.el.menuBoardTitle);
     }
 
@@ -548,6 +562,10 @@ class Game {
         this.keys = {};
         this.state = 'paused';
         this.setOverlay('pause');
+        const owned = UPGRADES.filter(u => this.stack(u.id) > 0);
+        document.getElementById('pauseUps').innerHTML = owned.length
+            ? owned.map(u => `<span class="up">${u.icon} ${u.name}<sup>${this.stack(u.id)}/${u.max}</sup></span>`).join('')
+            : '';
     }
 
     resume() {

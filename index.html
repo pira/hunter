@@ -86,14 +86,22 @@
         #superBar.ready #superFill { background: linear-gradient(90deg, #facc15, #fde047, #facc15); }
         #superBar.active #superFill { background: linear-gradient(90deg, #f97316, #fde047); transition: none; }
         @keyframes blink { to { filter: brightness(1.6); } }
-        #superBtn { pointer-events: auto; right: 14px; bottom: calc(14px + env(safe-area-inset-bottom)); width: 5em; height: 5em; border-radius: 50%; border: 3px solid rgba(255,255,255,.25); background: rgba(0,0,0,.45); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; opacity: .55; transition: transform .15s, opacity .15s; }
-        #superBtn span { font-size: 1.6em; line-height: 1; filter: grayscale(.8); }
-        #superBtn b { font-family: var(--display); font-weight: normal; font-size: .8em; letter-spacing: 1px; color: #cbd5e1; }
-        #superBtn.ready { opacity: 1; border-color: #facc15; background: radial-gradient(circle, rgba(250,204,21,.45), rgba(120,53,15,.65)); box-shadow: 0 0 22px rgba(250,204,21,.75); animation: throb .45s infinite alternate; }
-        #superBtn.ready span { filter: none; }
-        #superBtn.ready b { color: #fff7c2; }
-        body:not(.touch) #superBtn { width: 4em; height: 4em; font-size: .9em; }
-        body:not(.touch) #superBtn b::after { content: ' ␣'; font-size: .8em; opacity: .7; }
+        /* SUPER button: pops up under the score when the meter is full */
+        #superBtn { pointer-events: auto; top: calc(48px * var(--ui) + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%) scale(.4); opacity: 0; visibility: hidden; display: flex; align-items: center; gap: .35em; padding: .35em 1.1em .35em .55em; border-radius: 999px; border: 3px solid #fff7c2; background: linear-gradient(180deg, #fde047, #f59e0b); color: #3b1d00; box-shadow: 0 4px 0 #92400e, 0 0 26px rgba(250,204,21,.85); transition: transform .25s cubic-bezier(.3,1.6,.6,1), opacity .2s, visibility .2s; }
+        #superBtn span { font-size: 1.5em; line-height: 1; }
+        #superBtn b { font-family: var(--display); font-weight: normal; font-size: 1.25em; letter-spacing: 1px; }
+        #superBtn small { font-size: .65em; opacity: .7; margin-left: .2em; }
+        #superBtn.ready { opacity: 1; visibility: visible; transform: translateX(-50%) scale(1); animation: superPulse .8s ease-in-out infinite; }
+        @keyframes superPulse { 50% { transform: translateX(-50%) scale(1.08); box-shadow: 0 4px 0 #92400e, 0 0 40px rgba(250,204,21,1); } }
+        #hud.super-ready #combo { top: calc(100px * var(--ui) + env(safe-area-inset-top)); }
+        #hud.super-ready ~ #bossBar { top: calc(140px * var(--ui) + env(safe-area-inset-top)); }
+        /* owned upgrades strip (after timed effects and one-level cards) */
+        .up { position: relative; display: grid; place-items: center; width: 1.7em; height: 1.7em; font-size: 1em; border-radius: 8px; background: rgba(0,0,0,.35); }
+        .up sup { position: absolute; right: -3px; top: -5px; font-family: var(--display); font-size: .6em; color: var(--gold); text-shadow: 0 1px 2px #000; }
+        .up.more { pointer-events: auto; cursor: pointer; font-family: var(--display); font-size: .8em; color: #e2e8f0; width: auto; padding: 0 .4em; }
+        .pause-ups { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin: .8em 0 .2em; }
+        .pause-ups .up { width: auto; height: auto; padding: .3em .5em; gap: .3em; display: flex; font-size: .85em; }
+        .pause-ups .up sup { position: static; font-size: .9em; }
         #bossBar { position: absolute; top: calc(92px * var(--ui) + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); width: min(70%, 520px); text-align: center; pointer-events: none; }
         #bossName { font-family: var(--display); font-size: 1.2em; color: #ffb4a8; text-shadow: 0 2px 0 #000; }
         #bossName small { font-family: system-ui, sans-serif; font-size: .6em; color: #e2e8f0; opacity: .85; margin-left: 6px; }
@@ -262,6 +270,10 @@
         .profile-own { display: flex; flex-wrap: wrap; gap: .5em; justify-content: center; margin-top: 1em; }
         .code-box { flex-basis: 100%; text-align: center; font-size: .82em; color: #cbd5e1; }
         .code-box code { display: block; margin: .4em 0; padding: .6em; border-radius: 10px; background: #0b1220; border: 1px dashed #475569; word-break: break-all; font-size: .9em; color: #fde68a; -webkit-user-select: all; user-select: all; }
+        .board-tabs { display: flex; justify-content: center; gap: 4px; margin: .35em 0 0; }
+        .board-tabs button { border: 1px solid var(--line); background: transparent; color: var(--muted); border-radius: 999px; padding: .2em .8em; font-size: .75em; }
+        .board-tabs button.on { background: rgba(250,204,21,.15); color: var(--gold); border-color: rgba(250,204,21,.5); }
+        .board .cls-i { font-size: .85em; margin-right: .25em; }
         .board li[data-pid] { cursor: pointer; }
         .board li[data-pid]:hover { background: rgba(255,255,255,.1); }
         .board li[data-pid] .name::after { content: ' ›'; color: var(--muted); }
@@ -275,6 +287,8 @@
         @media (max-width: 560px) {
             #powerups { position: absolute; top: 2.7em; right: 0; flex-wrap: wrap; justify-content: flex-end; width: 11em; }
             #combo { min-width: 6em; }
+            #superBtn { font-size: .78em; padding: .3em .8em .3em .45em; }
+            #superBtn small { display: none; }
             #comboCount { display: none; }
             .pu { font-size: 1.05em; padding: 1px 4px; }
             #cards { flex-direction: column; align-items: stretch; gap: 10px; }
@@ -313,7 +327,7 @@
                 <button id="pauseBtn" class="icon-btn" aria-label="Pause">⏸</button>
             </div>
             <div id="combo"><div class="row"><span id="comboMult">×1</span><span id="comboCount"></span></div><div class="combobar"><div id="comboFill"></div></div></div>
-            <button id="superBtn" aria-label="Super"><span>⚡</span><b>SUPER</b></button>
+            <button id="superBtn" aria-label="Super"><span>⚡</span><b>SUPER!</b></button>
         </div>
 
         <div id="bossBar" hidden>
@@ -356,6 +370,7 @@
                 <div class="howto touch-only">Drag anywhere to move · you attack on your own<br>Tap ⚡ SUPER when the bar is full</div>
                 <div id="iosHint" class="hint" hidden>📲 Tap <b>Share</b> → <b>Add to Home Screen</b> to play fullscreen <button id="iosHintClose" aria-label="Dismiss">✕</button></div>
                 <h3 id="menuBoardTitle">🏆 Top Hunters</h3>
+                <div class="board-tabs" id="boardTabs"><button data-board="v3" class="on">Monster Road</button><button data-board="v2">Classic</button></div>
                 <ol id="menuBoard" class="board"></ol>
                 <div id="version"></div>
             </div>
@@ -400,6 +415,7 @@
         <div id="pause" class="overlay">
             <div class="panel">
                 <h2>PAUSED</h2>
+                <div id="pauseUps" class="pause-ups"></div>
                 <div class="stack">
                     <button id="resumeBtn" class="btn primary">▶ RESUME</button>
                     <button id="restartBtn" class="btn">↻ Restart</button>

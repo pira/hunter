@@ -207,7 +207,7 @@ extendGame({
             mk(cx - (twin ? 60 : 0));
             if (twin) mk(cx + 60);
         } else if (id === 'bomber') {
-            this.makeGatekeeper('bomber', cx, -40, { homeY: this.H * 0.17, every: twin ? 70 : 95, mines: twin ? 2 : 1, harmless: false });
+            this.makeGatekeeper('bomber', cx, -40, { homeY: Math.max(this.H * 0.17, this.topSafe + 10), every: twin ? 70 : 95, mines: twin ? 2 : 1, harmless: false });
         } else if (id === 'charger') {
             this.makeGatekeeper('charger', cx, -50, { mode: 'aim', t: 0 });
             if (twin) this.makeGatekeeper('charger', cx, -50, { mode: 'aim', t: -90 });
@@ -279,7 +279,7 @@ extendGame({
             case 'charger': {
                 if (m.mode === 'aim') {
                     if (m.t < 0) break;
-                    m.y += (70 - m.y) * 0.08;
+                    m.y += (Math.max(70, this.topSafe) - m.y) * 0.08;
                     m.x += U.clamp(p.x - m.x, -2.2, 2.2) * freeze;
                     m.lane = m.t > 20;
                     if (m.t > 75) {
@@ -324,7 +324,7 @@ extendGame({
                 break;
             }
             case 'archers': {
-                const top = this.H * 0.12;
+                const top = Math.max(this.H * 0.12, this.topSafe);
                 const span = this.H * 0.45;
                 m.y = top + span * (0.5 + 0.5 * Math.sin(m.t * 0.01 + (m.side > 0 ? 2 : 0)));
                 if (m.t % 100 === 0) {

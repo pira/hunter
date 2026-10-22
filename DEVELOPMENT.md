@@ -1,6 +1,8 @@
 # Monster Hunter — Architecture & v3 Development Plan
 
-Status: approved plan, 2026-10-22. Baseline: v2.2.0 (`66ba06a`). Live: https://oleg.manida.com
+Status: implemented 2026-10-22 (P1–P7: v2.3.0 → v3.1.0). Baseline: v2.2.0 (`66ba06a`). Live: https://oleg.manida.com
+
+> Part 1 describes the v2.2.0 baseline the plan started from. For the current layout see the README; notes on what was built and where it deviates from this plan are in Part 3 at the end.
 
 This document has two parts: how the game works today (so changes land in the right place), and the phased plan to v3 with every decision taken so far. Numbers marked *tunable* are starting values for playtesting, not commitments.
 

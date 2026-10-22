@@ -45,6 +45,11 @@ extendGame({
         return this.W - this.roadLeft;
     },
 
+    /** World y below which nothing important should sit: the HUD covers the top ~130 CSS px. */
+    get topSafe() {
+        return Math.min(this.H * 0.4, 130 / this.scale);
+    },
+
     get floorY() {
         return this.H - 90;
     },

@@ -152,11 +152,12 @@
         },
 
         /** Top scores. Returns { scores, source: 'global' | 'local' }. */
-        async top(limit = 10) {
+        async top(limit = 10, board = this.board) {
             try {
-                const body = await request(`/scores?limit=${limit}&board=${this.board}`);
+                const body = await request(`/scores?limit=${limit}&board=${board}`);
                 return { scores: body.scores || [], source: 'global' };
             } catch (e) {
+                if (board !== this.board) return { scores: [], source: 'local' };
                 return { scores: readLocal().slice(0, limit), source: 'local' };
             }
         },

@@ -43,8 +43,8 @@ extendGame({
         this.el.comboFill.style.width = `${(this.comboTimer / this.comboWindow) * 100}%`;
         this.el.combo.style.transform = `translateX(-50%) scale(${1 + (this.comboPop || 0) * 0.25})`;
 
-        // Super meter: bar fills with kills; the button lights up when it's ready (or counts down a Whirlwind).
-        const ready = this.superMeter >= 100 && this.whirl <= 0;
+        // Super meter: bar under the hearts fills with kills; the SUPER button pops up under the score.
+        const ready = this.superMeter >= 100 && this.whirl <= 0 && this.state === 'playing';
         const pct = this.whirl > 0 ? (this.whirl / WHIRLWIND_STEPS) * 100 : this.superMeter;
         this.el.superFill.style.width = `${pct.toFixed(1)}%`;
         const superState = `${ready}:${this.whirl > 0}:${this.cls}`;
@@ -53,16 +53,22 @@ extendGame({
             this.el.superBar.classList.toggle('ready', ready);
             this.el.superBar.classList.toggle('active', this.whirl > 0);
             this.el.superBtn.classList.toggle('ready', ready);
-            this.el.superBtn.dataset.cls = this.cls;
-            this.el.superBtn.innerHTML = `<span>${CLASSES[this.cls].icon}</span><b>${ready ? 'SUPER!' : 'SUPER'}</b>`;
+            this.el.hud.classList.toggle('super-ready', ready);
+            this.el.superBtn.innerHTML = `<span>${CLASSES[this.cls].icon}</span><b>${CLASSES[this.cls].superName.toUpperCase()}!</b>${this.isTouch ? '' : '<small>SPACE</small>'}`;
         }
-
+        // Top-right: timed effects (countdown) → this level's cards (dashed) → owned upgrades (rank).
         const active = TIMED_POWERUPS.filter(t => this.timers[t] > 0);
         const buffs = LEVEL_BUFFS.filter(bf => this.buffs[bf.id]);
+        const owned = UPGRADES.filter(u => this.stack(u.id) > 0);
+        const room = Math.max(0, 8 - active.length - buffs.length);
+        const shown = owned.slice(0, owned.length > room ? Math.max(0, room - 1) : room);
+        const hidden = owned.length - shown.length;
         this.setHtml('powerups', this.el.powerups,
             active.map(t => `<span class="pu" style="--c:${POWERUPS[t].color}">${POWERUPS[t].emoji}${POWERUPS[t].tag ? `<i>${POWERUPS[t].tag}</i>` : ''}` +
                 `<b>${Math.ceil(this.timers[t] / (60 * GAME_SPEED))}</b></span>`).join('') +
-            buffs.map(bf => `<span class="pu buff" title="${bf.name}">${bf.icon}<b>LV</b></span>`).join(''));
+            buffs.map(bf => `<span class="pu buff" title="${bf.name}">${bf.icon}<b>LV</b></span>`).join('') +
+            shown.map(u => `<span class="up" title="${u.name}">${u.icon}<sup>${this.stack(u.id)}</sup></span>`).join('') +
+            (hidden > 0 ? `<button class="up more" data-more="1" aria-label="All upgrades">+${hidden}</button>` : ''));
         this.setText('coins', this.el.coins, `🪙 ${this.coins}`);
 
         if (this.boss) {
@@ -184,15 +190,15 @@ extendGame({
         this.renderBoard(this.el.finalBoard, this.el.finalBoardTitle, result.scores, result.source, { id: result.id, name, score: this.score });
     },
 
-    async loadBoard(listEl, titleEl) {
+    async loadBoard(listEl, titleEl, board = Leaderboard.board) {
         listEl.innerHTML = '<li class="muted">Loading…</li>';
-        const { scores, source } = await Leaderboard.top(10);
-        this.renderBoard(listEl, titleEl, scores, source);
+        const { scores, source } = await Leaderboard.top(10, board);
+        this.renderBoard(listEl, titleEl, scores, source, null, board);
     },
 
-    renderBoard(listEl, titleEl, scores, source, mine) {
+    renderBoard(listEl, titleEl, scores, source, mine, board = Leaderboard.board) {
         titleEl.hidden = false;
-        titleEl.textContent = source === 'global' ? '🏆 Top Hunters' : '🏆 Top Hunters (this device)';
+        titleEl.textContent = (board === 'v2' ? '🏆 Classic Hunters' : '🏆 Top Hunters') + (source === 'global' ? '' : ' (this device)');
         if (!scores.length) {
             listEl.innerHTML = '<li class="muted">No scores yet — be the first!</li>';
             return;
@@ -203,7 +209,7 @@ extendGame({
             if (isMine) marked = true;
             const name = String(s.name).replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
             const pid = typeof s.playerId === 'string' && /^[0-9a-f-]{36}$/.test(s.playerId) ? ` data-pid="${s.playerId}"` : '';
-            return `<li class="${isMine ? 'mine' : ''}"${pid}><span class="rank">${i + 1}</span><span class="name">${name}</span>` +
+            return `<li class="${isMine ? 'mine' : ''}"${pid}><span class="rank">${i + 1}</span><span class="name">${CLASSES[s.cls] ? `<span class="cls-i">${CLASSES[s.cls].icon}</span>` : ''}${name}</span>` +
                 `<span class="lvl">Lv ${Number(s.level) || 1}</span><span class="pts">${(Number(s.score) || 0).toLocaleString()}</span></li>`;
         }).join('');
         listEl.querySelectorAll('li[data-pid]').forEach(li => li.addEventListener('click', () => this.openProfile(li.dataset.pid)));
