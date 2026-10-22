@@ -170,7 +170,7 @@
             local.sort((a, b) => b.score - a.score);
             write(LOCAL_KEY, local.slice(0, 20));
             const history = read(HISTORY_KEY, []);
-            history.unshift({ score: entry.score, level: entry.level, kills: entry.kills, combo: entry.combo, bosses: entry.bosses, duration: entry.duration, ts: record.ts, cls: entry.cls });
+            history.unshift({ score: entry.score, level: entry.level, kills: entry.kills, combo: entry.combo, bosses: entry.bosses, duration: entry.duration, ts: record.ts, cls: entry.cls, gold: entry.coins, gems: entry.gems });
             write(HISTORY_KEY, history.slice(0, 20));
             return { record, rank: local.indexOf(record) + 1, scores: local.slice(0, 10) };
         },

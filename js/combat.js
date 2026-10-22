@@ -130,6 +130,16 @@ extendGame({
                 this.damageMonster(m, dmg, { kx: n.x * 11, ky: n.y * 11, crit, sound: 'slash', src: p });
                 this.spark(m.x - n.x * m.size, m.y - n.y * m.size, '#ffe0b2', 5);
             }
+            // the axe also cuts boss bullets out of the air: melee's answer to bullet patterns
+            for (const s of this.enemyShots) {
+                if (s.life <= 0) continue;
+                const dx = s.x - p.x;
+                const dy = s.y - p.y;
+                const dist = Math.hypot(dx, dy);
+                if (dist > c.reach + 16 + s.r) continue;
+                const rel = U.angleDelta(c.angle, Math.atan2(dy, dx)) * c.dir;
+                if (c.full || (rel >= from - 0.35 && rel <= to + 0.35)) this.popShot(s);
+            }
             if (hit && !c.shook) {
                 c.shook = true;
                 this.shake(3);
@@ -215,7 +225,18 @@ extendGame({
         this.grenades = this.grenades.filter(g => g.timer > 0);
     },
 
+    /** Destroy an enemy projectile (axe, blast or bolt). */
+    popShot(s) {
+        s.life = 0;
+        this.spark(s.x, s.y, '#fde68a', 4);
+        if (this.frameNo - (this.popSfxAt || 0) > 4) {
+            this.popSfxAt = this.frameNo;
+            Sfx.tone(1500 + Math.random() * 400, { duration: 0.04, type: 'triangle', volume: 0.05, bus: 'sfx' });
+        }
+    },
+
     explode(x, y, radius, baseDamage) {
+        for (const s of this.enemyShots) if (s.life > 0 && U.distanceSquared(x, y, s.x, s.y) <= (radius + s.r) ** 2) this.popShot(s);
         for (const m of this.monsters) {
             if (m.dead) continue;
             if (U.distanceSquared(x, y, m.x, m.y) <= (radius + m.size) ** 2) {
@@ -254,6 +275,7 @@ extendGame({
             }
             if (b.x < -20 || b.x > this.W + 20 || b.y < -20 || b.y > this.H + 20) b.life = 0;
             if (b.life <= 0) continue;
+            for (const s of this.enemyShots) if (s.life > 0 && U.distanceSquared(b.x, b.y, s.x, s.y) < (b.r + s.r + 3) ** 2) this.popShot(s);
             for (const m of this.monsters) {
                 if (m.dead || b.hits.has(m)) continue;
                 if (U.distanceSquared(b.x, b.y, m.x, m.y) < (b.r + m.size) ** 2) {

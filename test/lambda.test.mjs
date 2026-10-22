@@ -195,6 +195,9 @@ describe('lambda: banking, wheel and meta shop', () => {
         assert.equal(res.status, 200);
         assert.equal(res.body.player.gold, 120);
         assert.deepEqual(res.body.pot, { id: res.body.pot.id, amount: 120, spins: 0, status: 'open' });
+        const prof = await api.call('GET', `/player/${PID}`);
+        assert.equal(prof.body.runs[0].gold, 120);
+        assert.equal(prof.body.runs[0].cls, 'wizard');
     });
 
     it('doubles on a win, loses it all on a loss, and refuses stale or closed spins', async () => {

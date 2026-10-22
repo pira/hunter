@@ -324,7 +324,9 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
         const runItem = {
             pk: `player#${pid}`, sk: `run#${pad(ts, 14)}#${id}`,
             score: run.score, level: run.level, kills: run.kills, combo: run.combo, bosses: run.bosses, duration: run.duration, ts,
-            ...(run.cls ? { cls: run.cls, board: 'v3' } : {})
+            ...(run.cls ? { cls: run.cls, board: 'v3' } : {}),
+            ...(unspent > 0 ? { gold: unspent } : {}),
+            ...(run.gems > 0 ? { gems: run.gems } : {})
         };
         for (let attempt = 0; attempt < 3; attempt++) {
             const next = {
@@ -577,7 +579,7 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
             ScanIndexForward: false,
             Limit: 20
         });
-        const runs = (out.Items || []).map(({ score, level, kills, combo, bosses, duration, ts, cls }) => ({ score, level, kills, combo, bosses, duration, ts, cls }));
+        const runs = (out.Items || []).map(({ score, level, kills, combo, bosses, duration, ts, cls, gold, gems }) => ({ score, level, kills, combo, bosses, duration, ts, cls, gold, gems }));
         return { player: publicMeta(pid, meta), runs };
     }
 

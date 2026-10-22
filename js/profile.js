@@ -126,7 +126,8 @@ extendGame({
         el.profileStats.innerHTML = stats.map(([k, v, cls]) => `<div class="${cls || ''}"><span>${k}</span><b>${esc(v)}</b></div>`).join('');
         const runs = res.runs || [];
         el.profileRuns.innerHTML = runs.length
-            ? runs.map((r, i) => `<li><span class="rank">${i + 1}</span><span><span class="pts">${(r.score || 0).toLocaleString()}</span> <span class="meta">Lv ${r.level} · ${r.kills} kills${r.bosses ? ` · ${r.bosses} 👑` : ''}</span></span>` +
+            ? runs.map((r, i) => `<li><span class="rank">${i + 1}</span><span>${CLASSES[r.cls] ? `<span class="cls-i" title="${CLASSES[r.cls].name}">${CLASSES[r.cls].icon}</span> ` : ''}<span class="pts">${(r.score || 0).toLocaleString()}</span> <span class="meta">Lv ${r.level} · ${r.kills} kills${r.bosses ? ` · ${r.bosses} 👑` : ''}</span>` +
+                `${r.gold || r.gems ? `<span class="earn">${r.gold ? `${POUCH} +${r.gold.toLocaleString()}` : ''}${r.gems ? ` ${GEM} +${r.gems}` : ''}</span>` : ''}</span>` +
                 `<span class="meta">${U.formatTime(r.duration || 0)}</span><span class="when">${Game.timeAgo(r.ts)}</span></li>`).join('')
             : '<li class="muted">No hunts yet — go get them!</li>';
         el.profileOwn.hidden = !res.mine;

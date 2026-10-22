@@ -222,14 +222,21 @@ extendGame({
             drift(b.wp.x, b.wp.y, b.speed * (b.slamT > 0 ? 0 : 1));
             if (b.slamT > 0) {
                 if (--b.slamT === 0) {
-                    this.shockwave(b, b.enraged ? 0.32 : 0.48);
-                    if (b.enraged) this.later(32, () => this.shockwave(b, 0.32));
+                    this.shockwave(b, b.slamPlan);
+                    if (b.enraged) {
+                        // the second wave's gaps are shown at once and lie within reach of the first
+                        const plan2 = this.planShock(b, 32, b.slamPlan);
+                        this.shockWarn(b, plan2, 32);
+                        this.later(32, () => this.shockwave(b, plan2));
+                    }
                 }
             } else if (b.atkT > (b.enraged ? 150 : 210)) {
                 b.atkT = 0;
                 b.volley++;
                 if (b.volley % 2) {
                     b.slamT = 50;
+                    b.slamPlan = this.planShock(b, 50);
+                    this.shockWarn(b, b.slamPlan, 50);
                     this.floater(b.x, b.y - b.size - 14, 'SLAM!', '#fb923c', 20);
                 } else {
                     this.boulders(b.enraged ? 3 : 2);
@@ -265,7 +272,7 @@ extendGame({
                 if (b.volley % 2) this.laser(b);
                 else {
                     this.bulletWall(b);
-                    if (b.enraged) this.later(70, () => this.bulletWall(b));
+                    if (b.enraged) this.later(70, () => this.bulletWall(b, true));
                 }
             }
         } else if (pat === 'hydra') {
@@ -335,26 +342,97 @@ extendGame({
         this.hazards.push({ type: 'timer', t: 0, update: h => { if (h.t >= steps) { h.dead = true; if (this.state === 'playing' && this.boss) fn(); } } });
     },
 
-    // Gravelord: ground slam → expanding shockwave ring with gaps to slip through.
-    shockwave(b, gapW) {
-        const gaps = [];
-        const toP = Math.atan2(this.player.y - b.y, this.player.x - b.x);
-        gaps.push(toP + (Math.random() < 0.5 ? 1 : -1) * (0.6 + Math.random() * 0.8));
-        gaps.push(gaps[0] + Math.PI * (0.8 + Math.random() * 0.4));
+    /**
+     * Gravelord: ground slam → expanding shockwave ring with two gaps. Fair for every class:
+     *  - the gaps are shown on the ground while the slam winds up (shockWarn),
+     *  - one gap is always within reach of the player at their own speed (slow wizard included),
+     *    and is at least ~90 px wide where the player stands (70 px enraged),
+     *  - the ring dies out at a fixed radius, so a ranged hero can also just stay far away.
+     */
+    shockMaxR(b) {
+        return Math.max(260, Math.min(this.W, this.H) * 0.55 + b.size);
+    },
+
+    planShock(b, delay, after) {
+        const p = this.player;
+        const cx = b.x;
+        const cy = b.y + b.size * 0.6;
+        const d = Math.max(70, Math.hypot(p.x - cx, p.y - cy));
+        const aP = Math.atan2(p.y - cy, p.x - cx);
+        const toP = after ? after.gaps.reduce((best, g) => (Math.abs(U.angleDelta(aP, g)) < Math.abs(U.angleDelta(aP, best)) ? g : best)) : aP;
+        const speed = p.baseSpeed * this.moveMult;
+        // a follow-up wave (enraged double slam): the player sits in the first wave's gap until it
+        // passes, so only the delay between the waves counts, measured from that gap
+        const steps = after ? delay : delay + Math.max(0, (d - b.size) / 3.2);
+        const reachArc = Math.min(d * 1.1, speed * steps * 0.55); // px along the ring the player can surely cover
+        const gapW = U.clamp((b.enraged ? 70 : 90) / d, 0.3, 1.2);
+        // the gap must open where the player can actually stand (not off the screen edge)
+        const onScreen = a => {
+            const x = cx + Math.cos(a) * d;
+            const y = cy + Math.sin(a) * d;
+            return x > 24 && x < this.W - 24 && y > 24 && y < this.H - 24;
+        };
+        let g0 = toP;
+        for (let i = 0; i < 12; i++) {
+            const a = toP + (0.35 + 0.65 * Math.random()) * (reachArc / d) * (i % 2 ? 1 : -1) * (i < 8 ? 1 : 0.4);
+            if (onScreen(a)) {
+                g0 = a;
+                break;
+            }
+        }
+        return { gaps: [g0, g0 + Math.PI * (0.8 + Math.random() * 0.4)], gapW, cx, cy };
+    },
+
+    /** Ground telegraph of a coming shockwave: the ring's reach and its two safe gaps. */
+    shockWarn(b, plan, life) {
+        const maxR = this.shockMaxR(b);
         this.hazards.push({
-            type: 'shock', x: b.x, y: b.y + b.size * 0.6, r: b.size, gaps, gapW, t: 0, owner: b,
+            type: 'shockWarn', t: 0, owner: b, plan,
+            update: h => { if (h.t >= life || b.dead) h.dead = true; },
+            draw: (ctx, h) => {
+                const pulse = 0.5 + 0.5 * Math.sin(h.t * 0.35);
+                ctx.save();
+                ctx.strokeStyle = `rgba(251,146,60,${0.25 + 0.25 * pulse})`;
+                ctx.lineWidth = 3;
+                ctx.setLineDash([10, 10]);
+                ctx.beginPath();
+                ctx.arc(plan.cx, plan.cy, maxR, 0, TAU);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                for (const g of plan.gaps) {
+                    ctx.fillStyle = `rgba(74,222,128,${0.14 + 0.14 * pulse})`;
+                    ctx.beginPath();
+                    ctx.moveTo(plan.cx + Math.cos(g) * b.size, plan.cy + Math.sin(g) * b.size);
+                    ctx.arc(plan.cx, plan.cy, maxR, g - plan.gapW / 2, g + plan.gapW / 2);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.fillStyle = `rgba(187,247,208,${0.5 + 0.4 * pulse})`;
+                    ctx.font = `18px ${DISPLAY_FONT}`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    for (const k of [0.45, 0.75]) ctx.fillText('SAFE', plan.cx + Math.cos(g) * maxR * k, plan.cy + Math.sin(g) * maxR * k);
+                }
+                ctx.restore();
+            }
+        });
+    },
+
+    shockwave(b, plan) {
+        const maxR = this.shockMaxR(b);
+        this.hazards.push({
+            type: 'shock', x: plan.cx, y: plan.cy, r: b.size, gaps: plan.gaps, gapW: plan.gapW, t: 0, owner: b,
             update: h => {
                 h.r += 3.2;
-                if (h.r > Math.hypot(this.W, this.H)) h.dead = true;
+                if (h.r > maxR) h.dead = true;
                 const p = this.player;
                 const d = Math.hypot(p.x - h.x, p.y - h.y);
-                if (Math.abs(d - h.r) < 9 + p.r * 0.5) {
+                if (h.r < maxR - 40 && Math.abs(d - h.r) < 9 + p.r * 0.5) {
                     const a = Math.atan2(p.y - h.y, p.x - h.x);
                     if (!h.gaps.some(g => Math.abs(U.angleDelta(g, a)) < h.gapW / 2)) this.hurtPlayer(h.owner);
                 }
             },
             draw: (ctx, h) => {
-                const fade = Math.max(0, 1 - h.r / Math.hypot(this.W, this.H));
+                const fade = U.clamp((maxR - h.r) / 60, 0, 1);
                 ctx.strokeStyle = `rgba(251,146,60,${0.85 * fade})`;
                 ctx.lineWidth = 10;
                 ctx.lineCap = 'round';
@@ -439,7 +517,9 @@ extendGame({
     // Stormcaller: telegraphed beam that then sweeps slowly.
     laser(b) {
         const p = this.player;
-        const spin = (Math.random() < 0.5 ? 1 : -1) * (b.enraged ? 0.016 : 0.011);
+        // Slow enough to outrun on foot at mid range (wizard included); the beam starts a little
+        // away from the boss, so hugging it is a safe spot for melee. The telegraph shows the turn.
+        const spin = (Math.random() < 0.5 ? 1 : -1) * (b.enraged ? 0.0105 : 0.008);
         this.hazards.push({
             type: 'laser', owner: b, angle: Math.atan2(p.y - b.y, p.x - b.x) - spin * 40, spin, t: 0, warn: 60, active: 150,
             update: h => {
@@ -454,7 +534,7 @@ extendGame({
                     const dy = q.y - b.y;
                     const along = dx * Math.cos(h.angle) + dy * Math.sin(h.angle);
                     const off = Math.abs(-dx * Math.sin(h.angle) + dy * Math.cos(h.angle));
-                    if (along > 0 && off < 10 + q.r * 0.5) this.hurtPlayer(b);
+                    if (along > b.size + 34 && off < 10 + q.r * 0.5) this.hurtPlayer(b);
                     if (h.t === h.warn + 1) Sfx.fx('beam', 0.6, (d, rate, len, k) => {
                         k.osc(len, rate, 'sawtooth', 110, 90, d, 0.6);
                         k.osc(len, rate, 'square', 220, 180, d, 0.3);
@@ -479,12 +559,31 @@ extendGame({
                     ctx.lineTo(ex, ey);
                     ctx.stroke();
                     ctx.setLineDash([]);
+                    // which way it will turn
+                    const ar = b.size + 46;
+                    const a0 = h.angle;
+                    const a1 = h.angle + Math.sign(h.spin) * 0.9;
+                    ctx.strokeStyle = 'rgba(186,230,253,0.85)';
+                    ctx.lineWidth = 4;
+                    ctx.beginPath();
+                    ctx.arc(b.x, b.y, ar, Math.min(a0, a1), Math.max(a0, a1));
+                    ctx.stroke();
+                    const hx = b.x + Math.cos(a1) * ar;
+                    const hy = b.y + Math.sin(a1) * ar;
+                    const tan = a1 + Math.sign(h.spin) * Math.PI / 2;
+                    ctx.fillStyle = 'rgba(186,230,253,0.95)';
+                    ctx.beginPath();
+                    ctx.moveTo(hx + Math.cos(tan) * 10, hy + Math.sin(tan) * 10);
+                    ctx.lineTo(hx + Math.cos(tan + 2.4) * 9, hy + Math.sin(tan + 2.4) * 9);
+                    ctx.lineTo(hx + Math.cos(tan - 2.4) * 9, hy + Math.sin(tan - 2.4) * 9);
+                    ctx.closePath();
+                    ctx.fill();
                 } else {
                     for (const [w, c] of [[26, 'rgba(56,189,248,0.25)'], [12, 'rgba(125,211,252,0.7)'], [4, '#ffffff']]) {
                         ctx.strokeStyle = c;
                         ctx.lineWidth = w + Math.sin(h.t * 0.8) * 2;
                         ctx.beginPath();
-                        ctx.moveTo(b.x, b.y);
+                        ctx.moveTo(b.x + Math.cos(h.angle) * (b.size + 30), b.y + Math.sin(h.angle) * (b.size + 30));
                         ctx.lineTo(ex, ey);
                         ctx.stroke();
                     }
@@ -495,9 +594,18 @@ extendGame({
     },
 
     // Stormcaller: a row of bullets falling down the screen with one gap to slip through.
-    bulletWall(b) {
+    bulletWall(b, follow) {
         const gapW = 110;
-        const gapX = this.roadLeft + 30 + Math.random() * (this.roadRight - this.roadLeft - gapW - 60);
+        // the gap is always reachable at the hero's own speed before the wall arrives
+        const p = this.player;
+        const steps = follow ? 70 : Math.max(40, (p.y - b.y - 20) / 2.3);
+        const reach = p.baseSpeed * this.moveMult * steps * 0.6;
+        const from = follow && b.wallGap !== undefined ? b.wallGap : p.x;
+        const lo = Math.max(this.roadLeft + 30 + gapW / 2, from - reach);
+        const hi = Math.min(this.roadRight - 30 - gapW / 2, from + reach);
+        const centre = lo < hi ? lo + Math.random() * (hi - lo) : U.clamp(from, this.roadLeft + gapW / 2, this.roadRight - gapW / 2);
+        b.wallGap = centre;
+        const gapX = centre - gapW / 2;
         for (let x = 10; x < this.W; x += 28) {
             if (x > gapX && x < gapX + gapW) continue;
             this.enemyShot(x, b.y + 20, Math.PI / 2, 2.3, 'spark');
