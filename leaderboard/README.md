@@ -55,7 +55,8 @@ If you change the level curve in `game-utils.js`, change `xpToNextLevel` in `lam
 ## Deploy
 
 ```bash
-./leaderboard/deploy.sh ap-southeast-1
+./leaderboard/deploy.sh ap-southeast-1   # first deploy / infrastructure (admin rights)
+./leaderboard/update.sh ap-southeast-1   # code + table permissions only (iam:PutRolePolicy, lambda:UpdateFunctionCode)
 ```
 
 Creates/updates the table `monster-hunter-scores`, the role and the function `monster-hunter-leaderboard`, and prints the function URL. Put that URL in `config.js` → `leaderboardUrl`, commit and push. CORS is configured on the function URL for `oleg.manida.com`, `pira.github.io` and `localhost:8000`.

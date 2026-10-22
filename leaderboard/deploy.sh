@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Deploys (or updates) the leaderboard API: DynamoDB table + IAM role + Lambda with a public function URL.
-# Requires: AWS CLI v2 with credentials, zip. Usage: ./leaderboard/deploy.sh [region]
+# Requires: AWS CLI v2 with admin-level credentials, zip. Usage: ./leaderboard/deploy.sh [region]
+# Already deployed and only the code changed? ./leaderboard/update.sh needs far fewer permissions.
 set -euo pipefail
 
 REGION="${1:-ap-southeast-1}"
@@ -10,7 +11,12 @@ ORIGINS='["https://oleg.manida.com","http://oleg.manida.com","https://pira.githu
 HERE="$(cd "$(dirname "$0")" && pwd)"
 export AWS_REGION="$REGION"
 
-if ! aws dynamodb describe-table --table-name "$TABLE" >/dev/null 2>&1; then
+# Only create the table when it really doesn't exist (an AccessDenied must not look like "missing").
+if ! OUT=$(aws dynamodb describe-table --table-name "$TABLE" 2>&1 >/dev/null); then
+  case "$OUT" in
+    *ResourceNotFoundException*) ;;
+    *) echo "$OUT" >&2; echo "Can't read table $TABLE with these credentials. To update an existing deployment, use ./leaderboard/update.sh" >&2; exit 1 ;;
+  esac
   echo "Creating table $TABLE"
   aws dynamodb create-table --table-name "$TABLE" \
     --attribute-definitions AttributeName=pk,AttributeType=S AttributeName=sk,AttributeType=S \
