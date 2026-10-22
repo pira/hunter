@@ -361,3 +361,27 @@ New item: `pk=pot#<nonce>, sk=pot` → `playerId, amount, spins, status (open|ba
 ### 2.6 Open tunables to settle in playtests
 
 `ROAD_SPEED`, soft-floor height, `LEVEL_DAMAGE(L)`, class hearts/speed/cooldowns, super charge table, Storm damage, card shares, coin `tierBase`, artefact prices, `WHEEL_WIN`.
+
+
+---
+
+## Part 3 — As built (2026-10-22)
+
+All seven phases are implemented: v2.3.0 (P1), v2.4.0 (P2), P3–P6 on branch `v3` merged as v3.0.0, P7 as v3.1.0.
+Where the build differs from the plan above:
+
+- **Code layout:** as 2.3 plus `js/road.js` (scroll, biome tiles), `js/encounters.js` (level flow, gatekeepers, waves,
+  hazards), `js/sprites.js` (vector heroes) and `js/meta.js` (P7). `extendGame()` copies property descriptors, so
+  getters survive the mixin. The version lives in `js/core.js`.
+- **Fullscreen** targets `document.documentElement` rather than `#stage` (the stage has a fixed CSS size and would be
+  stretched). Auto-fullscreen on Play can be switched off with ⛶ and stays off (`hunter.fullscreen`).
+- **Audio:** synth sounds and creature voices are rendered in plain JS DSP into AudioBuffers (same idea as
+  OfflineAudioContext, but synchronous and cheap: ~8 ms per creature voice, pre-warmed in the background).
+- **Boss voices:** Piper `en_US-john-medium` (LibriVox, public domain) + per-boss ffmpeg chains, `tools/voices/`.
+- **Encounter decks:** 6 gatekeepers and 6 waves, each with an easy (A) and a hard/twin (B) variant, dealt as
+  "all A shuffled, then all B shuffled" — 12 + 12 regular encounters before any repeat, i.e. none before L30.
+- **Balance (bot-calibrated, `tools/sim/balance.py`):** `levelDamage(L) = 70·(1+0.3(L−1))·hpScale(L)` gives ~60–90 s
+  levels; goblins throw grenades in pairs (cd 66, r 38) to keep the classes within ~±25% of each other;
+  permanent card base prices doubled because v3 levels pay more coins; `expectedIncome(L) = 0.7·levelDamage(L)+10+2L`.
+- **Server:** one Lambda serves both boards. v2 clients keep working unchanged.
+- **Open tunables** remain as listed in 2.6; `?stats` and the balance bot are the tools to settle them.

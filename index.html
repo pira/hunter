@@ -270,6 +270,41 @@
         .profile-own { display: flex; flex-wrap: wrap; gap: .5em; justify-content: center; margin-top: 1em; }
         .code-box { flex-basis: 100%; text-align: center; font-size: .82em; color: #cbd5e1; }
         .code-box code { display: block; margin: .4em 0; padding: .6em; border-radius: 10px; background: #0b1220; border: 1px dashed #475569; word-break: break-all; font-size: .9em; color: #fde68a; -webkit-user-select: all; user-select: all; }
+        .bank-box { position: relative; margin: .2em auto .6em; padding: .7em; border-radius: 16px; background: radial-gradient(circle at 50% 30%, rgba(250,204,21,.16), rgba(0,0,0,.2)); border: 1px solid rgba(250,204,21,.35); }
+        #wheel { width: 150px; height: 150px; display: block; margin: 0 auto; }
+        #potText { margin: .4em 0; font-size: .92em; color: #fde68a; }
+        #potText b { font-family: var(--display); font-weight: normal; color: #fff; letter-spacing: .5px; }
+        .bank-btns { display: flex; gap: .5em; justify-content: center; flex-wrap: wrap; }
+        .bank-btns .btn { font-size: 1em; padding: .55em 1em; }
+        #spinBtn { background: linear-gradient(180deg, #f472b6, #db2777); box-shadow: 0 4px 0 #831843; }
+        .confetti { position: absolute; left: 50%; top: 40%; width: 8px; height: 12px; background: var(--c); border-radius: 2px; animation: confetti 1s ease-out forwards; pointer-events: none; }
+        @keyframes confetti { to { transform: translate(var(--x), var(--y)) rotate(540deg); opacity: 0; } }
+        .profile-shop h3 { margin-top: .9em; }
+        .gold-line { margin-top: .8em; padding: .5em .8em; border-radius: 12px; background: linear-gradient(90deg, rgba(250,204,21,.18), rgba(250,204,21,.04)); font-size: 1.05em; }
+        .gold-line b { font-family: var(--display); font-weight: normal; color: var(--gold); font-size: 1.3em; letter-spacing: .5px; }
+        .gold-line small { display: block; color: var(--muted); font-size: .72em; }
+        .arts { list-style: none; padding: 0; margin: .4em 0 0; }
+        .arts li { display: grid; grid-template-columns: 1.8em 1fr auto auto; gap: .5em; align-items: center; padding: .35em .4em; border-radius: 10px; font-size: .85em; }
+        .arts li:nth-child(odd) { background: rgba(255,255,255,.04); }
+        .arts .ai { font-size: 1.4em; }
+        .arts .an { display: flex; flex-direction: column; line-height: 1.2; }
+        .arts .an small { color: var(--muted); font-size: .8em; }
+        .tier { color: var(--t); font-family: var(--display); font-size: .9em; white-space: nowrap; }
+        .tier.none { color: var(--muted); font-family: inherit; }
+        .buy { border: 0; border-radius: 10px; padding: .35em .6em; font-family: var(--display); font-size: .85em; color: #3b1d00; background: linear-gradient(180deg, #facc15, #f59e0b); box-shadow: 0 2px 0 #92400e; white-space: nowrap; }
+        .buy:disabled { background: #334155; color: #94a3b8; box-shadow: none; cursor: not-allowed; }
+        .buy.on { background: #14532d; color: #bbf7d0; box-shadow: none; }
+        .maxed { font-family: var(--display); color: #e879f9; font-size: .85em; }
+        .skin-row { display: flex; gap: .4em; align-items: stretch; margin: .4em 0; overflow-x: auto; padding-bottom: 2px; }
+        .skin-cls { align-self: center; font-size: 1.4em; }
+        .skin { flex: 0 0 5.6em; display: flex; flex-direction: column; align-items: center; gap: .15em; padding: .35em .25em; border-radius: 12px; background: rgba(255,255,255,.05); border: 2px solid transparent; font-size: .8em; text-align: center; }
+        .skin canvas { width: 3.6em; height: 3.6em; }
+        .skin b { font-size: .85em; line-height: 1.1; }
+        .skin small { font-size: .75em; }
+        .skin.on { border-color: #4ade80; }
+        .skin.mythic { background: radial-gradient(circle at 50% 30%, rgba(232,121,249,.25), rgba(255,255,255,.04)); }
+        .skin.legendary { background: radial-gradient(circle at 50% 30%, rgba(245,158,11,.2), rgba(255,255,255,.04)); }
+        .board .name.glow { color: #fdf4ff; text-shadow: 0 0 8px #e879f9, 0 0 14px #c026d3; }
         .board-tabs { display: flex; justify-content: center; gap: 4px; margin: .35em 0 0; }
         .board-tabs button { border: 1px solid var(--line); background: transparent; color: var(--muted); border-radius: 999px; padding: .2em .8em; font-size: .75em; }
         .board-tabs button.on { background: rgba(250,204,21,.15); color: var(--gold); border-color: rgba(250,204,21,.5); }
@@ -398,6 +433,7 @@
                     </div>
                 </div>
                 <div id="profileStats" class="stat-grid"></div>
+                <div id="profileShop" class="profile-shop"></div>
                 <h3>⚔️ Recent hunts</h3>
                 <ol id="profileRuns" class="runs"></ol>
                 <div id="profileOwn" class="profile-own" hidden>
@@ -431,6 +467,14 @@
                 <div id="newBest">★ NEW PERSONAL BEST ★</div>
                 <div id="finalStats"></div>
                 <p id="submitStatus"></p>
+                <div id="bankBox" class="bank-box" hidden>
+                    <canvas id="wheel" width="180" height="180"></canvas>
+                    <p id="potText"></p>
+                    <div class="bank-btns">
+                        <button id="spinBtn" class="btn">🎰 Double or nothing</button>
+                        <button id="keepBtn" class="btn ghost">🏦 Keep it</button>
+                    </div>
+                </div>
                 <h3 id="finalBoardTitle" hidden>🏆 Top Hunters</h3>
                 <ol id="finalBoard" class="board"></ol>
                 <div class="stack">
@@ -459,5 +503,6 @@
     <script src="js/render.js"></script>
     <script src="js/sprites.js"></script>
     <script src="js/profile.js"></script>
+    <script src="js/meta.js"></script>
 </body>
 </html>

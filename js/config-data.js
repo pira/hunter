@@ -145,3 +145,42 @@ const BIG_BOSSES = [
     { name: 'Hydra', voice: 'hydra', title: 'Three Heads, One Appetite', color: '#0f766e', accent: '#a3e635', size: 46, hp: 200, speed: 0.5, pattern: 'hydra', big: true },
     { name: 'Lich', voice: 'lich', title: 'King of the Restless Dead', color: '#3b2f6b', accent: '#a78bfa', size: 38, hp: 220, speed: 0.8, pattern: 'lich', big: true }
 ];
+
+// ---------------------------------------------------------------------- meta progression (P7)
+// Must match leaderboard/lambda/catalog.mjs (test/catalog.test.mjs checks it).
+const TIERS = [
+    null,
+    { name: 'basic', label: 'Basic', color: '#cbd5e1', price: 1000, gate: 0 },
+    { name: 'rare', label: 'Rare', color: '#60a5fa', price: 4000, gate: 10 },
+    { name: 'legendary', label: 'Legendary', color: '#f59e0b', price: 15000, gate: 20 },
+    { name: 'mythic', label: 'Mythic', color: '#e879f9', price: 60000, gate: 30 }
+];
+// Permanent artefacts: small bonuses, all owned ones active. values[tier] replaces the previous tier.
+const ARTEFACTS = {
+    greed: { icon: '💍', name: 'Greed Ring', stat: 'gold', what: 'gold', values: [0, 1, 3, 5, 7] },
+    whetstone: { icon: '🪨', name: 'Whetstone', stat: 'damage', what: 'damage', values: [0, 1, 2, 3, 5] },
+    rune: { icon: '🌀', name: 'Quickening Rune', stat: 'rate', what: 'attack speed', values: [0, 1, 2, 3, 5] },
+    shard: { icon: '🔷', name: 'Storm Shard', stat: 'charge', what: 'super charge', values: [0, 2, 4, 6, 10] },
+    boots: { icon: '🥾', name: 'Wind Boots', stat: 'speed', what: 'move speed', values: [0, 1, 2, 3, 5] },
+    idol: { icon: '🗿', name: 'Luck Idol', stat: 'luck', what: 'drop chance', values: [0, 2, 4, 6, 10] },
+    charm: { icon: '🧿', name: 'Road Charm', stat: 'road', what: 'road speed', values: [0, -2, -4, -6, -8] },
+    hourglass: { icon: '⏳', name: 'Hourglass', stat: 'timed', what: 'timed effects', values: [0, 2, 5, 8, 12] },
+    amulet: { icon: '🛡️', name: 'Guardian Amulet', stat: 'guard', what: 'chance to ignore a hit', values: [0, 1, 2, 3, 5] }
+};
+const SKIN_PRICES = { basic: 300, rare: 2000, legendary: 8000, mythic: 30000 };
+// Cosmetic skins per class: palette overrides for js/sprites.js + extras (headgear, trail, aura, kill burst).
+const SKINS = {
+    frost: { cls: 'wizard', rarity: 'basic', name: 'Frost Mage', palette: { robe: '#38bdf8', robeDark: '#0369a1', hat: '#0284c7', trim: '#e0f2fe', hatBand: '#e0f2fe', star: '#ffffff', orb: '#e0f2fe' } },
+    flame: { cls: 'wizard', rarity: 'rare', name: 'Flame King', palette: { robe: '#dc2626', robeDark: '#991b1b', trim: '#fbbf24', orb: '#fb923c' }, extras: { noHat: true, crown: '#fbbf24' } },
+    shadow: { cls: 'wizard', rarity: 'legendary', name: 'Shadow Archmage', palette: { robe: '#1f2937', robeDark: '#111827', hat: '#312e81', hatBand: '#a78bfa', trim: '#a78bfa', star: '#c4b5fd', orb: '#c084fc', beard: '#9ca3af' }, extras: { trail: '#a78bfa' } },
+    celestial: { cls: 'wizard', rarity: 'mythic', name: 'Celestial', palette: { robe: '#fef3c7', robeDark: '#fde68a', hat: '#f8fafc', hatBand: '#facc15', trim: '#facc15', star: '#facc15', orb: '#fde047' }, extras: { trail: '#fde047', aura: '#facc15', burst: '#fde047' } },
+    viking: { cls: 'barbarian', rarity: 'basic', name: 'Snow Viking', palette: { hair: '#facc15', hairDark: '#ca8a04', fur: '#e5e7eb', furLight: '#ffffff', pants: '#1e3a8a' } },
+    warlord: { cls: 'barbarian', rarity: 'rare', name: 'Golden Warlord', palette: { fur: '#7f1d1d', furLight: '#b91c1c', axeHead: '#fde047', buckle: '#fde047' }, extras: { noHelmet: true, crown: '#facc15' } },
+    lava: { cls: 'barbarian', rarity: 'legendary', name: 'Lava Berserker', palette: { hair: '#f97316', hairDark: '#c2410c', helmet: '#292524', helmetDark: '#1c1917', horn: '#fb923c', axeHead: '#fb923c', axeEdge: '#fde047', fur: '#292524', furLight: '#57534e' }, extras: { trail: '#fb923c' } },
+    titan: { cls: 'barbarian', rarity: 'mythic', name: 'Storm Titan', palette: { skin: '#bfdbfe', skinShade: '#93c5fd', hair: '#f8fafc', hairDark: '#cbd5e1', helmet: '#e5e7eb', horn: '#fde047', axeHead: '#fde047', fur: '#1e3a8a', furLight: '#3b82f6' }, extras: { trail: '#93c5fd', aura: '#60a5fa', burst: '#bfdbfe' } },
+    redcap: { cls: 'goblin', rarity: 'basic', name: 'Red Cap', palette: { cap: '#dc2626', vest: '#1d4ed8', vestDark: '#1e3a8a' } },
+    pirate: { cls: 'goblin', rarity: 'rare', name: 'Pirate Goblin', palette: { vest: '#f8fafc', vestDark: '#1f2937', pants: '#1f2937' }, extras: { noCap: true, pirate: true } },
+    toxic: { cls: 'goblin', rarity: 'legendary', name: 'Toxic Goblin', palette: { skin: '#a3e635', ear: '#bef264', eye: '#f0abfc', vest: '#581c87', vestDark: '#3b0764', bomb: '#4d7c0f', fuse: '#d946ef' }, extras: { trail: '#a3e635' } },
+    king: { cls: 'goblin', rarity: 'mythic', name: 'Goblin King', palette: { vest: '#7e22ce', vestDark: '#581c87', satchel: '#facc15' }, extras: { noCap: true, crown: '#facc15', trail: '#facc15', aura: '#fde047', burst: '#facc15' } }
+};
+const RARITY = { basic: 1, rare: 2, legendary: 3, mythic: 4 };

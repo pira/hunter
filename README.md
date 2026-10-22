@@ -29,6 +29,7 @@ Pick a hero, run down the monster road through eleven biomes, chain kills into a
   - One-level cards — Freeze, Fleet Foot, Fury, Coin Magnet, Road Brake, Double Progress/Gold/Damage, Feast — cost a share of what you have been earning per level.
 - **Pickups:** 🌩️ Storm (chain lightning every 3 s), 🔋 Overcharge, 🧪 Poison (spreads by touch), 💫 Stun, ⚡ Rapid Fire, 🛡️ Invincible, ❄️ Freeze, 🐢 Road Brake, 🧲 Magnet, 🪙×2/×3, ❤️ Extra Life, 🌋 Earthquake. Timers never stack past 30 s.
 - **Your hunter:** the first launch asks for a name; every run is saved to your profile (best score, hunts, kills, bosses, play time, recent runs). Tap any name on the leaderboard to see that hunter's profile. A recovery code moves your hunter to another device.
+- **Gold, the wheel and the profile shop:** coins you haven't spent when a hunt ends are banked into your profile. Feeling lucky? Spin **Double or nothing** as often as you dare (the server spins, 50/50), or keep it. Spend gold in your profile on **artefacts** (small permanent bonuses: Greed Ring, Whetstone, Quickening Rune, Storm Shard, Wind Boots, Luck Idol, Road Charm, Hourglass, Guardian Amulet — basic → rare → legendary → mythic, higher tiers unlock at best level 10/20/30) and **skins** for each hero (mythic ones glow, leave a trail and light up your name on the board).
 - **Leaderboard:** runs are submitted automatically. The *Classic* tab keeps the v2 board.
 
 ## Project layout
@@ -45,6 +46,7 @@ js/                 the game, as classic scripts mixed into one Game class (no b
   profile.js        identity and profile overlay  road.js     scrolling, biomes, background tiles
   encounters.js     level flow, gatekeepers, waves, hazards
   sprites.js        vector player characters (cached per class × skin × frame)
+  meta.js           banked gold, the wheel, artefacts and skins (profile shop)
 game-utils.js       pure helpers shared with tests (level curve, combo tiers, …)
 audio.js            Web Audio engine: buses + limiter, voice manager, health watchdog,
                     procedural creature voices and hit sounds (samples in sfx/)

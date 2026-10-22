@@ -187,7 +187,7 @@
             try {
                 const res = await request('/scores', { method: 'POST', body: JSON.stringify(body) });
                 if (res.player) this.cacheProfile(res.player);
-                return { source: 'global', rank: res.rank, id: res.id, scores: res.scores || [], player: res.player };
+                return { source: 'global', rank: res.rank, id: res.id, scores: res.scores || [], player: res.player, pot: res.pot };
             } catch (e) {
                 const rejected = e.status >= 400 && e.status < 500;
                 if (!rejected) write(PENDING_KEY, { body, at: Date.now() }); // network trouble: retry on next launch
@@ -228,6 +228,33 @@
 
         localHistory() {
             return read(HISTORY_KEY, []);
+        },
+
+        // ---- meta: wheel, banking, shop (all decided server-side; the client only shows results)
+
+        async meta(action, payload) {
+            const id = this.identity();
+            if (!id || !this.enabled) throw new Error('offline');
+            const res = await request(`/player/${id.id}/${action}`, { method: 'POST', body: JSON.stringify({ secret: id.secret, ...payload }) });
+            if (res.player) this.cacheProfile(res.player);
+            else if (res.gold !== undefined) this.cacheProfile({ id: id.id, gold: res.gold });
+            return res;
+        },
+
+        spin(pot, spins) { return this.meta('spin', { pot, spins }); },
+        bank(pot) { return this.meta('bank', { pot }); },
+        buy(item, id, tier) { return this.meta('buy', { item, id, tier }); },
+        equip(cls, skin) { return this.meta('equip', { cls, skin }); },
+
+        /** Refresh the cached own profile (gold, artefacts, skins) in the background. */
+        async refreshOwn() {
+            const id = this.identity();
+            if (!id || !this.enabled) return this.cachedProfile();
+            try {
+                const res = await request(`/player/${id.id}`);
+                this.cacheProfile(res.player);
+            } catch (e) { /* offline: keep the cache */ }
+            return this.cachedProfile();
         },
 
         /** Public profile { player, runs, source }. Own profile falls back to device history offline. */

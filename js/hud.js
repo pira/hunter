@@ -155,6 +155,8 @@ extendGame({
         this.el.newBest.hidden = !(this.score > best && this.score > 0);
 
         this.el.submitStatus.textContent = '';
+        this.el.bankBox.hidden = true;
+        this.pot = null;
         this.el.finalBoard.innerHTML = '';
         this.el.finalBoardTitle.hidden = true;
         this.gameOverAt = performance.now();
@@ -188,6 +190,7 @@ extendGame({
                     : `Saved on this device (#${result.rank}) — will upload when you're back online`;
         }
         this.renderBoard(this.el.finalBoard, this.el.finalBoardTitle, result.scores, result.source, { id: result.id, name, score: this.score });
+        if (result.pot) this.showPot(result.pot, result.player && result.player.gold);
     },
 
     async loadBoard(listEl, titleEl, board = Leaderboard.board) {
@@ -209,7 +212,7 @@ extendGame({
             if (isMine) marked = true;
             const name = String(s.name).replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
             const pid = typeof s.playerId === 'string' && /^[0-9a-f-]{36}$/.test(s.playerId) ? ` data-pid="${s.playerId}"` : '';
-            return `<li class="${isMine ? 'mine' : ''}"${pid}><span class="rank">${i + 1}</span><span class="name">${CLASSES[s.cls] ? `<span class="cls-i">${CLASSES[s.cls].icon}</span>` : ''}${name}</span>` +
+            return `<li class="${isMine ? 'mine' : ''}"${pid}><span class="rank">${i + 1}</span><span class="name${SKINS[s.skin] && SKINS[s.skin].rarity === 'mythic' ? ' glow' : ''}">${CLASSES[s.cls] ? `<span class="cls-i">${CLASSES[s.cls].icon}</span>` : ''}${name}</span>` +
                 `<span class="lvl">Lv ${Number(s.level) || 1}</span><span class="pts">${(Number(s.score) || 0).toLocaleString()}</span></li>`;
         }).join('');
         listEl.querySelectorAll('li[data-pid]').forEach(li => li.addEventListener('click', () => this.openProfile(li.dataset.pid)));

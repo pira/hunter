@@ -164,3 +164,93 @@ describe('lambda: v3 board', () => {
         assert.equal((await t.call('POST', '/scores', { ...v3({ coins: 999999 }), token })).status, 422);
     });
 });
+
+describe('lambda: banking, wheel and meta shop', () => {
+    let t;
+    let rolls;
+    beforeEach(() => {
+        rolls = [];
+        t = setup();
+    });
+    // a fresh app whose wheel follows `rolls` (true = win)
+    function rigged() {
+        const db = t.db;
+        let clock = 1_800_000_000_000;
+        const app = createApp({ send: db.send, tokenSecret: 'test-secret', now: () => clock, random: randomBytes, wheel: () => rolls.shift() });
+        const call = async (method, path, body) => {
+            const res = await app({ requestContext: { http: { method, sourceIp: '9.9.9.9' } }, rawPath: path, body: body ? JSON.stringify(body) : undefined });
+            return { status: res.statusCode, body: JSON.parse(res.body) };
+        };
+        return { call, advance: ms => { clock += ms; } };
+    }
+    async function finishRun(api, coins, extra = {}) {
+        const token = (await api.call('POST', '/run')).body.token;
+        api.advance(130_000);
+        return api.call('POST', '/scores', { ...run({ level: 5 }), board: 'v3', cls: 'wizard', coins, token, playerId: PID, secret: SECRET, ...extra });
+    }
+
+    it('banks unspent gold at death and returns a pot', async () => {
+        const api = rigged();
+        const res = await finishRun(api, 120);
+        assert.equal(res.status, 200);
+        assert.equal(res.body.player.gold, 120);
+        assert.deepEqual(res.body.pot, { id: res.body.pot.id, amount: 120, spins: 0, status: 'open' });
+    });
+
+    it('doubles on a win, loses it all on a loss, and refuses stale or closed spins', async () => {
+        const api = rigged();
+        const { pot } = (await finishRun(api, 100)).body;
+        rolls.push(true);
+        const won = await api.call('POST', `/player/${PID}/spin`, { secret: SECRET, pot: pot.id, spins: 0 });
+        assert.equal(won.status, 200);
+        assert.equal(won.body.win, true);
+        assert.equal(won.body.gold, 200);
+        assert.equal(won.body.pot.amount, 200);
+        // double tap with the old spin count is rejected
+        assert.equal((await api.call('POST', `/player/${PID}/spin`, { secret: SECRET, pot: pot.id, spins: 0 })).status, 409);
+        rolls.push(false);
+        const lost = await api.call('POST', `/player/${PID}/spin`, { secret: SECRET, pot: pot.id, spins: 1 });
+        assert.equal(lost.body.win, false);
+        assert.equal(lost.body.gold, 0);
+        assert.equal(t.db.get(`player#${PID}`, 'meta').gold, 0);
+        rolls.push(true);
+        assert.equal((await api.call('POST', `/player/${PID}/spin`, { secret: SECRET, pot: pot.id, spins: 2 })).status, 409);
+    });
+
+    it('bank closes the pot; the wheel cannot be spun with a wrong secret', async () => {
+        const api = rigged();
+        const { pot } = (await finishRun(api, 80)).body;
+        assert.equal((await api.call('POST', `/player/${PID}/spin`, { secret: 'z'.repeat(43), pot: pot.id, spins: 0 })).status, 403);
+        const banked = await api.call('POST', `/player/${PID}/bank`, { secret: SECRET, pot: pot.id });
+        assert.equal(banked.body.pot.status, 'banked');
+        rolls.push(true);
+        assert.equal((await api.call('POST', `/player/${PID}/spin`, { secret: SECRET, pot: pot.id, spins: 0 })).status, 409);
+    });
+
+    it('buys artefact tiers in order, gated by gold and best level', async () => {
+        const api = rigged();
+        await finishRun(api, 1500);
+        const buy = (id, tier) => api.call('POST', `/player/${PID}/buy`, { secret: SECRET, item: 'artefact', id, tier });
+        assert.equal((await buy('greed', 2)).status, 409); // tier 1 first
+        const ok = await buy('greed', 1);
+        assert.equal(ok.status, 200);
+        assert.equal(ok.body.player.artefacts.greed, 1);
+        assert.equal(ok.body.player.gold, 500);
+        assert.equal((await buy('greed', 2)).status, 403); // best level 5 < 10
+        assert.equal((await buy('whetstone', 1)).status, 409); // not enough gold
+    });
+
+    it('buys and equips skins; equipping needs ownership; the board shows the equipped skin', async () => {
+        const api = rigged();
+        await finishRun(api, 400);
+        const eq = skin => api.call('POST', `/player/${PID}/equip`, { secret: SECRET, cls: 'wizard', skin });
+        assert.equal((await eq('frost')).status, 403);
+        const bought = await api.call('POST', `/player/${PID}/buy`, { secret: SECRET, item: 'skin', id: 'frost' });
+        assert.equal(bought.status, 200);
+        assert.equal(bought.body.player.gold, 100);
+        assert.equal((await eq('frost')).status, 200);
+        assert.equal((await eq('viking')).status, 400); // barbarian skin on a wizard
+        const res = await finishRun(api, 0, { skin: 'celestial' });
+        assert.equal(res.body.scores.find(s => s.playerId === PID && s.skin).skin, 'frost');
+    });
+});

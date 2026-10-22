@@ -35,7 +35,7 @@ aws iam put-role-policy --role-name "$NAME" --policy-name table-access --policy-
 ROLE_ARN=$(aws iam get-role --role-name "$NAME" --query Role.Arn --output text)
 
 ZIP="$(mktemp -d)/lambda.zip"
-(cd "$HERE/lambda" && zip -q "$ZIP" index.mjs app.mjs)
+(cd "$HERE/lambda" && zip -q "$ZIP" index.mjs app.mjs catalog.mjs)
 
 if aws lambda get-function --function-name "$NAME" >/dev/null 2>&1; then
   echo "Updating function code"

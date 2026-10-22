@@ -9,6 +9,18 @@ Serverless backend for the global score table: one Lambda (Node.js 22) behind a 
 | `POST /scores` | `{ name, score, level, kills, combo, bosses, duration, token, playerId?, secret? }` | `{ id, rank, scores, player? }` |
 | `GET /player/{id}` | – | `{ player, runs }` — public profile + last 20 runs (never the secret hash) |
 | `POST /player/{id}/name` | `{ secret, name }` | `{ player }` |
+| `POST /player/{id}/spin` | `{ secret, pot, spins }` | `{ win, pot, gold }` — double or nothing, rolled server-side (`WHEEL_WIN` 0.5) |
+| `POST /player/{id}/bank` | `{ secret, pot }` | `{ gold, pot }` — closes the pot |
+| `POST /player/{id}/buy` | `{ secret, item: 'artefact'\|'skin', id, tier? }` | `{ player }` — conditional on gold, previous tier and best-level gate |
+| `POST /player/{id}/equip` | `{ secret, cls, skin }` | `{ player }` — must own the skin (`''` takes it off) |
+
+v3 runs send `board: 'v3', cls, coins` (unspent gold). They land on `board#v3`; `GET /scores?board=v3` reads it
+(default stays the Classic `board#v2`). v3 plausibility: `level ≤ 2 + duration/12`, score ≤ 1000 + 4000/s,
+kills ≤ 60 + 25/s, `coins ≤ coinCap(kills, bosses, level)`. The submit transaction credits the unspent gold to the
+profile and opens a pot (`pk=pot#<nonce>`, TTL 24 h) the wheel can ride on; every spin is one transaction
+conditioned on the pot's spin count and the profile's gold, so double taps and client-side gold edits do nothing.
+The board row's skin comes from the profile's equipped skin, never from the client. Catalog prices and gates live
+in `lambda/catalog.mjs` (mirrored in `js/config-data.js`; `test/catalog.test.mjs` keeps them in sync).
 
 ## Identity
 

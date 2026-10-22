@@ -461,6 +461,20 @@ Object.assign(Game, {
             Game.ellipse(g, -3, -32, 1.6, 1.3, p.lens, null);
             Game.ellipse(g, 3.6, -32, 1.6, 1.3, p.lens, null);
         }
+        if (ex.pirate) {
+            // tricorn hat with a tiny skull
+            g.beginPath();
+            g.moveTo(-14, -30);
+            g.quadraticCurveTo(-8, -33, -6, -40);
+            g.quadraticCurveTo(0.5, -36, 7, -40);
+            g.quadraticCurveTo(9, -33, 15, -30);
+            g.quadraticCurveTo(0.5, -27, -14, -30);
+            g.closePath();
+            Game.blob(g, '#111827', OUTLINE, 1.6);
+            Game.ellipse(g, 0.5, -34, 2.2, 2, '#f8fafc', null);
+            g.fillStyle = '#facc15';
+            g.fillRect(-12, -30.8, 25, 1.4);
+        }
         if (ex.crown) Game.drawCrown(g, 0.5, -34, ex.crown);
         // hand holding a lit bomb
         Game.ellipse(g, 10, -11, 2.6, 2.4, p.skin, OUTLINE, 1.4);

@@ -490,6 +490,20 @@ extendGame({
         const breathe = moving ? 0 : Math.sin(this.frameNo * 0.06) * 0.6;
         const feetY = p.y + 14 * scale;
         this.drawShadow(ctx, p.x, feetY, 12 * scale);
+        const fx = this.skinExtras();
+        if (fx.aura) {
+            // mythic skins glow
+            const pulse = 0.5 + 0.5 * Math.sin(this.frameNo * 0.08);
+            const g = ctx.createRadialGradient(p.x, p.y, 4, p.x, p.y, 34 * scale);
+            g.addColorStop(0, `${fx.aura}88`);
+            g.addColorStop(1, `${fx.aura}00`);
+            ctx.globalAlpha = 0.5 + 0.3 * pulse;
+            ctx.fillStyle = g;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 34 * scale, 0, TAU);
+            ctx.fill();
+            ctx.globalAlpha = 1;
+        }
         if (giant) {
             ctx.globalAlpha = 0.3 + 0.15 * Math.sin(this.frameNo * 0.3);
             ctx.fillStyle = '#7CFC00';

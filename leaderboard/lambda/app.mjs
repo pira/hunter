@@ -9,6 +9,10 @@
 //   POST /scores                     submit a finished run (optionally with playerId + secret)
 //   GET  /player/{id}                public profile + last 20 runs
 //   POST /player/{id}/name           rename { secret, name }
+//   POST /player/{id}/spin           double-or-nothing on the run's pot { secret, pot, spins }
+//   POST /player/{id}/bank           close the pot { secret, pot }
+//   POST /player/{id}/buy            artefact tier or skin { secret, item: 'artefact'|'skin', id, tier? }
+//   POST /player/{id}/equip          wear an owned skin { secret, cls, skin ('' = none) }
 //
 // Items (single table):
 //   pk="board#v2"      sk="<inverted score>#<ts>#<id>"   Classic score rows, best first
@@ -17,7 +21,9 @@
 //   pk="rate"          sk=<ip>#<minute>                   per-IP submit counter (TTL)
 //   pk="player#<pid>"  sk="meta"                          profile (secretHash never leaves the server)
 //   pk="player#<pid>"  sk="run#<ts>#<id>"                 run history
-import { createHmac, createHash, randomBytes, timingSafeEqual } from 'node:crypto';
+//   pk="pot#<nonce>"   sk="pot"                           the run's banked gold on the wheel (TTL 24 h)
+import { createHmac, createHash, randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
+import { TIERS, ARTEFACTS, SKINS, SKIN_PRICES, WHEEL_WIN } from './catalog.mjs';
 
 export const BOARD = 'board#v2';
 export const BOARD_V3 = 'board#v3';
@@ -28,7 +34,9 @@ export const MAX_RUN_MS = 6 * 3600 * 1000;
 export const SUBMITS_PER_MINUTE = 6;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const SECRET_RE = /^[A-Za-z0-9_-]{32,128}$/;
-const PUBLIC_META = ['name', 'bestScore', 'bestLevel', 'runs', 'kills', 'bosses', 'playSeconds', 'createdAt', 'updatedAt'];
+const PUBLIC_META = ['name', 'bestScore', 'bestLevel', 'runs', 'kills', 'bosses', 'playSeconds', 'createdAt', 'updatedAt', 'gold', 'artefacts', 'skins', 'equipped'];
+const POT_RE = /^[A-Za-z0-9_-]{6,40}$/;
+const POT_TTL = 24 * 3600;
 
 export class HttpError extends Error {
     constructor(status, message) {
@@ -72,7 +80,7 @@ export const sha256 = s => createHash('sha256').update(String(s)).digest('base64
 const isInt = (v, min, max) => Number.isInteger(v) && v >= min && v <= max;
 const pad = (n, w) => String(n).padStart(w, '0');
 
-export function createApp({ send, tokenSecret, now = () => Date.now(), random = randomBytes }) {
+export function createApp({ send, tokenSecret, now = () => Date.now(), random = randomBytes, wheel = () => randomInt(0, 1_000_000) < WHEEL_WIN * 1_000_000 }) {
     const sign = payload => createHmac('sha256', tokenSecret).update(payload).digest('base64url');
 
     function makeToken() {
@@ -217,6 +225,9 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
         const { coins: unspent, ...shown } = run;
         const boardItem = { pk: board, sk, id, ...shown, ts };
         if (pid) boardItem.playerId = pid;
+        // The skin shown on the board is whatever the profile has equipped — never the client's word.
+        delete boardItem.skin;
+        if (meta && meta.equipped && run.cls && meta.equipped[run.cls]) boardItem.skin = meta.equipped[run.cls];
 
         if (!pid) {
             try {
@@ -227,18 +238,19 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
             }
             await send('Put', { Item: boardItem });
         } else {
-            meta = await writeWithProfile({ pid, meta, secret: body.secret, run, ts, id, nonceItem, boardItem });
+            meta = await writeWithProfile({ pid, meta, secret: body.secret, run, ts, id, nonceItem, boardItem, unspent: v3 ? unspent || 0 : 0, nonce: token.nonce });
         }
 
         const [rank, scores] = await Promise.all([rankOf(board, sk), topScores(board, 10)]);
         const out = { id, rank, scores };
         if (meta) out.player = publicMeta(pid, meta);
+        if (meta && meta.potCredited > 0) out.pot = { id: token.nonce, amount: meta.potCredited, spins: 0, status: 'open' };
         return out;
     }
 
     // Nonce + board row + run row + profile in one transaction; the profile update is guarded by
     // an optimistic lock on `version` so concurrent submits can't lose increments.
-    async function writeWithProfile({ pid, meta, secret, run, ts, id, nonceItem, boardItem }) {
+    async function writeWithProfile({ pid, meta, secret, run, ts, id, nonceItem, boardItem, unspent = 0, nonce }) {
         const runItem = {
             pk: `player#${pid}`, sk: `run#${pad(ts, 14)}#${id}`,
             score: run.score, level: run.level, kills: run.kills, combo: run.combo, bosses: run.bosses, duration: run.duration, ts,
@@ -246,7 +258,7 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
         };
         for (let attempt = 0; attempt < 3; attempt++) {
             const next = {
-                ...(meta || { pk: `player#${pid}`, sk: 'meta', secretHash: sha256(secret), createdAt: ts, runs: 0, kills: 0, bosses: 0, playSeconds: 0, bestScore: 0, bestLevel: 0, version: 0 }),
+                ...(meta || newMeta(pid, secret, ts)),
                 name: run.name,
                 updatedAt: ts
             };
@@ -257,6 +269,11 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
             next.bestScore = Math.max(next.bestScore || 0, run.score);
             next.bestLevel = Math.max(next.bestLevel || 0, run.level);
             next.version = (meta ? meta.version || 0 : 0) + 1;
+            // Unspent gold is banked 100% at death (D5); the pot lets it ride on the wheel.
+            next.gold = (next.gold || 0) + unspent;
+            next.artefacts = next.artefacts || {};
+            next.skins = next.skins || {};
+            next.equipped = next.equipped || {};
             const metaPut = meta
                 ? { Put: { Item: next, ConditionExpression: '#v = :v', ExpressionAttributeNames: { '#v': 'version' }, ExpressionAttributeValues: { ':v': meta.version || 0 } } }
                 : { Put: { Item: next, ConditionExpression: 'attribute_not_exists(pk)' } };
@@ -266,10 +283,11 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
                         { Put: { Item: nonceItem, ConditionExpression: 'attribute_not_exists(pk)' } },
                         { Put: { Item: boardItem } },
                         { Put: { Item: runItem } },
-                        metaPut
+                        metaPut,
+                        ...(unspent > 0 ? [{ Put: { Item: { pk: `pot#${nonce}`, sk: 'pot', playerId: pid, amount: unspent, spins: 0, status: 'open', ttl: Math.floor(ts / 1000) + POT_TTL } } }] : [])
                     ]
                 });
-                return next;
+                return { ...next, potCredited: unspent };
             } catch (e) {
                 if (e.name !== 'TransactionCanceledException') throw e;
                 const reasons = (e.CancellationReasons || []).map(r => r && r.Code);
@@ -280,6 +298,159 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
             }
         }
         throw new HttpError(409, 'profile busy, try again');
+    }
+
+    function newMeta(pid, secret, ts) {
+        return {
+            pk: `player#${pid}`, sk: 'meta', secretHash: sha256(secret), createdAt: ts, runs: 0, kills: 0, bosses: 0, playSeconds: 0,
+            bestScore: 0, bestLevel: 0, gold: 0, artefacts: {}, skins: {}, equipped: {}, version: 0
+        };
+    }
+
+    /** Profiles created before the meta shop lack its maps; add them so nested updates work. */
+    async function ensureMaps(pid, meta) {
+        if (meta.artefacts && meta.skins && meta.equipped && meta.gold !== undefined) return meta;
+        const out = await send('Update', {
+            Key: { pk: `player#${pid}`, sk: 'meta' },
+            UpdateExpression: 'SET artefacts = if_not_exists(artefacts, :m), skins = if_not_exists(skins, :m), equipped = if_not_exists(equipped, :m), gold = if_not_exists(gold, :z)',
+            ExpressionAttributeValues: { ':m': {}, ':z': 0 },
+            ReturnValues: 'ALL_NEW'
+        });
+        return out.Attributes;
+    }
+
+    async function ownProfile(pid, body) {
+        const meta = await authorize(pid, body.secret);
+        if (!meta) throw new HttpError(404, 'no such player');
+        return ensureMaps(pid, meta);
+    }
+
+    // ---- banking + wheel (D5): the server rolls, the client only animates the result
+
+    async function getPot(pid, potId) {
+        if (!POT_RE.test(potId || '')) throw new HttpError(400, 'invalid pot');
+        const out = await send('Get', { Key: { pk: `pot#${potId}`, sk: 'pot' }, ConsistentRead: true });
+        const pot = out.Item;
+        if (!pot || pot.playerId !== pid) throw new HttpError(404, 'no such pot');
+        return pot;
+    }
+
+    async function spin(pid, body, ip) {
+        const meta = await ownProfile(pid, body);
+        if (await rateLimited(ip, 'spin', 40)) throw new HttpError(429, 'slow down');
+        const pot = await getPot(pid, body.pot);
+        if (pot.status !== 'open' || !(pot.amount > 0)) throw new HttpError(409, 'pot is closed');
+        if (!isInt(body.spins, 0, 1000) || body.spins !== pot.spins) throw new HttpError(409, 'stale spin');
+        if ((meta.gold || 0) < pot.amount) throw new HttpError(409, 'not enough gold');
+        const win = Boolean(wheel());
+        const amount = pot.amount;
+        const next = { amount: win ? amount * 2 : 0, spins: pot.spins + 1, status: win ? 'open' : 'lost' };
+        try {
+            await send('TransactWrite', {
+                TransactItems: [
+                    { Update: {
+                        Key: { pk: `pot#${body.pot}`, sk: 'pot' },
+                        UpdateExpression: 'SET amount = :na, spins = :n1, #st = :st',
+                        ConditionExpression: 'spins = :n AND #st = :open',
+                        ExpressionAttributeNames: { '#st': 'status' },
+                        ExpressionAttributeValues: { ':na': next.amount, ':n1': next.spins, ':st': next.status, ':n': pot.spins, ':open': 'open' }
+                    } },
+                    { Update: {
+                        Key: { pk: `player#${pid}`, sk: 'meta' },
+                        UpdateExpression: win ? 'SET gold = gold + :a ADD version :one' : 'SET gold = gold - :a ADD version :one',
+                        ConditionExpression: 'secretHash = :h AND gold >= :a',
+                        ExpressionAttributeValues: { ':a': amount, ':one': 1, ':h': sha256(body.secret) }
+                    } }
+                ]
+            });
+        } catch (e) {
+            if (e.name === 'TransactionCanceledException') throw new HttpError(409, 'try again');
+            throw e;
+        }
+        return { win, pot: { id: body.pot, ...next }, gold: (meta.gold || 0) + (win ? amount : -amount) };
+    }
+
+    async function bank(pid, body) {
+        const meta = await ownProfile(pid, body);
+        const pot = await getPot(pid, body.pot);
+        if (pot.status === 'open') {
+            try {
+                await send('Update', {
+                    Key: { pk: `pot#${body.pot}`, sk: 'pot' },
+                    UpdateExpression: 'SET #st = :b',
+                    ConditionExpression: '#st = :open',
+                    ExpressionAttributeNames: { '#st': 'status' },
+                    ExpressionAttributeValues: { ':b': 'banked', ':open': 'open' }
+                });
+            } catch (e) {
+                if (e.name !== 'ConditionalCheckFailedException') throw e;
+            }
+        }
+        return { gold: meta.gold || 0, pot: { id: body.pot, amount: pot.amount, spins: pot.spins, status: pot.status === 'open' ? 'banked' : pot.status } };
+    }
+
+    // ---- meta shop: artefact tiers and cosmetic skins; every write is conditioned on gold
+
+    async function buy(pid, body) {
+        const meta = await ownProfile(pid, body);
+        const h = sha256(body.secret);
+        let update;
+        if (body.item === 'artefact') {
+            const tier = body.tier;
+            if (!ARTEFACTS.includes(body.id) || !isInt(tier, 1, 4)) throw new HttpError(400, 'invalid artefact');
+            const { price, gate } = TIERS[tier];
+            const current = (meta.artefacts || {})[body.id] || 0;
+            if (current !== tier - 1) throw new HttpError(409, 'buy the previous tier first');
+            if ((meta.bestLevel || 0) < gate) throw new HttpError(403, `reach level ${gate} first`);
+            update = {
+                UpdateExpression: 'SET gold = gold - :p, artefacts.#a = :t ADD version :one',
+                ConditionExpression: `secretHash = :h AND gold >= :p AND bestLevel >= :g AND ${tier === 1 ? 'attribute_not_exists(artefacts.#a)' : 'artefacts.#a = :prev'}`,
+                ExpressionAttributeNames: { '#a': body.id },
+                ExpressionAttributeValues: { ':p': price, ':t': tier, ':one': 1, ':h': h, ':g': gate, ...(tier > 1 ? { ':prev': tier - 1 } : {}) }
+            };
+        } else if (body.item === 'skin') {
+            const skin = SKINS[body.id];
+            if (!skin) throw new HttpError(400, 'invalid skin');
+            if ((meta.skins || {})[body.id]) throw new HttpError(409, 'already owned');
+            const price = SKIN_PRICES[skin.rarity];
+            update = {
+                UpdateExpression: 'SET gold = gold - :p, skins.#s = :yes ADD version :one',
+                ConditionExpression: 'secretHash = :h AND gold >= :p AND attribute_not_exists(skins.#s)',
+                ExpressionAttributeNames: { '#s': body.id },
+                ExpressionAttributeValues: { ':p': price, ':yes': true, ':one': 1, ':h': h }
+            };
+        } else {
+            throw new HttpError(400, 'invalid item');
+        }
+        try {
+            const out = await send('Update', { Key: { pk: `player#${pid}`, sk: 'meta' }, ReturnValues: 'ALL_NEW', ...update });
+            return { player: publicMeta(pid, out.Attributes) };
+        } catch (e) {
+            if (e.name === 'ConditionalCheckFailedException') throw new HttpError(409, 'not enough gold');
+            throw e;
+        }
+    }
+
+    async function equip(pid, body) {
+        await ownProfile(pid, body);
+        const cls = body.cls;
+        const skin = body.skin || '';
+        if (!['wizard', 'barbarian', 'goblin'].includes(cls)) throw new HttpError(400, 'invalid class');
+        if (skin && (!SKINS[skin] || SKINS[skin].cls !== cls)) throw new HttpError(400, 'invalid skin');
+        try {
+            const out = await send('Update', {
+                Key: { pk: `player#${pid}`, sk: 'meta' },
+                UpdateExpression: 'SET equipped.#c = :s ADD version :one',
+                ConditionExpression: `secretHash = :h${skin ? ' AND attribute_exists(skins.#s)' : ''}`,
+                ExpressionAttributeNames: { '#c': cls, ...(skin ? { '#s': skin } : {}) },
+                ExpressionAttributeValues: { ':s': skin, ':one': 1, ':h': sha256(body.secret) },
+                ReturnValues: 'ALL_NEW'
+            });
+            return { player: publicMeta(pid, out.Attributes) };
+        } catch (e) {
+            if (e.name === 'ConditionalCheckFailedException') throw new HttpError(403, 'you do not own that skin');
+            throw e;
+        }
     }
 
     async function getPlayer(pid) {
@@ -303,7 +474,7 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
         if (await rateLimited(ip, 'name', 10)) throw new HttpError(429, 'slow down');
         const ts = now();
         if (!meta) {
-            const item = { pk: `player#${pid}`, sk: 'meta', secretHash: sha256(body.secret), name, createdAt: ts, updatedAt: ts, runs: 0, kills: 0, bosses: 0, playSeconds: 0, bestScore: 0, bestLevel: 0, version: 1 };
+            const item = { ...newMeta(pid, body.secret, ts), name, updatedAt: ts, version: 1 };
             try {
                 await send('Put', { Item: item, ConditionExpression: 'attribute_not_exists(pk)' });
             } catch (e) {
@@ -350,6 +521,10 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
                 const [, pid, action] = m;
                 if (method === 'GET' && !action) return json(200, await getPlayer(pid));
                 if (method === 'POST' && action === '/name') return json(200, await rename(pid, parseBody(event), ip));
+                if (method === 'POST' && action === '/spin') return json(200, await spin(pid, parseBody(event), ip));
+                if (method === 'POST' && action === '/bank') return json(200, await bank(pid, parseBody(event)));
+                if (method === 'POST' && action === '/buy') return json(200, await buy(pid, parseBody(event)));
+                if (method === 'POST' && action === '/equip') return json(200, await equip(pid, parseBody(event)));
             }
             return json(404, { error: 'not found' });
         } catch (e) {

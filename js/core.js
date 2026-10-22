@@ -3,7 +3,7 @@
 class Game {
     constructor() {
         // Version system (bumped by the pre-commit hook, see VERSION-README.md)
-        this.version = "3.0.0";
+        this.version = "3.1.0";
         this.buildDate = "2026-10-22";
 
         this.canvas = document.getElementById('gameCanvas');
@@ -42,6 +42,7 @@ class Game {
         // Deep link to a profile (?p=<id>) and a retry of any run that failed to upload last time.
         const deep = new URLSearchParams(window.location.search).get('p');
         if (deep) this.openProfile(deep);
+        this.syncProfile();
         Leaderboard.flushPending().then(res => {
             if (res && this.state === 'menu') this.loadBoard(this.el.menuBoard, this.el.menuBoardTitle);
         });
@@ -65,9 +66,12 @@ class Game {
             againBtn: $('againBtn'), pauseBtn: $('pauseBtn'), muteBtn: $('muteBtn'),
             version: $('version'), newBest: $('newBest'), coins: $('coins'), shopCoins: $('shopCoins'),
             continueBtn: $('continueBtn'), fsBtn: $('fsBtn'), menuFsBtn: $('menuFsBtn'), soundChip: $('soundChip'),
-            iosHint: $('iosHint'), iosHintClose: $('iosHintClose')
+            iosHint: $('iosHint'), iosHintClose: $('iosHintClose'), bankBox: $('bankBox'), wheel: $('wheel'), potText: $('potText'),
+            spinBtn: $('spinBtn'), keepBtn: $('keepBtn'), profileShop: $('profileShop')
         };
         this.el.continueBtn.addEventListener('click', () => this.closeShop());
+        this.el.spinBtn.addEventListener('click', () => this.spinWheel());
+        this.el.keepBtn.addEventListener('click', () => this.keepPot());
 
         this.el.version.textContent = `v${this.version} · ${this.buildDate}`;
         this.el.playBtn.addEventListener('click', () => this.startRun());
@@ -545,6 +549,7 @@ class Game {
         this.el.bossBar.hidden = true;
         this.lastTime = performance.now();
         this.acc = 0;
+        this.loadArtefacts();
         this.chargeMult = this.artefactMult('charge');
         this.statsLog = /[?&]stats\b/.test(window.location.search) ? this.makeStatsLog() : null;
         this.startLevel();

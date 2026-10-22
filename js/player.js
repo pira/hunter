@@ -90,6 +90,10 @@ extendGame({
 
         const moving = Math.hypot(p.vx, p.vy) > 0.5;
         p.moveT = moving ? p.moveT + 1 : 0;
+        const trail = this.skin && SKINS[this.skin] && SKINS[this.skin].extras && SKINS[this.skin].extras.trail;
+        if (trail && moving && this.frameNo % 3 === 0) {
+            this.particle({ x: p.x + (Math.random() - 0.5) * 10, y: p.y + 8 + (Math.random() - 0.5) * 6, vx: -p.vx * 0.15, vy: -p.vy * 0.15 - 0.3, life: 28, size: 2.5 + Math.random() * 2, color: trail, kind: 'spark', drag: 0.96 });
+        }
         if (moving && this.frameNo % 6 === 0) {
             this.particle({ x: p.x - p.vx * 2, y: p.y + p.r * 0.8, vx: -p.vx * 0.1, vy: -0.2, life: 24, size: 3, color: 'rgba(255,255,255,0.5)', kind: 'dust' });
         }

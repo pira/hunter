@@ -280,6 +280,11 @@ extendGame({
         if (points > 0) this.floater(m.x, m.y - m.size, `+${points}`, mult > 1 ? ['#fff', '#fff', '#7CFC00', '#00e5ff', '#ff4dd2', '#ffd60a'][mult] : '#ffffff', big ? 22 : 16);
         this.burst(m.x, m.y, m.color, big ? 26 : 12, big ? 6 : 4);
         this.burst(m.x, m.y, '#ffffff', big ? 8 : 4, 3);
+        const kb = this.skinExtras().burst;
+        if (kb) {
+            this.ring(m.x, m.y, m.size * 2.2, kb, 14); // mythic skins: a signature kill burst
+            this.spark(m.x, m.y, kb, 5);
+        }
         if (big) {
             this.ring(m.x, m.y, m.size * 3, m.color, 20);
             this.shake(m.boss ? 0 : 5);
