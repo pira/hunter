@@ -151,7 +151,7 @@ extendGame({
         if (!enc) return;
         enc.t++;
         if (enc.kind === 'gatekeeper' || enc.kind === 'wave') {
-            if (enc.kind === 'wave') this.updateWave(enc);
+            this.updateWave(enc); // runs the scheduled spawns of waves and of gatekeepers with escorts
             const alive = this.monsters.some(m => m.enc === enc && !m.dead);
             if (!alive && !enc.queue.length && enc.t > 30) this.encounterWon();
         }
