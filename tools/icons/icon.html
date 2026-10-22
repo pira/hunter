@@ -1,0 +1,28 @@
+<!doctype html><html><body style="margin:0;background:transparent">
+<canvas id="c"></canvas>
+<script>
+// Renders the app icon at ?size=N (&maskable=1 keeps the art inside the 80% safe zone).
+const q = new URLSearchParams(location.search);
+const S = Number(q.get('size') || 512), maskable = q.get('maskable') === '1';
+const c = document.getElementById('c'); c.width = c.height = S;
+const g = c.getContext('2d');
+const bg = g.createRadialGradient(S * .5, S * .38, S * .05, S * .5, S * .5, S * .75);
+bg.addColorStop(0, '#5b3fd1'); bg.addColorStop(.55, '#2a1f6b'); bg.addColorStop(1, '#0d1321');
+g.fillStyle = bg;
+if (maskable) g.fillRect(0, 0, S, S);
+else { g.beginPath(); g.roundRect(0, 0, S, S, S * .22); g.fill(); }
+// sparkles
+g.fillStyle = 'rgba(255,214,10,.9)';
+for (const [x, y, r] of [[.18, .2, .025], [.83, .16, .02], [.86, .62, .018], [.13, .7, .015], [.7, .3, .012]]) {
+  g.beginPath();
+  for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4, rr = i % 2 ? r * .35 : r; g.lineTo(S * x + Math.cos(a) * S * rr, S * y + Math.sin(a) * S * rr); }
+  g.fill();
+}
+const k = maskable ? .72 : .86;
+g.font = `${S * .62 * k}px "Noto Color Emoji"`;
+g.textAlign = 'center'; g.textBaseline = 'middle';
+g.save(); g.translate(S / 2, S * (maskable ? .5 : .47)); g.scale(-1, 1);
+g.shadowColor = 'rgba(0,0,0,.45)'; g.shadowBlur = S * .04; g.shadowOffsetY = S * .02;
+g.fillText('🧙‍♂️', 0, 0); g.restore();
+document.title = 'ready';
+</script></body></html>

@@ -13,6 +13,7 @@ Kite waves of monsters, chain kills into a combo multiplier, pick an upgrade car
 | Switch weapon | Space / E / Q, 1–4, mouse wheel | tap a weapon slot or the big button |
 | Shop | 1–3 buy, Enter continue | tap a card, tap Continue |
 | Pause / mute | P or Esc / M | ⏸ / 🔊 buttons |
+| Fullscreen | automatic on Play (⛶ toggles; turning it off is remembered) | same; on iPhone use Share → Add to Home Screen |
 
 - **Weapons:** 🔫 Blaster and 🗡️ Blade from the start; 💣 Grenades and 🚀 Missiles are unlocked in the shop.
   - *Blaster* auto-aims (bosses first). Split Shot adds bullets; Multi-Shot fires the whole volley in 4 directions.
@@ -33,7 +34,11 @@ index.html          markup, HUD, menus, styles
 config.js           runtime config (leaderboard API URL)
 game.js             the game (fixed 60 Hz simulation, canvas rendering)
 game-utils.js       pure helpers shared with tests (level curve, combo tiers, …)
-audio.js            Web Audio sound engine (samples in sfx/ + synthesized UI blips)
+audio.js            Web Audio engine: buses + limiter, voice manager, health watchdog,
+                    procedural creature voices and hit sounds (samples in sfx/)
+manifest.webmanifest, icons/   PWA install (fullscreen on iPhone via Add to Home Screen)
+tools/audio/        prepare.sh rebuilds sfx/ from the originals in tools/audio/src/
+tools/icons/        make-icons.py renders icons/ with headless Chromium
 leaderboard.js      leaderboard client with local fallback
 leaderboard/        AWS backend: Lambda source + deploy script (see leaderboard/README.md)
 test/               node:test unit tests

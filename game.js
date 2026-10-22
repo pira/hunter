@@ -115,8 +115,8 @@ const BOSSES = [
 class Game {
     constructor() {
         // Version system (bumped by the pre-commit hook, see VERSION-README.md)
-        this.version = "2.2.0";
-        this.buildDate = "2026-10-21";
+        this.version = "2.3.0";
+        this.buildDate = "2026-10-22";
 
         this.canvas = document.getElementById('gameCanvas');
         this.ctx = this.canvas.getContext('2d');
@@ -138,8 +138,10 @@ class Game {
         this.attract = [];
 
         Sfx.init();
+        Sfx.prewarm(Object.entries(MONSTER_TYPES).flatMap(([tier, list]) => list.map(t => [t.name, tier])));
         this.bindDom();
         this.setupInput();
+        this.setupPlatform();
         this.resize();
         window.addEventListener('resize', () => this.resize());
         window.addEventListener('orientationchange', () => setTimeout(() => this.resize(), 150));
@@ -169,7 +171,8 @@ class Game {
             submitStatus: $('submitStatus'), finalBoard: $('finalBoard'), finalBoardTitle: $('finalBoardTitle'),
             againBtn: $('againBtn'), weaponBtn: $('weaponBtn'), pauseBtn: $('pauseBtn'), muteBtn: $('muteBtn'),
             version: $('version'), newBest: $('newBest'), coins: $('coins'), shopCoins: $('shopCoins'),
-            continueBtn: $('continueBtn')
+            continueBtn: $('continueBtn'), fsBtn: $('fsBtn'), menuFsBtn: $('menuFsBtn'), soundChip: $('soundChip'),
+            iosHint: $('iosHint'), iosHintClose: $('iosHintClose')
         };
         this.el.continueBtn.addEventListener('click', () => this.closeShop());
 
@@ -305,6 +308,155 @@ class Game {
         }, { passive: true });
     }
 
+    // ------------------------------------------------------------------ platform: fullscreen, wake lock, lock-in
+
+    setupPlatform() {
+        const root = document.documentElement;
+        this.fsSupported = Boolean(root.requestFullscreen || root.webkitRequestFullscreen);
+        document.body.classList.toggle('no-fs', !this.fsSupported);
+        const onFsChange = () => {
+            const full = this.isFullscreen();
+            if (full && this.runActive()) this.lockOrientation();
+            // Leaving fullscreen in the middle of a run (Esc, back gesture, notification shade) pauses it.
+            if (!full && this.state === 'playing') this.pause();
+            this.el.fsBtn.textContent = this.el.menuFsBtn.textContent = full ? '🗗' : '⛶';
+        };
+        document.addEventListener('fullscreenchange', onFsChange);
+        document.addEventListener('webkitfullscreenchange', onFsChange);
+        const toggle = e => {
+            e.currentTarget.blur();
+            if (this.isFullscreen()) {
+                this.storeSet('hunter.fullscreen', '0'); // the player opted out: stop auto-entering
+                this.exitFullscreen();
+            } else {
+                this.storeSet('hunter.fullscreen', '1');
+                this.enterFullscreen(true);
+            }
+        };
+        this.el.fsBtn.addEventListener('click', toggle);
+        this.el.menuFsBtn.addEventListener('click', toggle);
+
+        // The page is a game, not a document: no pinch zoom, double-tap zoom, selection or long-press menus.
+        const isInput = e => e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA');
+        ['gesturestart', 'gesturechange', 'dblclick'].forEach(evt => document.addEventListener(evt, e => e.preventDefault(), { passive: false }));
+        document.addEventListener('selectstart', e => { if (!isInput(e)) e.preventDefault(); });
+        document.addEventListener('contextmenu', e => { if (!isInput(e)) e.preventDefault(); });
+        document.addEventListener('touchmove', e => {
+            if (e.touches.length > 1) e.preventDefault(); // pinch
+        }, { passive: false });
+
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden && this.runActive()) this.acquireWakeLock();
+        });
+
+        // Sound health: show a chip when the context stays silent (iOS interruption, dead output device).
+        Sfx.onHealth = ok => {
+            this.el.soundChip.hidden = ok || !this.runActive();
+        };
+        this.el.soundChip.addEventListener('click', e => {
+            e.stopPropagation();
+            Sfx.restore();
+            this.el.soundChip.hidden = true;
+        });
+
+        // iPhone Safari has no element fullscreen: suggest installing to the home screen, once.
+        const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        const standalone = navigator.standalone || window.matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches;
+        if (ios && !standalone && !this.fsSupported && !this.storeGet('hunter.iosHint')) {
+            this.el.iosHint.hidden = false;
+            this.storeSet('hunter.iosHint', '1');
+        }
+        this.el.iosHintClose.addEventListener('click', () => {
+            this.el.iosHint.hidden = true;
+        });
+    }
+
+    storeGet(key) {
+        try {
+            return localStorage.getItem(key);
+        } catch (e) {
+            return null;
+        }
+    }
+
+    storeSet(key, value) {
+        try {
+            localStorage.setItem(key, value);
+        } catch (e) { /* storage unavailable */ }
+    }
+
+    runActive() {
+        return ['playing', 'paused', 'transition', 'levelup', 'dying'].includes(this.state);
+    }
+
+    isFullscreen() {
+        return Boolean(document.fullscreenElement || document.webkitFullscreenElement);
+    }
+
+    enterFullscreen(force = false) {
+        if (!this.fsSupported || this.isFullscreen()) return;
+        if (!force && this.storeGet('hunter.fullscreen') === '0') return;
+        const root = document.documentElement;
+        try {
+            const p = root.requestFullscreen ? root.requestFullscreen({ navigationUI: 'hide' }) : root.webkitRequestFullscreen();
+            if (p && p.catch) p.catch(() => {});
+        } catch (e) { /* not allowed here */ }
+    }
+
+    exitFullscreen() {
+        try {
+            const p = document.exitFullscreen ? document.exitFullscreen() : document.webkitExitFullscreen && document.webkitExitFullscreen();
+            if (p && p.catch) p.catch(() => {});
+        } catch (e) { /* not in fullscreen */ }
+    }
+
+    lockOrientation() {
+        try {
+            const o = screen.orientation;
+            if (o && o.lock) o.lock(o.type).catch(() => {}); // keep whatever way the device is held (Android)
+        } catch (e) { /* unsupported */ }
+    }
+
+    unlockOrientation() {
+        try {
+            if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock();
+        } catch (e) { /* unsupported */ }
+    }
+
+    async acquireWakeLock() {
+        if (!('wakeLock' in navigator) || this.wakeLock || document.hidden) return;
+        try {
+            this.wakeLock = await navigator.wakeLock.request('screen');
+            this.wakeLock.addEventListener('release', () => {
+                this.wakeLock = null;
+            });
+        } catch (e) {
+            this.wakeLock = null;
+        }
+    }
+
+    releaseWakeLock() {
+        if (this.wakeLock) {
+            this.wakeLock.release().catch(() => {});
+            this.wakeLock = null;
+        }
+    }
+
+    // Run started or resumed: go fullscreen, keep the screen on, watch audio health.
+    enterGameMode() {
+        this.enterFullscreen();
+        if (this.isFullscreen()) this.lockOrientation();
+        this.acquireWakeLock();
+        Sfx.setActive(true);
+    }
+
+    leaveGameMode() {
+        this.releaseWakeLock();
+        this.unlockOrientation();
+        Sfx.setActive(false);
+        this.el.soundChip.hidden = true;
+    }
+
     releaseStick() {
         this.stick = { id: null, ax: 0, ay: 0, x: 0, y: 0, dx: 0, dy: 0 };
     }
@@ -418,6 +570,7 @@ class Game {
 
     showMenu() {
         Sfx.stopMusic();
+        this.leaveGameMode();
         this.state = 'menu';
         this.resetRun();
         this.setOverlay('menu');
@@ -441,6 +594,7 @@ class Game {
         this.el.bossBar.hidden = true;
         this.lastTime = performance.now();
         this.acc = 0;
+        this.enterGameMode();
         this.banner('HUNT!', 'Chain kills for a combo multiplier');
         Sfx.arpeggio([392, 523, 659], 0.08, { type: 'triangle', volume: 0.12 });
         Leaderboard.startRun().then(token => {
@@ -462,6 +616,7 @@ class Game {
         this.state = 'playing';
         this.setOverlay(null);
         this.lastTime = performance.now();
+        this.enterGameMode();
     }
 
     toggleMute() {
@@ -682,7 +837,7 @@ class Game {
         if (p.hp <= 0) {
             this.die(source);
         } else {
-            Sfx.play('playerHit', { volume: 0.7 });
+            Sfx.play('playerHit', { volume: 0.9 });
         }
     }
 
@@ -797,7 +952,7 @@ class Game {
                 this.grenades.push({ x: p.x, y: p.y, sx: p.x, sy: p.y, vx: Math.cos(a) * 6.5, vy: Math.sin(a) * 6.5, range, timer: 64, spin: 0 });
             }
         }
-        Sfx.play('grenade', { volume: 0.55 });
+        Sfx.play('grenade', { volume: 0.8 });
     }
 
     fireMissiles() {
@@ -1199,6 +1354,8 @@ class Game {
         if (m.hp <= 0) {
             if (m.boss) this.startBossDeath(m);
             else this.killMonster(m);
+        } else {
+            Sfx.hit(m.size, { volume: m.boss ? 0.3 : 0.22 });
         }
     }
 
@@ -1291,10 +1448,11 @@ class Game {
 
         if (m.boss) {
             this.bossDefeated(m);
-        } else if (['large', 'elite', 'legendary', 'mythic', 'ancient', 'ultimate'].includes(m.tier)) {
-            Sfx.play('bossDeath', { volume: 0.55, rate: 1 + Math.random() * 0.3 });
         } else {
-            Sfx.play('monsterDeath', { volume: 0.5, rate: 1.3 + Math.random() * 0.4 });
+            // Every monster type has its own procedurally generated voice.
+            const big = m.tier !== 'small' && m.tier !== 'medium';
+            Sfx.creature(m.name, m.minion ? 'small' : m.tier, { volume: big ? 0.6 : 0.42, size: m.size });
+            if (!big) Sfx.play('monsterDeath', { volume: 0.22, rate: 1.3 + Math.random() * 0.4 });
         }
 
         this.dropLoot(m);
@@ -1363,7 +1521,7 @@ class Game {
                 this.coins += gain;
                 this.coinsEarned += gain;
                 this.coinFloat.n += gain;
-                Sfx.tone(c.value >= 5 ? 1046 : 1568, { duration: 0.06, type: 'square', volume: 0.04 });
+                Sfx.coin(c.value >= 5);
             } else if (c.t > 18 && d < magnet) {
                 const pull = 0.1 + 0.25 * (1 - d / magnet);
                 c.x += (p.x - c.x) * pull;
@@ -1608,7 +1766,7 @@ class Game {
         if (def.timed) {
             this.timers[pu.type] = Math.min(TIMER_CAP, this.timers[pu.type] + this.powerupDuration);
             this.floater(p.x, p.y - 36, def.name.toUpperCase(), def.color, 22);
-            Sfx.play('powerup', { volume: 0.5 });
+            Sfx.play('powerup', { volume: 0.32 });
         } else if (pu.type === 'heart') {
             if (p.hp < p.maxHp) {
                 p.hp++;
@@ -1617,7 +1775,7 @@ class Game {
                 this.spawnCoins(p.x, p.y, 5, 1.5); // full health: hearts turn into coins
                 this.floater(p.x, p.y - 36, 'Full health → 🪙', '#ffd60a', 16);
             }
-            Sfx.play('powerup', { volume: 0.5, rate: 1.2 });
+            Sfx.play('powerup', { volume: 0.32, rate: 1.2 });
         } else if (pu.type === 'bomb') {
             this.activateBomb();
         }
@@ -2901,6 +3059,8 @@ class Game {
 
     showGameOver() {
         this.state = 'gameover';
+        this.releaseWakeLock();
+        Sfx.setActive(false);
         this.timeScale = 1;
         this.el.bossBar.hidden = true;
         Sfx.playMusic('gameOver', 0.45);

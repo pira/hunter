@@ -9,7 +9,10 @@
     <meta name="theme-color" content="#0d1321">
     <meta name="description" content="Monster Hunter — a fast arcade survival game. Chain kills, pick upgrades, slay bosses, top the leaderboard.">
     <title>Monster Hunter</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧙‍♂️</text></svg>">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="apple-mobile-web-app-title" content="Hunter">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Lilita+One&display=swap" rel="stylesheet">
@@ -26,6 +29,9 @@
         html, body {
             margin: 0;
             height: 100%;
+            position: fixed;
+            inset: 0;
+            overscroll-behavior: none;
             overflow: hidden;
             background: radial-gradient(ellipse at center, #1b2640 0%, #0d1321 70%);
             color: var(--text);
@@ -110,7 +116,7 @@
         .overlay.show { display: flex; animation: fade .2s ease-out; }
         #menu { background: rgba(5, 8, 16, .35); }
         @keyframes fade { from { opacity: 0; } }
-        .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 1.4em 1.6em; width: min(100%, 26em); max-height: 100%; overflow-y: auto; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,.5); -webkit-user-select: text; user-select: text; touch-action: pan-y; }
+        .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 1.4em 1.6em; width: min(100%, 26em); max-height: 100%; overflow-y: auto; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,.5); touch-action: pan-y; position: relative; }
         h1, h2, h3 { font-family: var(--display); font-weight: normal; margin: 0; letter-spacing: 1px; }
         .logo { display: flex; align-items: center; justify-content: center; gap: .3em; }
         .logo .wiz { font-size: 3.6em; animation: bob 1.6s ease-in-out infinite; display: inline-block; transform: scaleX(-1); }
@@ -140,6 +146,12 @@
         .board .lvl { color: var(--muted); font-size: .8em; }
         .board .pts { font-family: var(--display); letter-spacing: .5px; }
         #version { color: #475569; font-size: .7em; margin-top: 1em; }
+        .panel-corner { position: absolute; top: .7em; right: .7em; }
+        .fs-btn { font-size: 1.05em; }
+        body.no-fs .fs-btn { display: none !important; }
+        .hint { margin: .9em auto 0; padding: .5em 2.2em .5em .8em; position: relative; border-radius: 12px; background: rgba(91,63,209,.25); border: 1px solid rgba(167,139,250,.45); color: #e9e5ff; font-size: .85em; line-height: 1.4; }
+        .hint button { position: absolute; right: .4em; top: 50%; transform: translateY(-50%); background: none; border: 0; color: #c4b5fd; font-size: 1em; padding: .3em; }
+        #soundChip { position: absolute; left: 50%; bottom: calc(80px * var(--ui) + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 5; border: 0; border-radius: 999px; padding: .55em 1.1em; font-family: var(--display); font-size: 1em; letter-spacing: .5px; color: #3b1d00; background: linear-gradient(180deg, #facc15, #f59e0b); box-shadow: 0 4px 0 #92400e, 0 0 24px rgba(250,204,21,.5); animation: throb .6s infinite alternate; }
 
         /* Level-up cards */
         #levelup { flex-direction: column; background: rgba(5, 8, 16, .6); transition: background-color .35s, backdrop-filter .35s; }
@@ -246,6 +258,7 @@
             <div class="hud-center"><div id="score">0</div></div>
             <div class="hud-right">
                 <div id="powerups"></div>
+                <button id="fsBtn" class="icon-btn fs-btn" aria-label="Fullscreen">⛶</button>
                 <button id="muteBtn" class="icon-btn" aria-label="Toggle sound">🔊</button>
                 <button id="pauseBtn" class="icon-btn" aria-label="Pause">⏸</button>
             </div>
@@ -259,9 +272,11 @@
             <div class="bar"><div id="bossTrail"></div><div id="bossFill"></div></div>
         </div>
         <div id="banner"></div>
+        <button id="soundChip" hidden>🔇 Tap to restore sound</button>
 
         <div id="menu" class="overlay">
             <div class="panel">
+                <button id="menuFsBtn" class="icon-btn fs-btn panel-corner" aria-label="Fullscreen">⛶</button>
                 <div class="logo"><span class="wiz">🧙‍♂️</span><h1>MONSTER<br><span>HUNTER</span></h1></div>
                 <p class="tagline">Survive the horde. Chain kills. Slay the bosses.</p>
                 <button id="playBtn" class="btn primary">▶ PLAY</button>
@@ -270,6 +285,7 @@
                     <kbd>Space</kbd> / <kbd>1</kbd>–<kbd>4</kbd> switch weapon · <kbd>P</kbd> pause · <kbd>M</kbd> mute
                 </div>
                 <div class="howto touch-only">Drag anywhere to move · weapons fire on their own<br>Tap a weapon slot (or the big button) to switch</div>
+                <div id="iosHint" class="hint" hidden>📲 Tap <b>Share</b> → <b>Add to Home Screen</b> to play fullscreen <button id="iosHintClose" aria-label="Dismiss">✕</button></div>
                 <h3 id="menuBoardTitle">🏆 Top Hunters</h3>
                 <ol id="menuBoard" class="board"></ol>
                 <div id="version"></div>
