@@ -1,0 +1,322 @@
+{
+  "bonecrusher": {
+    "intro": [
+      {
+        "file": "sfx/voice/bonecrusher-intro-1.mp3",
+        "text": "I'll grind your bones to gravel!",
+        "duration": 2.56
+      }
+    ],
+    "taunt": [
+      {
+        "file": "sfx/voice/bonecrusher-taunt-1.mp3",
+        "text": "Stand still, snack!",
+        "duration": 2.064
+      },
+      {
+        "file": "sfx/voice/bonecrusher-taunt-2.mp3",
+        "text": "Crunch time!",
+        "duration": 0.836
+      },
+      {
+        "file": "sfx/voice/bonecrusher-taunt-3.mp3",
+        "text": "Ha! Too slow!",
+        "duration": 1.489
+      }
+    ],
+    "enrage": [
+      {
+        "file": "sfx/voice/bonecrusher-enrage-1.mp3",
+        "text": "ENOUGH!",
+        "duration": 0.627
+      }
+    ],
+    "death": [
+      {
+        "file": "sfx/voice/bonecrusher-death-1.mp3",
+        "text": "Impossible...",
+        "duration": 0.94
+      }
+    ]
+  },
+  "hexweaver": {
+    "intro": [
+      {
+        "file": "sfx/voice/hexweaver-intro-1.mp3",
+        "text": "Welcome to my web of curses, little hunter.",
+        "duration": 3.109
+      }
+    ],
+    "taunt": [
+      {
+        "file": "sfx/voice/hexweaver-taunt-1.mp3",
+        "text": "Hee hee hee! Dance for me!",
+        "duration": 1.829
+      },
+      {
+        "file": "sfx/voice/hexweaver-taunt-2.mp3",
+        "text": "Feel the hex!",
+        "duration": 1.097
+      },
+      {
+        "file": "sfx/voice/hexweaver-taunt-3.mp3",
+        "text": "Is that all you have got?",
+        "duration": 2.194
+      }
+    ],
+    "enrage": [
+      {
+        "file": "sfx/voice/hexweaver-enrage-1.mp3",
+        "text": "Now you've made me angry!",
+        "duration": 2.168
+      }
+    ],
+    "death": [
+      {
+        "file": "sfx/voice/hexweaver-death-1.mp3",
+        "text": "My spells... unraveling...",
+        "duration": 2.377
+      }
+    ]
+  },
+  "broodmother": {
+    "intro": [
+      {
+        "file": "sfx/voice/broodmother-intro-1.mp3",
+        "text": "My children are hungry. So hungry.",
+        "duration": 2.56
+      }
+    ],
+    "taunt": [
+      {
+        "file": "sfx/voice/broodmother-taunt-1.mp3",
+        "text": "Eat, my babies, eat!",
+        "duration": 1.802
+      },
+      {
+        "file": "sfx/voice/broodmother-taunt-2.mp3",
+        "text": "So many of us. Only one of you.",
+        "duration": 2.403
+      },
+      {
+        "file": "sfx/voice/broodmother-taunt-3.mp3",
+        "text": "You are surrounded!",
+        "duration": 1.228
+      }
+    ],
+    "enrage": [
+      {
+        "file": "sfx/voice/broodmother-enrage-1.mp3",
+        "text": "You hurt my children!",
+        "duration": 1.646
+      }
+    ],
+    "death": [
+      {
+        "file": "sfx/voice/broodmother-death-1.mp3",
+        "text": "My brood... will avenge me...",
+        "duration": 2.194
+      }
+    ]
+  },
+  "voidmaw": {
+    "intro": [
+      {
+        "file": "sfx/voice/voidmaw-intro-1.mp3",
+        "text": "I am the hunger between the stars.",
+        "duration": 2.717
+      }
+    ],
+    "taunt": [
+      {
+        "file": "sfx/voice/voidmaw-taunt-1.mp3",
+        "text": "Your light is fading.",
+        "duration": 2.508
+      },
+      {
+        "file": "sfx/voice/voidmaw-taunt-2.mp3",
+        "text": "Come closer, little hunter.",
+        "duration": 3.239
+      },
+      {
+        "file": "sfx/voice/voidmaw-taunt-3.mp3",
+        "text": "I will swallow you whole!",
+        "duration": 2.717
+      }
+    ],
+    "enrage": [
+      {
+        "file": "sfx/voice/voidmaw-enrage-1.mp3",
+        "text": "THE VOID AWAKENS!",
+        "duration": 2.116
+      }
+    ],
+    "death": [
+      {
+        "file": "sfx/voice/voidmaw-death-1.mp3",
+        "text": "The dark... recedes...",
+        "duration": 2.299
+      }
+    ]
+  },
+  "gravelord": {
+    "intro": [
+      {
+        "file": "sfx/voice/gravelord-intro-1.mp3",
+        "text": "The mountain wakes. And it is ANGRY.",
+        "duration": 2.638
+      }
+    ],
+    "taunt": [
+      {
+        "file": "sfx/voice/gravelord-taunt-1.mp3",
+        "text": "Rocks fall! You lose!",
+        "duration": 2.22
+      },
+      {
+        "file": "sfx/voice/gravelord-taunt-2.mp3",
+        "text": "I will crush you like a pebble!",
+        "duration": 1.985
+      },
+      {
+        "file": "sfx/voice/gravelord-taunt-3.mp3",
+        "text": "Ha ha! Flat as a pancake!",
+        "duration": 2.717
+      }
+    ],
+    "enrage": [
+      {
+        "file": "sfx/voice/gravelord-enrage-1.mp3",
+        "text": "FEEL THE EARTH SHAKE!",
+        "duration": 1.411
+      }
+    ],
+    "death": [
+      {
+        "file": "sfx/voice/gravelord-death-1.mp3",
+        "text": "I crumble... to dust...",
+        "duration": 2.325
+      }
+    ]
+  },
+  "stormcaller": {
+    "intro": [
+      {
+        "file": "sfx/voice/stormcaller-intro-1.mp3",
+        "text": "Kneel before the storm!",
+        "duration": 1.802
+      }
+    ],
+    "taunt": [
+      {
+        "file": "sfx/voice/stormcaller-taunt-1.mp3",
+        "text": "You just got zapped!",
+        "duration": 1.907
+      },
+      {
+        "file": "sfx/voice/stormcaller-taunt-2.mp3",
+        "text": "The sky obeys ME!",
+        "duration": 1.463
+      },
+      {
+        "file": "sfx/voice/stormcaller-taunt-3.mp3",
+        "text": "Lightning never misses!",
+        "duration": 1.724
+      }
+    ],
+    "enrage": [
+      {
+        "file": "sfx/voice/stormcaller-enrage-1.mp3",
+        "text": "UNLEASH THE TEMPEST!",
+        "duration": 1.515
+      }
+    ],
+    "death": [
+      {
+        "file": "sfx/voice/stormcaller-death-1.mp3",
+        "text": "The storm... passes...",
+        "duration": 2.247
+      }
+    ]
+  },
+  "hydra": {
+    "intro": [
+      {
+        "file": "sfx/voice/hydra-intro-1.mp3",
+        "text": "Three heads. Three times the trouble!",
+        "duration": 2.482
+      }
+    ],
+    "taunt": [
+      {
+        "file": "sfx/voice/hydra-taunt-1.mp3",
+        "text": "Snap snap snap!",
+        "duration": 1.593
+      },
+      {
+        "file": "sfx/voice/hydra-taunt-2.mp3",
+        "text": "We see you!",
+        "duration": 0.862
+      },
+      {
+        "file": "sfx/voice/hydra-taunt-3.mp3",
+        "text": "Cut one off, two more appear!",
+        "duration": 2.482
+      }
+    ],
+    "enrage": [
+      {
+        "file": "sfx/voice/hydra-enrage-1.mp3",
+        "text": "NOW WE'RE MAD!",
+        "duration": 1.28
+      }
+    ],
+    "death": [
+      {
+        "file": "sfx/voice/hydra-death-1.mp3",
+        "text": "All our heads... spinning...",
+        "duration": 2.064
+      }
+    ]
+  },
+  "lich": {
+    "intro": [
+      {
+        "file": "sfx/voice/lich-intro-1.mp3",
+        "text": "Death is only the beginning, mortal.",
+        "duration": 2.952
+      }
+    ],
+    "taunt": [
+      {
+        "file": "sfx/voice/lich-taunt-1.mp3",
+        "text": "Your soul will make a fine lantern.",
+        "duration": 2.743
+      },
+      {
+        "file": "sfx/voice/lich-taunt-2.mp3",
+        "text": "Join my army!",
+        "duration": 1.306
+      },
+      {
+        "file": "sfx/voice/lich-taunt-3.mp3",
+        "text": "You cannot kill what is already dead!",
+        "duration": 2.168
+      }
+    ],
+    "enrage": [
+      {
+        "file": "sfx/voice/lich-enrage-1.mp3",
+        "text": "Rise, my servants! RISE!",
+        "duration": 2.978
+      }
+    ],
+    "death": [
+      {
+        "file": "sfx/voice/lich-death-1.mp3",
+        "text": "I... will... return...",
+        "duration": 3.056
+      }
+    ]
+  }
+}

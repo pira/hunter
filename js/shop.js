@@ -1,4 +1,4 @@
-/* Monster Hunter — shop: XP/levels, card pricing, burn transition, level-up shop. Extends Game (js/core.js). */
+/* Monster Hunter — shop: card pricing, burn transition, level-up shop. Extends Game (js/core.js). */
 
 extendGame({
     updateCombo() {
@@ -7,20 +7,6 @@ extendGame({
             if (this.comboTimer === 0) this.combo = 0;
         }
         if (this.comboPop > 0) this.comboPop = Math.max(0, this.comboPop - 0.06);
-    },
-
-    gainXp(amount) {
-        this.xp += amount;
-        while (this.xp >= U.calculateLevelThreshold(this.level)) {
-            this.level++;
-            this.pendingLevels++;
-            this.bgKey = null;
-            this.buffs = {}; // one-level buffs end when the level does
-            const earned = this.coinsEarned - this.levelCoinsStart;
-            this.incomeEMA = this.incomeEMA ? 0.5 * this.incomeEMA + 0.5 * earned : earned;
-            this.levelCoinsStart = this.coinsEarned;
-            if (U.isBossLevel(this.level)) this.bossQueue++;
-        }
     },
 
     // Coins a player can expect to earn during `level` (≈3% of its XP + the level bonus).
@@ -38,12 +24,6 @@ extendGame({
     cardPrice(card) {
         if (card.share) return Math.max(card.cost, Math.round(card.share * Math.max(this.expectedIncome(this.level), this.incomeEMA)));
         return Math.round(card.cost * (1 + 0.75 * this.stack(card.id)));
-    },
-
-    levelProgress() {
-        const prev = this.level > 1 ? U.calculateLevelThreshold(this.level - 1) : 0;
-        const next = U.calculateLevelThreshold(this.level);
-        return U.clamp((this.xp - prev) / (next - prev), 0, 1);
     },
 
     availableCards() {
@@ -276,6 +256,7 @@ extendGame({
         this.setOverlay(null);
         this.lastTime = performance.now();
         this.cardsClosedAt = performance.now();
+        if (this.pendingLevels <= 0) this.startLevel();
         bought.forEach((c, i) => this.floater(this.player.x, this.player.y - 40 - i * 18, `${c.icon} ${c.name}`, '#ffffff', 18));
     },
 

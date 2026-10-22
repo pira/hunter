@@ -124,6 +124,7 @@ extendGame({
             this.burst(p.x, p.y, '#9be7ff', 18, 5);
         }
 
+        if (source && source.boss && !source.dying) this.bossTaunt(source);
         if (p.hp <= 0) {
             this.die(source);
         } else {

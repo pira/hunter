@@ -29,7 +29,8 @@ extendGame({
         this.setHtml('hearts', this.el.hearts, p.maxHp > 8
             ? `❤️ <b>${p.hp}</b>`
             : Array.from({ length: p.maxHp }, (_, i) => `<span class="${i < p.hp ? 'full' : 'empty'}">${i < p.hp ? '❤️' : '🖤'}</span>`).join(''));
-        this.setText('level', this.el.level, `LV ${this.level}`);
+        const phaseTag = { clear: ' ✓', encounter: ' ⚔️', loot: ' 🎁', travel: ' 🚩' }[this.phase] || '';
+        this.setText('level', this.el.level, `LV ${this.level}${phaseTag}`);
         this.el.xpFill.style.width = `${(this.levelProgress() * 100).toFixed(1)}%`;
         this.setText('score', this.el.score, this.score.toLocaleString());
 
@@ -65,7 +66,7 @@ extendGame({
         this.setText('coins', this.el.coins, `🪙 ${this.coins}`);
 
         if (this.boss) {
-            const pct = U.clamp(this.boss.hp / this.boss.maxHp, 0, 1);
+            const pct = this.bossHealth();
             this.bossTrailPct = Math.max(pct, this.bossTrailPct - 0.004);
             this.el.bossFill.style.width = `${pct * 100}%`;
             this.el.bossTrail.style.width = `${this.bossTrailPct * 100}%`;

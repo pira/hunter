@@ -170,3 +170,19 @@ describe('GameUtils v3 helpers', () => {
         assert.ok(Math.abs(GameUtils.stormDamage(7, 0, 6, 0.65, 2) - 6 * 1.3 * 2) < 1e-9);
     });
 });
+
+describe('GameUtils level flow', () => {
+    it('grows the level damage target', () => {
+        assert.equal(GameUtils.levelDamage(1), 100);
+        assert.ok(GameUtils.levelDamage(10) > GameUtils.levelDamage(9));
+        assert.equal(GameUtils.levelDamage(7), Math.round(100 * 2.5 * 1.3));
+    });
+
+    it('schedules encounters per D4', () => {
+        assert.equal(GameUtils.encounterKind(5), 'smallBoss');
+        assert.equal(GameUtils.encounterKind(15), 'smallBoss');
+        assert.equal(GameUtils.encounterKind(10), 'bigBoss');
+        assert.equal(GameUtils.encounterKind(100), 'bigBoss');
+        assert.equal(GameUtils.encounterKind(7), 'regular');
+    });
+});

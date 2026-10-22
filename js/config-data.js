@@ -118,9 +118,17 @@ const LEVEL_BUFFS = [
     { id: 'feast', icon: '🍖', name: 'Feast', max: Infinity, cost: 15, share: 0.25, weight: 0.4, desc: 'Fully heal' }
 ];
 
+// Small bosses (L5, 15, 25 …)
 const BOSSES = [
-    { name: 'Bonecrusher', title: 'The Juggernaut', color: '#C0392B', accent: '#F5B041', size: 40, hp: 60, speed: 0.9, pattern: 'charge' },
-    { name: 'Hexweaver', title: 'Witch of the Ninth Moon', color: '#7D3C98', accent: '#F4D03F', size: 36, hp: 60, speed: 1.1, pattern: 'rings' },
-    { name: 'Broodmother', title: 'Queen of the Swarm', color: '#1E8449', accent: '#ABEBC6', size: 46, hp: 80, speed: 0.6, pattern: 'summon' },
-    { name: 'Voidmaw', title: 'Devourer of Light', color: '#1B2631', accent: '#E74C3C', size: 44, hp: 110, speed: 1.0, pattern: 'chaos' }
+    { name: 'Bonecrusher', voice: 'bonecrusher', title: 'The Juggernaut', color: '#C0392B', accent: '#F5B041', size: 40, hp: 60, speed: 0.9, pattern: 'charge' },
+    { name: 'Hexweaver', voice: 'hexweaver', title: 'Witch of the Ninth Moon', color: '#7D3C98', accent: '#F4D03F', size: 36, hp: 60, speed: 1.1, pattern: 'rings' },
+    { name: 'Broodmother', voice: 'broodmother', title: 'Queen of the Swarm', color: '#1E8449', accent: '#ABEBC6', size: 46, hp: 80, speed: 0.6, pattern: 'summon' },
+    { name: 'Voidmaw', voice: 'voidmaw', title: 'Devourer of Light', color: '#1B2631', accent: '#E74C3C', size: 44, hp: 110, speed: 1.0, pattern: 'chaos' }
+];
+// Big bosses (L10, 20, 30, 40, then cycling with more HP)
+const BIG_BOSSES = [
+    { name: 'Gravelord', voice: 'gravelord', title: 'The Mountain That Walks', color: '#78716c', accent: '#fb923c', size: 54, hp: 260, speed: 0.6, pattern: 'gravelord', big: true },
+    { name: 'Stormcaller', voice: 'stormcaller', title: 'Master of Thunder', color: '#1e3a8a', accent: '#7dd3fc', size: 40, hp: 240, speed: 1.0, pattern: 'stormcaller', big: true },
+    { name: 'Hydra', voice: 'hydra', title: 'Three Heads, One Appetite', color: '#0f766e', accent: '#a3e635', size: 46, hp: 200, speed: 0.5, pattern: 'hydra', big: true },
+    { name: 'Lich', voice: 'lich', title: 'King of the Restless Dead', color: '#3b2f6b', accent: '#a78bfa', size: 38, hp: 220, speed: 0.8, pattern: 'lich', big: true }
 ];

@@ -414,7 +414,6 @@ class Game {
             hp: cls.hearts, maxHp: cls.hearts, iframes: 0, facing: 1, moveT: 0, contactCd: 0
         };
         this.score = 0;
-        this.xp = 0;
         this.level = 1;
         this.kills = 0;
         this.time = 0;
@@ -424,8 +423,21 @@ class Game {
         this.bestCombo = 0;
         this.bossesSlain = 0;
         this.bossCount = 0;
-        this.bossQueue = 0;
         this.bossWarning = 0;
+        this.pendingBoss = null;
+        this.bossParts = [];
+        this.smallCount = 0;
+        this.bigCount = 0;
+        this.regularCount = 0;
+        this.decks = {};
+        this.encounter = null;
+        this.hazards = [];
+        this.seam = null;
+        this.roadY = 0;
+        this.phase = 'fight';
+        this.progress = 0;
+        this.target = U.levelDamage(1);
+        this.biome = this.biomeFor ? this.biomeFor(1) : null;
         this.boss = null;
         this.pendingLevels = 0;
         this.coins = 0;
@@ -516,8 +528,9 @@ class Game {
         this.el.bossBar.hidden = true;
         this.lastTime = performance.now();
         this.acc = 0;
+        this.startLevel();
         this.enterGameMode();
-        this.banner('HUNT!', 'Chain kills for a combo multiplier');
+        this.banner('HUNT!', `${this.biome.name} · fill the bar to clear the level`);
         Sfx.arpeggio([392, 523, 659], 0.08, { type: 'triangle', volume: 0.12 });
         Leaderboard.startRun().then(token => {
             if (this.runId === runId) this.runToken = token;
@@ -604,6 +617,7 @@ class Game {
         if (this.state === 'dying') {
             this.deathTimer--;
             this.updateMonsters(true);
+            this.updateRoad();
             this.updateParticles();
             this.updateLightning();
             if (this.deathTimer <= 0) this.showGameOver();
@@ -620,6 +634,10 @@ class Game {
         this.updateDecals();
         this.updateMonsters(false);
         this.updateEnemyShots();
+        this.updateHazards();
+        this.updateRoad();
+        this.updateBossWarning();
+        this.updateLevelFlow();
         this.updatePowerups();
         this.updateCoins();
         this.updateCombo();

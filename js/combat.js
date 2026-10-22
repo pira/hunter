@@ -20,7 +20,7 @@ extendGame({
             if (m.dead || m.dying || (exclude && exclude.has(m))) continue;
             if (m.x < -m.size || m.x > this.W + m.size || m.y < -m.size || m.y > this.H + m.size) continue;
             // Bosses count as closer than they are, so auto-aim focuses them.
-            const d = U.distanceSquared(x, y, m.x, m.y) * (m.boss ? bossBias : 1);
+            const d = U.distanceSquared(x, y, m.x, m.y) * (m.boss || m.gk ? bossBias : 1);
             if (d < bestD) {
                 bestD = d;
                 best = m;
@@ -127,7 +127,7 @@ extendGame({
                 hit = true;
                 const n = U.normalizeVector(dx, dy);
                 const { dmg, crit } = this.rollDamage(c.damage);
-                this.damageMonster(m, dmg, { kx: n.x * 11, ky: n.y * 11, crit, sound: 'slash' });
+                this.damageMonster(m, dmg, { kx: n.x * 11, ky: n.y * 11, crit, sound: 'slash', src: p });
                 this.spark(m.x - n.x * m.size, m.y - n.y * m.size, '#ffe0b2', 5);
             }
             if (hit && !c.shook) {
@@ -189,7 +189,7 @@ extendGame({
             if (U.distanceSquared(x, y, m.x, m.y) <= (radius + m.size) ** 2) {
                 const n = U.normalizeVector(m.x - x, m.y - y);
                 const { dmg, crit } = this.rollDamage(baseDamage);
-                this.damageMonster(m, dmg, { kx: n.x * 6, ky: n.y * 6, crit, sound: false });
+                this.damageMonster(m, dmg, { kx: n.x * 6, ky: n.y * 6, crit, sound: false, aoe: true });
             }
         }
         this.explosions.push({ x, y, r: radius, t: 0, max: 22 });
@@ -227,7 +227,7 @@ extendGame({
                 if (U.distanceSquared(b.x, b.y, m.x, m.y) < (b.r + m.size) ** 2) {
                     b.hits.add(m);
                     const { dmg, crit } = this.rollDamage(b.damage);
-                    this.damageMonster(m, dmg, { kx: b.vx * 0.25, ky: b.vy * 0.25, crit, sound: 'zap' });
+                    this.damageMonster(m, dmg, { kx: b.vx * 0.25, ky: b.vy * 0.25, crit, sound: 'zap', src: { x: b.x - b.vx * 4, y: b.y - b.vy * 4 } });
                     this.spark(b.x, b.y, b.big ? '#f0abfc' : '#c4b5fd', b.big ? 6 : 3);
                     if (b.pierce-- <= 0) {
                         b.life = 0;
@@ -356,7 +356,7 @@ extendGame({
         chain.forEach((m, j) => {
             points.push({ x: m.x, y: m.y });
             const dmg = U.stormDamage(this.level, j, STORM.damage, STORM.falloff, this.damageMult);
-            this.damageMonster(m, dmg, { kx: (Math.random() - 0.5) * 4, ky: -2, sound: false });
+            this.damageMonster(m, dmg, { kx: (Math.random() - 0.5) * 4, ky: -2, sound: false, aoe: true });
             this.spark(m.x, m.y, '#e0f2fe', 8);
             this.spark(m.x, m.y, '#38bdf8', 6);
             this.decal(m.x, m.y + m.size * 0.6, 10 + m.size * 0.5, 'scorch');

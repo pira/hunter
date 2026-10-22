@@ -85,9 +85,16 @@ extendGame({
         this.coinDrops.forEach(c => this.drawCoin(ctx, c));
         this.powerups.forEach(pu => this.drawPowerup(ctx, pu));
         this.explosions.forEach(e => this.drawExplosion(ctx, e));
+        this.drawHazards(ctx);
         this.grenades.forEach(g => this.drawGrenade(ctx, g));
-        this.monsters.forEach(m => this.drawShadow(ctx, m.x, m.y + m.size * 0.85, m.size));
-        this.monsters.forEach(m => (m.boss ? this.drawBoss(ctx, m) : this.drawMonster(ctx, m)));
+        this.monsters.forEach(m => { if (!m.hidden && !m.gk && !m.boss) this.drawShadow(ctx, m.x, m.y + m.size * 0.85, m.size); });
+        this.monsters.forEach(m => {
+            if (m.hidden) return;
+            if (m.boss) this.drawBoss(ctx, m);
+            else if (m.gk) this.drawGatekeeper(ctx, m);
+            else this.drawMonster(ctx, m);
+        });
+        this.monsters.forEach(m => { if (m.boss && m.bubble) this.drawBubble(ctx, m); });
         const alive = this.state !== 'dying' && this.state !== 'gameover';
         if (alive) this.drawPlayer(ctx);
         if (alive) this.drawCleaves(ctx);
@@ -99,32 +106,6 @@ extendGame({
         this.drawStick(ctx);
     },
 
-    drawBackground(ctx) {
-        const key = `${this.canvas.width}x${this.canvas.height}:${this.level}`;
-        if (this.bgKey !== key) {
-            this.bgKey = key;
-            const bg = this.bgCanvas || (this.bgCanvas = document.createElement('canvas'));
-            bg.width = this.canvas.width;
-            bg.height = this.canvas.height;
-            const g = bg.getContext('2d');
-            const k = this.dpr * this.scale;
-            const hue = ARENA_HUES[(this.level - 1) % ARENA_HUES.length];
-            const light = Math.max(32, 64 - (this.level - 1) * 0.9);
-            g.fillStyle = `hsl(${hue}, 42%, ${light}%)`;
-            g.fillRect(0, 0, bg.width, bg.height);
-            const tile = 40 * k;
-            g.fillStyle = `hsla(${hue}, 45%, ${light + 4}%, 0.55)`;
-            for (let y = 0; y < bg.height; y += tile) {
-                for (let x = ((y / tile) % 2) * tile; x < bg.width; x += tile * 2) g.fillRect(x, y, tile, tile);
-            }
-            const vg = g.createRadialGradient(bg.width / 2, bg.height / 2, Math.min(bg.width, bg.height) * 0.3, bg.width / 2, bg.height / 2, Math.hypot(bg.width, bg.height) * 0.6);
-            vg.addColorStop(0, 'rgba(0,0,0,0)');
-            vg.addColorStop(1, 'rgba(0,0,0,0.42)');
-            g.fillStyle = vg;
-            g.fillRect(0, 0, bg.width, bg.height);
-        }
-        ctx.drawImage(this.bgCanvas, 0, 0);
-    },
 
     drawShadow(ctx, x, y, size) {
         ctx.fillStyle = 'rgba(0,0,0,0.18)';
@@ -142,7 +123,7 @@ extendGame({
     },
 
     drawCoin(ctx, c) {
-        if (c.life < 180 && Math.floor(c.life / 6) % 2 === 0) return;
+        if ((c.life < 180 || c.y > this.H - 80) && Math.floor(c.t / 6) % 2 === 0) return;
         const r = c.value >= 5 ? 7 : 5;
         const sx = Math.max(0.2, Math.abs(Math.cos(c.spin)));
         ctx.fillStyle = 'rgba(0,0,0,0.2)';
@@ -165,7 +146,7 @@ extendGame({
 
     drawPowerup(ctx, pu) {
         const def = POWERUPS[pu.type];
-        if (pu.life < 180 && Math.floor(pu.life / 8) % 2 === 0) return;
+        if ((pu.life < 180 || pu.y > this.H - 80) && Math.floor(pu.t / 8) % 2 === 0) return;
         const bob = Math.sin(pu.t * 0.08) * 3 - (pu.z || 0);
         const pulse = 1 + Math.sin(pu.t * 0.15) * 0.1;
         this.drawShadow(ctx, pu.x, pu.y + 14, 10);
@@ -309,6 +290,10 @@ extendGame({
     },
 
     drawBoss(ctx, b) {
+        if (b.boss.big) {
+            this.drawBigBoss(ctx, b);
+            return;
+        }
         const def = b.boss;
         const fill = b.flash > 0 ? '#ffffff' : def.color;
         const s = b.size;
@@ -672,25 +657,45 @@ extendGame({
         }
         ctx.lineCap = 'butt';
 
-        // Boss bullets: magenta orbs with a dark core, so they never read as your own shots.
+        // Enemy shots: magenta orbs by default (never confused with your own violet bolts), plus styles.
         const pulse = 1 + 0.15 * Math.sin(this.frameNo * 0.3);
         for (const s of this.enemyShots) {
-            ctx.globalAlpha = 0.3;
-            ctx.fillStyle = '#ff2d78';
+            if (s.style === 'arrow') {
+                ctx.save();
+                ctx.translate(s.x, s.y);
+                ctx.rotate(Math.atan2(s.vy, s.vx));
+                ctx.strokeStyle = '#78350f';
+                ctx.lineWidth = 2.5;
+                ctx.beginPath();
+                ctx.moveTo(-12, 0);
+                ctx.lineTo(6, 0);
+                ctx.stroke();
+                ctx.fillStyle = '#e5e7eb';
+                ctx.beginPath();
+                ctx.moveTo(10, 0);
+                ctx.lineTo(3, -4);
+                ctx.lineTo(3, 4);
+                ctx.fill();
+                ctx.fillStyle = '#ef4444';
+                ctx.fillRect(-13, -3, 5, 6);
+                ctx.restore();
+                continue;
+            }
+            const col = { fire: ['255,120,20', '#fde047', '#7c2d12'], acid: ['132,204,22', '#d9f99d', '#1a2e05'], spark: ['56,189,248', '#e0f2fe', '#0c4a6e'], skull: ['167,139,250', '#ede9fe', '#2e1065'] }[s.style] || ['255,45,120', '#ffd1e3', '#2a0014'];
+            ctx.fillStyle = `rgba(${col[0]},0.3)`;
             ctx.beginPath();
             ctx.arc(s.x, s.y, s.r * 1.9 * pulse, 0, TAU);
             ctx.fill();
-            ctx.globalAlpha = 1;
-            ctx.fillStyle = '#ff2d78';
-            ctx.strokeStyle = '#ffd1e3';
+            ctx.fillStyle = `rgb(${col[0]})`;
+            ctx.strokeStyle = col[1];
             ctx.lineWidth = 1.5;
             ctx.beginPath();
             ctx.arc(s.x, s.y, s.r, 0, TAU);
             ctx.fill();
             ctx.stroke();
-            ctx.fillStyle = '#2a0014';
+            ctx.fillStyle = col[2];
             ctx.beginPath();
-            ctx.arc(s.x, s.y, s.r * 0.5, 0, TAU);
+            ctx.arc(s.x, s.y, s.r * 0.45, 0, TAU);
             ctx.fill();
         }
     },
@@ -852,6 +857,15 @@ Object.assign(Game, {
                     ctx.arc(Math.cos(a) * (size + 4), Math.sin(a) * (size + 4), 3, 0, TAU);
                     ctx.stroke();
                 }
+                break;
+            case 'skull':
+                circle();
+                ctx.fillStyle = '#292524';
+                ctx.beginPath();
+                ctx.ellipse(-size * 0.38, -size * 0.1, size * 0.26, size * 0.3, 0, 0, TAU);
+                ctx.ellipse(size * 0.38, -size * 0.1, size * 0.26, size * 0.3, 0, 0, TAU);
+                ctx.fill();
+                ctx.fillRect(-size * 0.4, size * 0.45, size * 0.8, size * 0.2);
                 break;
             case 'behemoth':
                 circle();

@@ -167,7 +167,22 @@
         return base * hpScale(level) * damageMult * Math.pow(falloff, jump);
     }
 
+    /** Effective damage that fills the level bar (~60 s of fighting at par skill). */
+    function levelDamage(level) {
+        const L = Math.max(1, level);
+        return Math.round(100 * (1 + 0.25 * (L - 1)) * hpScale(L));
+    }
+
+    /** Encounter at the end of a level: big boss every 10, small boss at 5/15/25…, else gatekeeper/wave. */
+    function encounterKind(level) {
+        if (level % 10 === 0) return 'bigBoss';
+        if (level % 10 === 5) return 'smallBoss';
+        return 'regular';
+    }
+
     return {
+        levelDamage,
+        encounterKind,
         hpScale,
         superCharge,
         stormDamage,
