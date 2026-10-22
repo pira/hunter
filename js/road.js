@@ -54,7 +54,8 @@ extendGame({
     },
 
     get roadSpeed() {
-        return ROAD_SPEED * this.roadMult * (this.phase === 'travel' ? TRAVEL_SPEED : 1) * (this.state === 'dying' ? 0.5 : 1);
+        if (this.phase === 'travel') return ROAD_SPEED * TRAVEL_SPEED;
+        return ROAD_SPEED * this.roadMult * (this.state === 'dying' ? 0.5 : 1);
     },
 
     updateRoad() {

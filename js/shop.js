@@ -9,9 +9,8 @@ extendGame({
         if (this.comboPop > 0) this.comboPop = Math.max(0, this.comboPop - 0.06);
     },
 
-    // Coins a player can expect to earn during `level` (≈3% of its XP + the level bonus).
     expectedIncome(level) {
-        return 0.03 * U.xpToNextLevel(level) + this.levelBonus(level);
+        return U.expectedIncome(level);
     },
 
     levelBonus(level) {
@@ -22,8 +21,7 @@ extendGame({
     // Level buffs: a share of what this player actually earns per level (smoothed), never below the
     // curve's expectation — all four together cost ~1.5 levels of income, so they stay a real choice.
     cardPrice(card) {
-        if (card.share) return Math.max(card.cost, Math.round(card.share * Math.max(this.expectedIncome(this.level), this.incomeEMA)));
-        return Math.round(card.cost * (1 + 0.75 * this.stack(card.id)));
+        return U.cardPrice(card, this.stack(card.id), this.expectedIncome(this.level), this.incomeEMA);
     },
 
     availableCards() {
@@ -32,8 +30,8 @@ extendGame({
             .filter(u => !u.minLevel || this.level >= u.minLevel)
             .filter(u => u.id !== 'vitality' || this.player.maxHp < 6)
             .map(u => ({ ...u, weight: u.weight || (u.cls ? 1.6 : 1) }));
-        const buffs = LEVEL_BUFFS.filter(b => b.id !== 'feast' || this.player.hp < this.player.maxHp);
-        return permanent.concat(buffs);
+        const buffs = LEVEL_BUFFS.filter(b => (b.id !== 'feast' || this.player.hp < this.player.maxHp) && !this.buffs[b.id]);
+        return { permanent, buffs };
     },
 
     cardHeader() {
@@ -194,8 +192,8 @@ extendGame({
     },
 
     prepareCards(mode) {
-        const pool = this.availableCards();
-        const cards = U.pickWeightedUnique(pool, 3);
+        const { permanent, buffs } = this.availableCards();
+        const cards = U.dealCards(permanent, buffs, 3);
         this.cardChoices = cards.map(c => ({ ...c, price: this.cardPrice(c), sold: false }));
         this.cardMode = mode;
         this.cardHeader();
@@ -242,6 +240,7 @@ extendGame({
             return;
         }
         this.coins -= card.price;
+        this.coinsSpent = (this.coinsSpent || 0) + card.price;
         card.sold = true;
         this.applyCard(card);
         Sfx.arpeggio([659, 880, 1175], 0.05, { type: 'triangle', volume: 0.1 });

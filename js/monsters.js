@@ -215,7 +215,7 @@ extendGame({
      * The one damage pipeline. opts: kx/ky knockback, crit, sound flavour, src = where the hit came
      * from (for directional shields), aoe = explosions/lightning ignore shields.
      */
-    damageMonster(m, dmg, { kx = 0, ky = 0, crit = false, sound = 'thwack', src = null, aoe = false } = {}) {
+    damageMonster(m, dmg, { kx = 0, ky = 0, crit = false, sound = 'thwack', src = null, aoe = false, dot = false } = {}) {
         if (m.dead || m.dying || m.invulnerable) return;
         if (m.shielded) {
             if (this.frameNo - (m.lastClink || 0) > 10) {
@@ -254,6 +254,7 @@ extendGame({
             m.lastNum = this.frameNo;
             this.floater(m.x + (Math.random() - 0.5) * m.size, m.y - m.size - 4, `${Math.round(dmg * 10) / 10}`, '#ffffff', 14);
         }
+        if (!dot) this.poisonHit(m);
         if (m.onHurt) m.onHurt(m);
         if (m.hp <= 0) {
             if (m.boss) this.startBossDeath(m);

@@ -170,7 +170,7 @@
     /** Effective damage that fills the level bar (~60 s of fighting at par skill). */
     function levelDamage(level) {
         const L = Math.max(1, level);
-        return Math.round(100 * (1 + 0.25 * (L - 1)) * hpScale(L));
+        return Math.round(70 * (1 + 0.3 * (L - 1)) * hpScale(L));
     }
 
     /** Encounter at the end of a level: big boss every 10, small boss at 5/15/25…, else gatekeeper/wave. */
@@ -180,7 +180,49 @@
         return 'regular';
     }
 
+    /** Coins dropped by a kill: tier base × monster HP scale × random factor (0.8–1.2), at least 1. */
+    function coinDrop(tierBase, level, rand = 1) {
+        return Math.max(1, Math.round(tierBase * hpScale(level) * rand));
+    }
+
+    /** Price of a shop card: permanent = static base × (1 + 0.75 × rank); one-level = share of income. */
+    function cardPrice(card, rank, expected, incomeEMA) {
+        if (card.share) return Math.max(card.cost, Math.round(card.share * Math.max(expected, incomeEMA || 0)));
+        return Math.round(card.cost * (1 + 0.75 * rank));
+    }
+
+    /** Coins a player can expect to earn during a level (kills + level bonus + encounter loot). */
+    function expectedIncome(level) {
+        return Math.round(0.7 * levelDamage(level) + 10 + 2 * level);
+    }
+
+    /**
+     * Deals `count` shop cards: at least one permanent and one one-level card when both exist,
+     * never two cards of the same `group` (e.g. Freeze I and II), the rest weighted at random.
+     */
+    function dealCards(permanent, oneLevel, count = 3, rng = Math.random) {
+        const hand = [];
+        const take = item => {
+            if (!item) return;
+            hand.push(item);
+        };
+        const fits = item => !hand.includes(item) && !(item.group && hand.some(h => h.group === item.group));
+        if (permanent.length) take(pickWeighted(permanent, rng));
+        if (oneLevel.length) take(pickWeighted(oneLevel, rng));
+        const rest = permanent.concat(oneLevel);
+        while (hand.length < count) {
+            const pool = rest.filter(fits);
+            if (!pool.length) break;
+            take(pickWeighted(pool, rng));
+        }
+        return hand.slice(0, count);
+    }
+
     return {
+        dealCards,
+        coinDrop,
+        cardPrice,
+        expectedIncome,
         levelDamage,
         encounterKind,
         hpScale,

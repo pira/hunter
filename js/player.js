@@ -5,33 +5,52 @@ extendGame({
         return this.stacks[id] || 0;
     },
 
+    /** Permanent artefact bonus for a stat (P7 meta progression); 1 when none are owned. */
+    artefactMult(key) {
+        return this.artefacts ? this.artefacts.mult(key) : 1;
+    },
+
     get damageMult() {
-        return (1 + 0.2 * this.stack('power')) * (this.buffs.dmg2 ? 2 : 1);
+        return (1 + 0.2 * this.stack('power')) * (this.buffs.dmg2 ? 2 : 1) * this.artefactMult('damage');
     },
 
     get coinMult() {
         const timed = this.timers.coins3 > 0 ? 3 : this.timers.coins2 > 0 ? 2 : 1;
-        return timed * (this.buffs.gold2 ? 2 : 1);
+        return timed * (this.buffs.gold2 ? 2 : 1) * (1 + 0.15 * this.stack('goldrush')) * this.artefactMult('gold');
     },
 
     get mobSpeedMult() {
-        return (this.timers.freeze > 0 ? 0.5 : 1) * (this.buffs.slow ? 0.6 : 1);
+        const card = this.buffs.freeze2 ? 0.5 : this.buffs.freeze1 ? 0.75 : 1;
+        return Math.min(card, this.timers.freeze > 0 ? 0.5 : 1);
     },
 
     get magnetRadius() {
+        if (this.timers.magnet > 0 || this.buffs.magnetAll || this.phase === 'travel') return 2000;
         return 70 + 45 * this.stack('magnet');
     },
 
     get rateMult() {
-        return (1 + 0.15 * this.stack('haste')) * (this.timers.rapidFire > 0 ? 3 : 1);
+        const fury = this.buffs.fury2 ? 2 : this.buffs.fury1 ? 1.5 : 1;
+        return (1 + 0.15 * this.stack('haste')) * (this.timers.rapidFire > 0 ? 3 : 1) * fury * this.artefactMult('rate');
+    },
+
+    get moveMult() {
+        const fleet = this.buffs.fleet2 ? 2 : this.buffs.fleet1 ? 1.5 : 1;
+        return (1 + 0.1 * this.stack('boots')) * fleet * (this.whirl > 0 ? 1.3 : 1) * this.artefactMult('speed');
+    },
+
+    get luckMult() {
+        return (1 + 0.3 * this.stack('luck')) * this.artefactMult('luck');
     },
 
     get comboWindow() {
         return 150 + 36 * this.stack('streak');
     },
 
-    get powerupDuration() {
-        return Math.round(600 * (1 + 0.3 * this.stack('overtime')));
+    /** Steps a timed pickup lasts. */
+    powerupDuration(type) {
+        const secs = (POWERUPS[type] && POWERUPS[type].secs) || 10;
+        return Math.round(secs * 60 * GAME_SPEED * (1 + 0.3 * this.stack('overtime')) * this.artefactMult('timed'));
     },
 
     /** True while nothing can hurt the player (Invincible powerup or the barbarian's Whirlwind). */
@@ -62,7 +81,7 @@ extendGame({
             iy = this.stick.dy;
         }
 
-        const speed = p.baseSpeed * (1 + 0.1 * this.stack('boots')) * (this.whirl > 0 ? 1.3 : 1);
+        const speed = p.baseSpeed * this.moveMult;
         p.vx = U.lerp(p.vx, ix * speed, 0.3);
         p.vy = U.lerp(p.vy, iy * speed, 0.3);
         p.x = U.clamp(p.x + p.vx, p.r, this.W - p.r);
@@ -96,6 +115,14 @@ extendGame({
     hurtPlayer(source) {
         const p = this.player;
         if (this.state !== 'playing' || p.iframes > 0 || this.untouchable) return;
+        // Guardian Amulet (artefact): a small chance to shrug a hit off entirely.
+        if (Math.random() < this.artefactMult('guard') - 1) {
+            p.iframes = 40;
+            this.floater(p.x, p.y - 40, 'BLOCKED!', '#93c5fd', 20);
+            this.ring(p.x, p.y, 40, '#93c5fd', 16);
+            return;
+        }
+        this.hits = (this.hits || 0) + 1;
         p.hp--;
         p.iframes = 90;
         this.shake(14);

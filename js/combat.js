@@ -145,7 +145,7 @@ extendGame({
         const p = this.player;
         const def = PRIMARY.grenade;
         this.cooldown = def.cooldown * Math.pow(0.9, this.stack('fuse'));
-        const count = Math.min(4, 1 + this.stack('cluster'));
+        const count = Math.min(5, 2 + this.stack('cluster')); // goblins always throw a pair
         const dirs = all ? 4 : 1;
         const base = aim ? Math.atan2(aim.y - p.y, aim.x - p.x) : -Math.PI / 2;
         const range = all ? def.range : Math.min(def.range, Math.hypot(aim.x - p.x, aim.y - p.y) + 10);

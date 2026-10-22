@@ -1,7 +1,7 @@
 // Leaderboard + identity client: global scores and player profiles via the AWS Lambda API (config.js),
 // with a device-local fallback board and history when the API is unreachable.
 (function (root) {
-    const LOCAL_KEY = 'hunter.localScores';
+    const LOCAL_KEY = 'hunter.localScores.v3'; // v2 runs stay in hunter.localScores
     const NAME_KEY = 'hunter.playerName';
     const ID_KEY = 'hunter.identity';
     const PENDING_KEY = 'hunter.pendingSubmit';
@@ -80,6 +80,8 @@
     }
 
     const Leaderboard = {
+        board: 'v3', // 'v2' = the Classic board from before classes and the road
+
         get enabled() {
             return Boolean(apiUrl());
         },
@@ -152,7 +154,7 @@
         /** Top scores. Returns { scores, source: 'global' | 'local' }. */
         async top(limit = 10) {
             try {
-                const body = await request(`/scores?limit=${limit}`);
+                const body = await request(`/scores?limit=${limit}&board=${this.board}`);
                 return { scores: body.scores || [], source: 'global' };
             } catch (e) {
                 return { scores: readLocal().slice(0, limit), source: 'local' };
@@ -179,7 +181,7 @@
                 return { source: 'local', rank: local.rank, scores: local.scores, error: this.enabled ? 'offline' : 'disabled' };
             }
             const id = this.identity();
-            const body = { ...entry, token };
+            const body = { ...entry, token, board: this.board };
             if (id) Object.assign(body, { playerId: id.id, secret: id.secret, name: id.name });
             try {
                 const res = await request('/scores', { method: 'POST', body: JSON.stringify(body) });

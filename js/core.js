@@ -442,6 +442,9 @@ class Game {
         this.pendingLevels = 0;
         this.coins = 0;
         this.coinsEarned = 0;
+        this.coinsSpent = 0;
+        this.coinFrac = 0;
+        this.hits = 0;
         this.levelCoinsStart = 0;
         this.incomeEMA = 0;
         this.buffs = {};
@@ -528,6 +531,8 @@ class Game {
         this.el.bossBar.hidden = true;
         this.lastTime = performance.now();
         this.acc = 0;
+        this.chargeMult = this.artefactMult('charge');
+        this.statsLog = /[?&]stats\b/.test(window.location.search) ? this.makeStatsLog() : null;
         this.startLevel();
         this.enterGameMode();
         this.banner('HUNT!', `${this.biome.name} · fill the bar to clear the level`);

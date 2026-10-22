@@ -73,6 +73,36 @@ extendGame({
         }
     },
 
+    // ?stats: per-level calibration log (duration, effective damage, coins, kills, hits) for tuning.
+    makeStatsLog() {
+        let el = document.getElementById('statsLog');
+        if (!el) {
+            el = document.createElement('pre');
+            el.id = 'statsLog';
+            el.style.cssText = 'position:fixed;left:6px;bottom:6px;z-index:50;margin:0;max-height:45vh;overflow:auto;font:10px/1.3 monospace;color:#d9f99d;background:rgba(0,0,0,.72);padding:5px 7px;border-radius:6px;pointer-events:none';
+            document.body.appendChild(el);
+        }
+        const log = {
+            rows: [],
+            start: { t: 0, earned: 0, spent: 0, kills: 0, hits: 0 },
+            endLevel: g => {
+                const row = {
+                    L: g.level - 1, cls: g.cls, secs: Math.round(g.time - log.start.t), dmg: Math.round(g.target),
+                    earned: g.coinsEarned - log.start.earned, spent: (g.coinsSpent || 0) - log.start.spent,
+                    kills: g.kills - log.start.kills, hits: (g.hits || 0) - log.start.hits, expected: g.expectedIncome(g.level - 1)
+                };
+                log.rows.push(row);
+                log.start = { t: g.time, earned: g.coinsEarned, spent: g.coinsSpent || 0, kills: g.kills, hits: g.hits || 0 };
+                window.huntStats = log.rows;
+                el.textContent = 'L  cls        secs  dmg  earned/exp  spent kills hits\n' + log.rows.map(r =>
+                    `${String(r.L).padEnd(3)}${r.cls.padEnd(11)}${String(r.secs).padStart(4)} ${String(r.dmg).padStart(5)} ${String(r.earned).padStart(6)}/${String(r.expected).padEnd(4)} ${String(r.spent).padStart(5)} ${String(r.kills).padStart(5)} ${String(r.hits).padStart(4)}`).join('\n');
+                console.table(log.rows);
+            }
+        };
+        el.textContent = 'stats: per-level rows appear here';
+        return log;
+    },
+
     showGameOver() {
         this.state = 'gameover';
         this.releaseWakeLock();
@@ -136,7 +166,7 @@ extendGame({
         const name = (id && id.name) || 'Hunter';
         this.el.submitStatus.textContent = 'Saving your hunt…';
         const entry = {
-            name, cls: this.cls, score: this.score, level: this.level, kills: this.kills,
+            name, cls: this.cls, skin: this.skin || undefined, coins: Math.max(0, Math.floor(this.coins)), score: this.score, level: this.level, kills: this.kills,
             combo: this.bestCombo, bosses: this.bossesSlain, duration: Math.max(1, Math.round(this.time))
         };
         const runId = this.runId;

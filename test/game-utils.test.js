@@ -173,9 +173,9 @@ describe('GameUtils v3 helpers', () => {
 
 describe('GameUtils level flow', () => {
     it('grows the level damage target', () => {
-        assert.equal(GameUtils.levelDamage(1), 100);
+        assert.equal(GameUtils.levelDamage(1), 70);
         assert.ok(GameUtils.levelDamage(10) > GameUtils.levelDamage(9));
-        assert.equal(GameUtils.levelDamage(7), Math.round(100 * 2.5 * 1.3));
+        assert.equal(GameUtils.levelDamage(7), Math.round(70 * 2.8 * 1.3));
     });
 
     it('schedules encounters per D4', () => {
@@ -184,5 +184,46 @@ describe('GameUtils level flow', () => {
         assert.equal(GameUtils.encounterKind(10), 'bigBoss');
         assert.equal(GameUtils.encounterKind(100), 'bigBoss');
         assert.equal(GameUtils.encounterKind(7), 'regular');
+    });
+});
+
+describe('GameUtils economy', () => {
+    it('scales coin drops with monster HP and never drops nothing', () => {
+        assert.equal(GameUtils.coinDrop(1, 1, 0.8), 1);
+        assert.equal(GameUtils.coinDrop(3, 7, 1), 4);
+        assert.equal(GameUtils.coinDrop(0.2, 1, 1), 1);
+    });
+
+    it('prices permanent cards statically per rank and one-level cards by income', () => {
+        const perm = { cost: 20 };
+        assert.equal(GameUtils.cardPrice(perm, 0, 100), 20);
+        assert.equal(GameUtils.cardPrice(perm, 2, 100), 50);
+        const buff = { cost: 10, share: 0.3 };
+        assert.equal(GameUtils.cardPrice(buff, 0, 100, 50), 30);
+        assert.equal(GameUtils.cardPrice(buff, 0, 100, 200), 60);
+        assert.equal(GameUtils.cardPrice(buff, 0, 10, 0), 10);
+    });
+
+    it('expects more income on later levels', () => {
+        assert.ok(GameUtils.expectedIncome(10) > GameUtils.expectedIncome(1));
+    });
+});
+
+describe('GameUtils.dealCards', () => {
+    const perm = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
+    const one = [{ id: 'f1', group: 'freeze' }, { id: 'f2', group: 'freeze' }, { id: 'g' }];
+    it('always mixes permanent and one-level cards when both exist', () => {
+        for (let i = 0; i < 200; i++) {
+            const hand = GameUtils.dealCards(perm, one, 3);
+            assert.equal(hand.length, 3);
+            assert.ok(hand.some(c => perm.includes(c)));
+            assert.ok(hand.some(c => one.includes(c)));
+            assert.ok(!(hand.some(c => c.id === 'f1') && hand.some(c => c.id === 'f2')));
+            assert.equal(new Set(hand).size, 3);
+        }
+    });
+    it('falls back to one kind when the other is empty', () => {
+        assert.equal(GameUtils.dealCards([], one, 3).length, 2);
+        assert.equal(GameUtils.dealCards(perm, [], 3).length, 3);
     });
 });

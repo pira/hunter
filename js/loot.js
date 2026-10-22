@@ -2,18 +2,20 @@
 
 extendGame({
     dropLoot(m) {
-        const luck = 1 + 0.3 * this.stack('luck');
-        const [cChance, cMin, cMax] = m.minion ? [0.15, 1, 1] : COIN_DROPS[m.tier] || [0, 0, 0];
-        if (Math.random() < cChance * luck) this.spawnCoins(m.x, m.y, cMin + Math.floor(Math.random() * (cMax - cMin + 1)), 2.2);
+        const luck = this.luckMult;
+        const [chance, base] = m.minion ? [0.15, 1] : COIN_DROPS[m.tier] || [0, 0];
+        // Coins scale with monster HP (unlike v2), so late levels pay more.
+        if (Math.random() < chance) this.spawnCoins(m.x, m.y, U.coinDrop(base, this.level, 0.8 + Math.random() * 0.4), 2.2);
         if (m.minion) return;
 
         // Powerups are throttled: one per DROP_COOLDOWN and never more than a few on the floor.
         const onField = this.powerups.filter(pu => !pu.loot).length;
-        if (this.dropCd <= 0 && onField < MAX_FIELD_POWERUPS && Math.random() < (DROP_CHANCE[m.tier] || 0) * luck) {
+        if (this.dropCd <= 0 && onField < MAX_FIELD_POWERUPS && Math.random() < (DROP_CHANCE[m.tier] || (m.gk ? 0.5 : 0)) * luck) {
             this.spawnPowerup(m.x, m.y, null, { pop: true });
             this.dropCd = DROP_COOLDOWN;
             return;
         }
+        if (m.gk && (m.gen || 0) === 0) this.spawnCoins(m.x, m.y, 6 + this.level, 3.5, 5);
         // Hearts have their own, more generous roll while you're hurt.
         const p = this.player;
         if (p.hp < p.maxHp && this.heartCd <= 0 && Math.random() < (m.size > 14 ? 0.05 : 0.01) * luck) {
@@ -58,7 +60,10 @@ extendGame({
             const d = Math.hypot(p.x - c.x, p.y - c.y);
             if (c.t > 18 && d < p.r + 12) {
                 c.life = 0;
-                const gain = c.value * this.coinMult;
+                // fractional multipliers (Gold Rush, Greed Ring) accumulate until they make a whole coin
+                this.coinFrac = (this.coinFrac || 0) + c.value * this.coinMult;
+                const gain = Math.floor(this.coinFrac);
+                this.coinFrac -= gain;
                 this.coins += gain;
                 this.coinsEarned += gain;
                 this.coinFloat.n += gain;
@@ -130,12 +135,12 @@ extendGame({
         this.burst(pu.x, pu.y, def.color, 14, 4);
         if (pu.type === 'storm') {
             // Storm runs a fixed 15 s and strikes immediately, then every 3 s.
-            this.timers.storm = Math.min(TIMER_CAP, this.timers.storm + STORM.duration);
+            this.timers.storm = Math.min(TIMER_CAP, this.timers.storm + this.powerupDuration('storm'));
             this.stormClock = 1;
             this.floater(p.x, p.y - 36, 'STORM!', def.color, 24);
             Sfx.play('powerup', { volume: 0.32, rate: 0.9 });
         } else if (def.timed) {
-            this.timers[pu.type] = Math.min(TIMER_CAP, this.timers[pu.type] + this.powerupDuration);
+            this.timers[pu.type] = Math.min(TIMER_CAP, this.timers[pu.type] + this.powerupDuration(pu.type));
             this.floater(p.x, p.y - 36, def.name.toUpperCase(), def.color, 22);
             Sfx.play('powerup', { volume: 0.32 });
         } else if (pu.type === 'heart') {
@@ -147,8 +152,10 @@ extendGame({
                 this.floater(p.x, p.y - 36, 'Full health → 🪙', '#ffd60a', 16);
             }
             Sfx.play('powerup', { volume: 0.32, rate: 1.2 });
-        } else if (pu.type === 'bomb') {
-            this.activateBomb();
+        } else if (pu.type === 'quake') {
+            this.activateQuake();
+        } else if (pu.type === 'stun') {
+            this.activateStun();
         } else if (pu.type === 'overcharge') {
             this.floater(p.x, p.y - 36, 'OVERCHARGE!', def.color, 22);
             this.superMeter = 99.9;
@@ -157,16 +164,53 @@ extendGame({
         }
     },
 
-    activateBomb() {
+    // Earthquake (the old Bomb): everything on screen takes a hit; the ground cracks.
+    activateQuake() {
+        const p = this.player;
         for (const m of this.monsters) {
             if (m.dead) continue;
-            const n = U.normalizeVector(m.x - this.player.x, m.y - this.player.y);
-            this.damageMonster(m, 8 * this.damageMult, { kx: n.x * 10, ky: n.y * 10 });
+            const n = U.normalizeVector(m.x - p.x, m.y - p.y);
+            this.damageMonster(m, 8 * this.damageMult, { kx: n.x * 10, ky: n.y * 10, aoe: true, sound: false });
         }
         this.enemyShots = [];
+        for (let i = 0; i < 7; i++) this.decal(p.x + (Math.random() - 0.5) * this.W * 0.8, p.y + (Math.random() - 0.5) * this.H * 0.8, 50 + Math.random() * 40, 'crack');
+        this.decal(p.x, p.y + 10, 90, 'crack');
         this.flash = { color: '255,60,30', t: 40, max: 40 };
-        this.ring(this.player.x, this.player.y, Math.max(this.W, this.H), '#ff6b35', 36);
-        this.shake(18);
-        Sfx.play('boom', { volume: 0.9 });
+        this.ring(p.x, p.y, Math.max(this.W, this.H), '#ff6b35', 36);
+        this.shake(22);
+        Sfx.play('boom', { volume: 0.9, rate: 0.7 });
+    },
+
+    // Stun: every monster on screen freezes solid for 3 s (bosses 1 s).
+    activateStun() {
+        for (const m of this.monsters) {
+            if (m.dead || m.dying) continue;
+            if (m.x < -m.size || m.x > this.W + m.size || m.y < -m.size || m.y > this.H + m.size) continue;
+            m.stun = Math.round((m.boss ? 1 : 3) * 60 * GAME_SPEED);
+            this.spark(m.x, m.y - m.size, '#fde047', 4);
+        }
+        this.flash = { color: '255,240,120', t: 18, max: 18 };
+        this.floater(this.player.x, this.player.y - 36, 'STUNNED THEM ALL!', '#fde047', 22);
+        Sfx.arpeggio([1568, 1318, 1568, 1318], 0.05, { type: 'triangle', volume: 0.08 });
+    },
+
+    // Poison: while the timer runs, your hits poison monsters for 4 s; they infect whoever they touch.
+    poisonHit(m) {
+        if (!(this.timers.poison > 0) || m.boss && m.poison > 0) return;
+        m.poison = Math.round(4 * 60 * GAME_SPEED);
+    },
+
+    updatePoison(m) {
+        m.poison--;
+        if (m.poison % 27 === 0) {
+            this.damageMonster(m, 0.25 * U.hpScale(this.level) * this.damageMult, { sound: false, aoe: true, dot: true });
+            this.particle({ x: m.x + (Math.random() - 0.5) * m.size, y: m.y + m.size * 0.5, vx: 0, vy: 0.6, life: 20, size: 2.5, color: '#84cc16', kind: 'spark', drag: 1 });
+        }
+        if (m.poison % 10 === 0) {
+            for (const o of this.monsters) {
+                if (o === m || o.dead || o.poison > 0 || o.boss) continue;
+                if (U.distanceSquared(o.x, o.y, m.x, m.y) < (o.size + m.size + 4) ** 2) o.poison = Math.round(3 * 60 * GAME_SPEED);
+            }
+        }
     }
 });

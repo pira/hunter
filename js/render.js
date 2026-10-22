@@ -236,7 +236,24 @@ extendGame({
             ctx.globalAlpha = 1;
         }
         Game.drawShape(ctx, m.shape, m.size, fill);
-        if (this.timers && this.timers.freeze > 0 && !m.boss) {
+        if (m.poison > 0) {
+            ctx.globalAlpha = 0.45;
+            ctx.fillStyle = '#84cc16';
+            ctx.beginPath();
+            ctx.arc(0, 0, m.size, 0, TAU);
+            ctx.fill();
+            ctx.globalAlpha = 1;
+        }
+        if (m.stun > 0) {
+            ctx.fillStyle = '#fde047';
+            for (let i = 0; i < 3; i++) {
+                const a = this.frameNo * 0.15 + (i * TAU) / 3;
+                ctx.beginPath();
+                ctx.arc(Math.cos(a) * m.size * 0.9, -m.size - 4 + Math.sin(a) * 3, 2.5, 0, TAU);
+                ctx.fill();
+            }
+        }
+        if (this.timers && (this.timers.freeze > 0 || this.mobSpeedMult < 1) && !m.boss) {
             ctx.globalAlpha = 0.35;
             ctx.fillStyle = '#bfefff';
             ctx.beginPath();

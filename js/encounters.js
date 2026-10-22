@@ -215,8 +215,9 @@ extendGame({
             this.makeGatekeeper('totem', twin ? L + (R - L) * 0.3 : cx, this.H * 0.3, { spawnT: 0 });
             if (twin) this.makeGatekeeper('totem', L + (R - L) * 0.7, this.H * 0.36, { spawnT: 0 });
         } else if (id === 'archers') {
-            this.makeGatekeeper('archers', L * 0.5, this.H * 0.3, { side: -1, t: 0 });
-            this.makeGatekeeper('archers', R + (this.W - R) * 0.5, this.H * 0.4, { side: 1, t: 50 });
+            // in the bushes right at the roadside, within reach of every class
+            this.makeGatekeeper('archers', Math.max(24, L - 26), this.H * 0.3, { side: -1, t: 0 });
+            this.makeGatekeeper('archers', Math.min(this.W - 24, R + 26), this.H * 0.4, { side: 1, t: 50 });
             if (twin) this.encounter.queue = Array.from({ length: 6 }, (_, i) => ({ at: 120 + i * 40, fn: () => this.escort('small', L + Math.random() * (R - L), -30) }));
         }
     },
@@ -337,6 +338,10 @@ extendGame({
             }
             case 'wave':
                 this.moveWaveMob(m, freeze);
+                if (m.y > this.H + 40 + m.size) {
+                    m.dead = true; // ran off the bottom: this one got away
+                    m.escaped = true;
+                }
                 break;
             case 'hydraHead':
                 this.updateHydraHead(m, freeze);
@@ -471,7 +476,7 @@ extendGame({
             }
             case 'conga': {
                 const lead = m.leader;
-                if (!lead || lead.ai !== 'wave') {
+                if (!lead || lead.dead || lead.ai !== 'wave') {
                     this.breakFormation(m);
                     break;
                 }

@@ -133,3 +133,34 @@ describe('lambda: player profiles', () => {
         assert.equal((await t.call('GET', '/player/nope')).status, 400);
     });
 });
+
+describe('lambda: v3 board', () => {
+    let t;
+    beforeEach(() => { t = setup(); });
+    const v3 = (extra = {}) => ({ ...run({ level: 5, duration: 120 }), board: 'v3', cls: 'wizard', coins: 40, ...extra });
+
+    it('stores v3 runs on their own board with the class', async () => {
+        const token = await t.startRun();
+        t.advance(130_000);
+        const res = await t.call('POST', '/scores', { ...v3(), token });
+        assert.equal(res.status, 200);
+        assert.equal(res.body.scores[0].cls, 'wizard');
+        const classic = await t.call('GET', '/scores', null, '1.2.3.4', { limit: '10' });
+        assert.equal(classic.body.scores.length, 0);
+        const board = await t.call('GET', '/scores', null, '1.2.3.4', { limit: '10', board: 'v3' });
+        assert.equal(board.body.scores.length, 1);
+        assert.equal(board.body.scores[0].coins, undefined);
+    });
+
+    it('bounds the level by run length and validates the class', async () => {
+        let token = await t.startRun();
+        t.advance(130_000);
+        assert.equal((await t.call('POST', '/scores', { ...v3({ level: 30 }), token })).status, 422);
+        token = await t.startRun();
+        t.advance(130_000);
+        assert.equal((await t.call('POST', '/scores', { ...v3({ cls: 'ninja' }), token })).status, 400);
+        token = await t.startRun();
+        t.advance(130_000);
+        assert.equal((await t.call('POST', '/scores', { ...v3({ coins: 999999 }), token })).status, 422);
+    });
+});
