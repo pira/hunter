@@ -191,9 +191,10 @@ extendGame({
         this.headerShown = false;
     },
 
-    /** Rarely (~6%), the shop also offers a basic artefact for the profile collection. */
+    /** Once the run has earned 1000 coins, the shop rarely (~6%) also offers a basic artefact for the profile collection. */
     artefactCard() {
         const cap = 1 + Math.floor(this.level / 5); // the server accepts this many per run
+        if (this.coinsEarned < ARTEFACT_PRICE) return null;
         if (!Leaderboard.enabled || !Leaderboard.identity() || this.artCards.length >= cap || Math.random() > 0.06) return null;
         const ids = Object.keys(ARTEFACTS);
         const id = ids[Math.floor(Math.random() * ids.length)];
@@ -219,9 +220,9 @@ extendGame({
                 ? `<div class="pips">${Array.from({ length: c.max }, (_, k) => `<i class="${k < rank ? 'on' : k === rank ? 'next' : ''}"></i>`).join('')}</div>`
                 : '';
             const kind = c.artefact ? 'art' : c.oneLevel ? 'lvl' : 'perm';
-            const tag = c.artefact ? '<span class="tag art">✨ ARTEFACT</span>'
+            const tag = c.artefact ? '<span class="tag art">✨ PERMANENT</span>'
                 : c.oneLevel ? `<span class="tag lvl">${c.buff ? 'THIS LEVEL' : 'NOW'}</span>`
-                    : `<span class="tag perm">PERMANENT${c.cls ? ` · ${CLASSES[c.cls].icon}` : ''}</span>`;
+                    : `<span class="tag perm">WHOLE RUN${c.cls ? ` · ${CLASSES[c.cls].icon}` : ''}</span>`;
             return `<button class="card ${kind}" data-i="${i}" style="--d:${i * 70}ms"><span class="num">${i + 1}</span>` +
                 `<span class="cicon">${c.icon}</span><span class="cname">${c.name}</span>${tag}` +
                 `<span class="cdesc">${c.desc}</span>${pips}<span class="price">${COIN} ${c.price}</span></button>`;

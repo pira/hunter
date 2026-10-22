@@ -147,10 +147,13 @@ extendGame({
         this.cooldown = def.cooldown * Math.pow(0.9, this.stack('fuse'));
         const count = Math.min(5, 2 + this.stack('cluster')); // goblins always throw a pair
         const dirs = all ? 4 : 1;
+        // Short Fuse scales both ends of the random throw speed
+        const fast = Math.pow(1.1, this.stack('fuse'));
+        const throwSpeed = () => (def.speedMin + Math.random() * (def.speedMax - def.speedMin)) * fast;
         if (aim && aim.m && !all && aim.m.behavior === 'chase' && !aim.m.anchored && !aim.m.boss) {
             // lead a chaser: it walks towards you while the bomb is in the air
             const d = Math.hypot(aim.x - p.x, aim.y - p.y);
-            const lead = Math.min(d * 0.5, (aim.m.speed * d) / def.speed);
+            const lead = Math.min(d * 0.5, (aim.m.speed * d) / (((def.speedMin + def.speedMax) / 2) * fast));
             aim = { x: aim.x + ((p.x - aim.x) / Math.max(1, d)) * lead, y: aim.y + ((p.y - aim.y) / Math.max(1, d)) * lead };
         }
         const base = aim ? Math.atan2(aim.y - p.y, aim.x - p.x) : -Math.PI / 2;
@@ -164,15 +167,23 @@ extendGame({
                 // lob so the first bounce lands on the target, then hop up to `bounces` times
                 // Bombardment: each bomb lands at its own distance and hops 2–4 times
                 const dist = Math.max(30, range * (all ? 0.45 + 0.55 * Math.random() : 1));
-                const flight = dist / def.speed;
+                const speed = throwSpeed();
+                const flight = dist / speed;
                 this.grenades.push({
-                    x: p.x, y: p.y, sx: p.x, sy: p.y, z: 6, vx: Math.cos(a) * def.speed, vy: Math.sin(a) * def.speed,
+                    x: p.x, y: p.y, sx: p.x, sy: p.y, z: 6, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed,
                     vz: GRENADE_G * flight / 2, bounces: 0, maxBounces: all ? 2 + Math.floor(Math.random() * 3) : def.bounces, timer: fuse, fuse, spin: 0,
                     radius: this.blastRadius * blastMult, damage: def.damage * (all ? 1 : this.powerMult)
                 });
             }
         }
-        Sfx.play('grenade', { volume: 0.7, rate: 0.95 + Math.random() * 0.1 });
+        // airy lob: soft noise swell through a rising band-pass, no metal
+        Sfx.fx('lob', 0.32, (d, rate, len, k) => {
+            const r = k.rng(11);
+            for (let i = 0; i < len; i++) d[i] = (r() * 2 - 1) * Math.pow(Math.sin(Math.PI * i / len), 1.5);
+            k.biquad(d, rate, 'bandpass', t => 500 + 1300 * t, 0.8);
+            k.biquad(d, rate, 'lowpass', 2600, 0.7);
+            k.normalize(d, 0.6);
+        }, { volume: 0.18, poly: 2, rate: 0.9 + Math.random() * 0.2 });
     },
 
     updateGrenades() {
@@ -182,13 +193,6 @@ extendGame({
             g.z += g.vz;
             g.vz -= GRENADE_G;
             g.spin += 0.05 * Math.hypot(g.vx, g.vy);
-            const over = (g.vx || g.vy) && this.monsters.some(m => !m.dead && !m.dying && !m.hidden && U.distanceSquared(g.x, g.y, m.x, m.y) < (4 + m.size) ** 2);
-            // flying over a monster: stop and drop straight onto it
-            if (over && g.z > 0) {
-                g.vx = 0;
-                g.vy = 0;
-                g.vz = Math.min(g.vz, -1);
-            }
             if (g.z <= 0) {
                 // touching the ground (or resting): right on a monster → boom now; otherwise bounce on
                 g.z = 0;

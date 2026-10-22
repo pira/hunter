@@ -25,7 +25,7 @@ Pick a hero, run down the monster road through eleven biomes, chain kills into a
 - **Super meter** fills with kills (bigger monsters charge more; 🔋 Overcharge fills it at once).
 - **Combo:** kills within ~2.8 s of each other build a combo; 5/15/30/50 kills give ×2/×3/×4/×5 score. Getting hit resets it.
 - **Coins & shop:** coins scale with monster HP. Every level opens a shop with 3 cards (always at least one permanent upgrade and one one-level card) plus a level bonus.
-  - Permanent upgrades: fixed prices that rise per rank owned (a finite set). Class cards only show for your hero.
+  - Whole-run upgrades (purple cards): fixed prices that rise per rank owned (a finite set). Class cards only show for your hero.
   - One-level cards — Freeze, Fleet Foot, Fury, Coin Magnet, Road Brake, Double Progress/Gold/Damage, Feast — cost a share of what you have been earning per level.
 - **Pickups:** 🌩️ Storm (chain lightning every 3 s), 🔋 Overcharge, 🧪 Poison (spreads by touch), 💫 Stun, ⚡ Rapid Fire, 🛡️ Invincible, ❄️ Freeze, 🐢 Road Brake, 🧲 Magnet, 🪙×2/×3, ❤️ Extra Life, 🌋 Earthquake. Timers never stack past 30 s.
 - **Your hunter:** the first launch asks for a name; every run is saved to your profile (best score, hunts, kills, bosses, play time, recent runs). Tap any name on the leaderboard to see that hunter's profile. A recovery code moves your hunter to another device.

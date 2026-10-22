@@ -34,7 +34,7 @@ const CLASS_ORDER = ['wizard', 'barbarian', 'goblin'];
 const PRIMARY = {
     bolt: { cooldown: 32, damage: 1, speed: 9, radius: 4.5 },
     cleave: { cooldown: 64, damage: 3, reach: 72, arc: (70 * Math.PI) / 180, swing: 12 },
-    grenade: { cooldown: 76, damage: 5, radius: 38, range: 240, fuse: 60, speed: 8.45, bounces: 5 }
+    grenade: { cooldown: 76, damage: 5, radius: 33, range: 240, fuse: 60, speedMin: 5, speedMax: 8, bounces: 5 }
 };
 // Super meter charge per kill (0–100). Gatekeeper/boss values are used by the encounter system.
 const SUPER_CHARGE = { small: 2, medium: 3, large: 5, elite: 6, legendary: 10, mythic: 12, ancient: 15, ultimate: 25, gatekeeper: 35, boss: 100 };
@@ -109,7 +109,8 @@ const UPGRADES = [
     { id: 'streak', icon: '🔥', name: 'Hot Streak', max: 3, cost: 15, desc: 'Combo timer lasts 0.6s longer' },
     { id: 'luck', icon: '🍀', name: 'Lucky Charm', max: 3, cost: 20, desc: '+30% powerup drops' },
     { id: 'goldrush', icon: '💰', name: 'Gold Rush', max: 4, cost: 25, desc: '+15% coins' },
-    { id: 'magnet', icon: '🧲', name: 'Magnet', max: 3, cost: 15, desc: 'Pull coins and pickups from further away' },
+    { id: 'goldrun', icon: '🏦', name: 'Double Gold', max: 1, cost: 50, desc: '×2 coins (stacks with Triple Gold for ×6)' },
+    { id: 'magnet', icon: '🧲', name: 'Magnet', max: 3, cost: 15, desc: 'Pull coins from further away' },
     { id: 'overtime', icon: '⌛', name: 'Overtime', max: 3, cost: 20, desc: 'Powerups last 30% longer (cap 30s)' },
     { id: 'regen', icon: '🌿', name: 'Regeneration', max: 2, cost: 45, desc: 'Regrow a heart every 40s (25s at rank 2)' },
     { id: 'nova', icon: '💫', name: 'Static Nova', max: 2, cost: 35, desc: 'Taking a hit blasts nearby monsters' },
@@ -129,7 +130,7 @@ const LEVEL_BUFFS = [
     { id: 'fleet2', group: 'fleet', icon: '🐆', name: 'Fleet Foot II', buff: true, cost: 25, weight: 0.35, desc: 'This level: you run 200% fast' },
     { id: 'feast', icon: '🍖', name: 'Feast', cost: 25, weight: 0.4, desc: 'Fully heal' },
     { id: 'freeze1', group: 'freeze', icon: '🧊', name: 'Freeze I', buff: true, cost: 20, weight: 0.5, desc: 'This level: monsters move at 75%' },
-    { id: 'gold2', icon: '💰', name: 'Double Gold', buff: true, cost: 30, weight: 0.5, desc: 'This level: ×2 coins' },
+    { id: 'gold3', icon: '💰', name: 'Triple Gold', buff: true, cost: 30, weight: 0.5, desc: 'This level: ×3 coins' },
     { id: 'fury1', group: 'fury', icon: '😤', name: 'Fury I', buff: true, cost: 35, weight: 0.5, desc: 'This level: attack 150% as often' },
     { id: 'swarm', icon: '👯', name: 'Double Trouble', buff: true, cost: 35, weight: 0.45, desc: 'This level: twice the monsters — they all come in pairs. More kills, more coins!' },
     { id: 'xp2', icon: '📘', name: 'Double Progress', buff: true, cost: 40, weight: 0.5, desc: 'This level: the level bar fills twice as fast' },

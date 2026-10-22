@@ -211,15 +211,15 @@
         .card.nope { animation: nope .3s; }
         @keyframes nope { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
         .tag.buff { color: #a7f3d0; background: rgba(74,222,128,.12); }
-        /* shop cards: teal = this level only, gold = whole run, rarity glow = artefact */
+        /* shop cards: teal = this level only, purple = whole run, glowing gold = permanent artefact */
         .tag.lvl { color: #99f6e4; background: rgba(45,212,191,.16); letter-spacing: .5px; }
-        .tag.perm { color: #fde68a; background: rgba(250,204,21,.16); letter-spacing: .5px; }
-        .tag.art { color: #f5d0fe; background: rgba(232,121,249,.2); letter-spacing: .5px; }
+        .tag.perm { color: #e9d5ff; background: rgba(168,85,247,.2); letter-spacing: .5px; }
+        .tag.art { color: #fde68a; background: rgba(250,204,21,.2); letter-spacing: .5px; }
         .card.lvl { background: linear-gradient(180deg, #134e4a, #0f172a 70%); border-color: rgba(45,212,191,.35); }
-        .card.perm { background: linear-gradient(180deg, #3f2d0c, #0f172a 70%); border-color: rgba(250,204,21,.3); }
-        .card.art { background: linear-gradient(180deg, #4a1d5c, #1e1b4b 70%); border-color: #e879f9; box-shadow: 0 8px 0 rgba(0,0,0,.35), 0 0 22px rgba(232,121,249,.45); }
+        .card.perm { background: linear-gradient(180deg, #3b1764, #0f172a 70%); border-color: rgba(168,85,247,.4); }
+        .card.art { background: linear-gradient(180deg, #5c3d0a, #1c1405 70%); border-color: #facc15; box-shadow: 0 8px 0 rgba(0,0,0,.35), 0 0 22px rgba(250,204,21,.45); }
         .card.art .cicon { animation: artGlow 1.6s ease-in-out infinite alternate; }
-        @keyframes artGlow { from { filter: drop-shadow(0 0 2px #f0abfc); } to { filter: drop-shadow(0 0 12px #e879f9); } }
+        @keyframes artGlow { from { filter: drop-shadow(0 0 2px #fde68a); } to { filter: drop-shadow(0 0 12px #facc15); } }
         .tag.new { color: #fecaca; background: rgba(248,113,113,.16); }
         .pu { position: relative; }
         .pu i { position: absolute; right: 1px; top: 0; font-style: normal; font-family: var(--display); font-size: .45em; color: #fff; text-shadow: 0 1px 2px #000; }

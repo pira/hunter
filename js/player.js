@@ -21,7 +21,7 @@ extendGame({
 
     get coinMult() {
         const timed = this.timers.coins3 > 0 ? 3 : this.timers.coins2 > 0 ? 2 : 1;
-        return timed * (this.buffs.gold2 ? 2 : 1) * (1 + 0.15 * this.stack('goldrush')) * this.artefactMult('gold');
+        return timed * (this.buffs.gold3 ? 3 : 1) * (this.stack('goldrun') ? 2 : 1) * (1 + 0.15 * this.stack('goldrush')) * this.artefactMult('gold');
     },
 
     get mobSpeedMult() {
