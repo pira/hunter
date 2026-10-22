@@ -32,7 +32,13 @@ Kite waves of monsters, chain kills into a combo multiplier, pick an upgrade car
 ```
 index.html          markup, HUD, menus, styles
 config.js           runtime config (leaderboard API URL)
-game.js             the game (fixed 60 Hz simulation, canvas rendering)
+js/                 the game, as classic scripts mixed into one Game class (no build step):
+  config-data.js    constants and data tables     core.js     Game class: loop, states, input, platform
+  player.js         movement, damage, stats       combat.js   weapons, projectiles, damage pipeline
+  monsters.js       spawning, movement, kills     bosses.js   boss patterns and death sequence
+  loot.js           coins, drops, powerups        shop.js     levels, pricing, burn transition, shop
+  hud.js            DOM HUD, game over, board     render.js   canvas drawing and particles
+  profile.js        identity and profile overlay
 game-utils.js       pure helpers shared with tests (level curve, combo tiers, …)
 audio.js            Web Audio engine: buses + limiter, voice manager, health watchdog,
                     procedural creature voices and hit sounds (samples in sfx/)

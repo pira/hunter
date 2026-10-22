@@ -8,8 +8,8 @@ const { execSync } = require('child_process');
 const configPath = path.join(__dirname, 'version-config.json');
 const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
 
-// Read the game.js file
-const gameFilePath = path.join(__dirname, 'game.js');
+// Read js/core.js (holds this.version)
+const gameFilePath = path.join(__dirname, 'js', 'core.js');
 let gameContent = fs.readFileSync(gameFilePath, 'utf8');
 
 // Get current date in YYYY-MM-DD format
@@ -18,7 +18,7 @@ const currentDate = new Date().toISOString().split('T')[0];
 // Extract current version
 const versionMatch = gameContent.match(/this\.version = ["']([^"']+)["']/);
 if (!versionMatch) {
-    console.error('Could not find version in game.js');
+    console.error('Could not find version in js/core.js');
     process.exit(1);
 }
 

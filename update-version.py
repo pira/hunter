@@ -18,14 +18,14 @@ def main():
     except FileNotFoundError:
         config = {"strategy": "patch"}
     
-    # Read the game.js file
-    game_file_path = os.path.join(script_dir, 'game.js')
+    # Read js/core.js (holds this.version)
+    game_file_path = os.path.join(script_dir, 'js', 'core.js')
     
     try:
         with open(game_file_path, 'r', encoding='utf-8') as f:
             game_content = f.read()
     except FileNotFoundError:
-        print("❌ Error: game.js not found")
+        print("❌ Error: js/core.js not found")
         sys.exit(1)
     
     # Get current date in YYYY-MM-DD format
@@ -34,7 +34,7 @@ def main():
     # Extract current version
     version_match = re.search(r'this\.version = ["\']([^"\']+)["\']', game_content)
     if not version_match:
-        print("❌ Error: Could not find version in game.js")
+        print("❌ Error: Could not find version in js/core.js")
         sys.exit(1)
     
     current_version = version_match.group(1)
@@ -92,7 +92,7 @@ def main():
         with open(game_file_path, 'w', encoding='utf-8') as f:
             f.write(game_content)
     except IOError:
-        print("❌ Error: Could not write to game.js")
+        print("❌ Error: Could not write to js/core.js")
         sys.exit(1)
 
     # Update package.json version to stay in sync
