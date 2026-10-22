@@ -9,7 +9,7 @@ const U = GameMath;
 const TAU = Math.PI * 2;
 const STEP = 1 / 60;
 const GAME_SPEED = 0.9; // whole simulation runs at 90% speed
-const BURN_MS = 1500; // level-up burn transition length
+const BURN_MS = 1200; // level-up burn transition length
 const ARENA_HUES = [200, 265, 160, 330, 35, 225, 120, 290, 10, 185]; // one arena colour per level, cycling
 const WORLD_AREA = 800 * 600; // Every screen shape gets the same play area, so scores stay comparable.
 const EMOJI_FONT = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
@@ -23,21 +23,21 @@ const CLASSES = {
     },
     barbarian: {
         name: 'Barbarian', icon: '🪓', hearts: 4, speed: 4.2, power: 5, primary: 'cleave', color: '#f97316',
-        weapon: 'Cleave', blurb: 'Huge axe swings hit everything in front', superName: 'Whirlwind', superBlurb: '5 s of invincible spinning havoc'
+        weapon: 'Cleave', blurb: 'Huge axe swings hit everything in front', superName: 'Whirlwind', superBlurb: '10 s of invincible spinning havoc'
     },
     goblin: {
         name: 'Goblin', icon: '💣', hearts: 3, speed: 5.2, power: 4, primary: 'grenade', color: '#22c55e',
-        weapon: 'Grenades', blurb: 'Lobbed bombs with a big boom', superName: 'Bombardment', superBlurb: 'Bombs in all four directions'
+        weapon: 'Grenades', blurb: 'Lobbed bombs with a big boom', superName: 'Bombardment', superBlurb: 'Its raininng bombs'
     }
 };
 const CLASS_ORDER = ['wizard', 'barbarian', 'goblin'];
 const PRIMARY = {
     bolt: { cooldown: 32, damage: 1, speed: 9, radius: 4.5 },
-    cleave: { cooldown: 64, damage: 3, reach: 72, arc: (70 * Math.PI) / 180, swing: 12 },
-    grenade: { cooldown: 76, damage: 5, radius: 33, range: 240, fuse: 60, speedMin: 5, speedMax: 8, bounces: 5 }
+    cleave: { cooldown: 60, damage: 4, reach: 75, arc: (70 * Math.PI) / 180, swing: 12 },
+    grenade: { cooldown: 76, damage: 5, radius: 33, range: 240, fuse: 60, speedMin: 5, speedMax: 8, bounces: 4 }
 };
 // Super meter charge per kill (0–100). Gatekeeper/boss values are used by the encounter system.
-const SUPER_CHARGE = { small: 2, medium: 3, large: 5, elite: 6, legendary: 10, mythic: 12, ancient: 15, ultimate: 25, gatekeeper: 35, boss: 100 };
+const SUPER_CHARGE = { small: 2, medium: 3, large: 5, elite: 6, legendary: 10, mythic: 12, ancient: 15, ultimate: 25, gatekeeper: 35, boss: 70 };
 const GRENADE_G = 0.5; // grenade gravity (px/step²) for the bounce arcs
 const WHIRLWIND_STEPS = Math.round(5 * 60 * GAME_SPEED);
 const STORM = { duration: Math.round(15 * 60 * GAME_SPEED), every: Math.round(3 * 60 * GAME_SPEED), range: 260, jump: 120, jumps: 5, damage: 6, falloff: 0.65 };
@@ -68,12 +68,12 @@ const MONSTER_TYPES = {
 const TIER_UNLOCK = { elite: 6, legendary: 11, mythic: 16, ancient: 22, ultimate: 28 };
 const DROP_CHANCE = { small: 0.004, medium: 0.01, large: 0.03, elite: 0.06, legendary: 0.1, mythic: 0.14, ancient: 0.2, ultimate: 0.4 };
 const DROP_COOLDOWN = 480;         // frames between powerup drops from kills
-const MAX_FIELD_POWERUPS = 3;      // never more than this many lying around (boss loot excepted)
+const MAX_FIELD_POWERUPS = 4;      // never more than this many lying around (boss loot excepted)
 const TIMER_CAP = Math.round(30 * 60 * GAME_SPEED); // a powerup can never stack past 30 real seconds
 // Coins per kill: [chance, tierBase]; amount = tierBase × hpScale(L) × rand(0.8–1.2) × coin multipliers.
 const COIN_DROPS = {
-    small: [0.3, 1], medium: [0.45, 1.5], large: [0.8, 3], elite: [1, 4],
-    legendary: [1, 5], mythic: [1, 7.5], ancient: [1, 11], ultimate: [1, 23]
+    small: [0.3, 1], medium: [0.45, 2], large: [0.8, 4], elite: [1, 6],
+    legendary: [1, 8], mythic: [1, 11], ancient: [1, 15], ultimate: [1, 25]
 };
 
 // Pickups. Timed ones last `secs` (× Overtime, × Hourglass), capped at 30 real seconds.
@@ -84,16 +84,16 @@ const POWERUPS = {
     stun: { emoji: '💫', name: 'Stun', color: '#fde047', weight: 0.25 },
     rapidFire: { emoji: '⚡', name: 'Rapid Fire', color: '#00CED1', timed: true, secs: 10, weight: 0.9 },
     invincible: { emoji: '🛡️', name: 'Invincible', color: '#7CFC00', timed: true, secs: 10, weight: 0.35 },
-    freeze: { emoji: '❄️', name: 'Freeze', color: '#87CEEB', timed: true, secs: 10, weight: 0.7 },
+    freeze: { emoji: '❄️', name: 'Freeze', color: '#87CEEB', timed: true, secs: 12, weight: 0.7 },
     roadBrake: { emoji: '🐢', name: 'Road Brake', color: '#a3a3a3', timed: true, secs: 10, weight: 0.6 },
     magnet: { emoji: '🧲', name: 'Magnet', color: '#f43f5e', timed: true, secs: 15, weight: 0.7 },
-    coins2: { emoji: '🪙', pouch: true, tag: '×2', name: 'Coins ×2', color: '#FFC300', timed: true, secs: 10, weight: 0.8 },
-    coins3: { emoji: '🪙', pouch: true, tag: '×3', name: 'Coins ×3', color: '#FF8C00', timed: true, secs: 10, weight: 0.4 },
+    coins2: { emoji: '🪙', pouch: true, tag: '×2', name: 'Coins ×2', color: '#FFC300', timed: true, secs: 15, weight: 0.8 },
+    coins3: { emoji: '🪙', pouch: true, tag: '×3', name: 'Coins ×3', color: '#FF8C00', timed: true, secs: 15, weight: 0.4 },
     heart: { emoji: '❤️', name: 'Extra Life', color: '#FF1493', weight: 1 },
     quake: { emoji: '🌋', name: 'Earthquake', color: '#FF4500', weight: 0.3 }
 };
 const TIMED_POWERUPS = Object.keys(POWERUPS).filter(k => POWERUPS[k].timed);
-const POISON_RADIUS = 156;
+const POISON_RADIUS = 140;
 // UI icons (CSS-drawn, match the canvas drops): a coin, a pouch = a pile of coins, a gem
 const COIN = '<i class="coin"></i>';
 const POUCH = '<i class="pouch"></i>';
@@ -102,41 +102,41 @@ const GEM = '<i class="gem"></i>';
 // Permanent shop cards. Price = cost × 3 × (1 + 0.75 × rank already owned) — a finite sink (D3).
 const UPGRADES = [
     { id: 'power', icon: '💪', name: 'Power', max: 5, cost: 40, desc: '+20% basic attack damage' },
-    { id: 'haste', icon: '⏱️', name: 'Haste', max: 5, cost: 40, desc: '+10% attack speed' },
+    { id: 'haste', icon: '⏱️', name: 'Haste', max: 5, cost: 35, desc: '+10% attack speed' },
     { id: 'boots', icon: '👟', name: 'Swift Boots', max: 4, cost: 20, desc: '+10% move speed' },
     { id: 'vitality', icon: '❤️', name: 'Vitality', max: 3, cost: 50, desc: '+1 max heart and heal 1' },
-    { id: 'crit', icon: '🎯', name: 'Keen Eye', max: 4, cost: 35, desc: '+8% chance to crit for 2.5× damage' },
-    { id: 'streak', icon: '🔥', name: 'Hot Streak', max: 3, cost: 15, desc: 'Combo timer lasts 0.6s longer' },
+    { id: 'crit', icon: '🎯', name: 'Keen Eye', max: 4, cost: 30, desc: '+8% chance to crit for 2.5× damage' },
+    { id: 'streak', icon: '🔥', name: 'Hot Streak', max: 3, cost: 8, desc: 'Combo timer lasts 1s longer' },
     { id: 'luck', icon: '🍀', name: 'Lucky Charm', max: 3, cost: 20, desc: '+30% powerup drops' },
-    { id: 'goldrush', icon: '💰', name: 'Gold Rush', max: 4, cost: 25, desc: '+15% coins' },
-    { id: 'goldrun', icon: '🏦', name: 'Double Gold', max: 1, cost: 50, desc: '×2 coins (stacks with Triple Gold for ×6)' },
-    { id: 'magnet', icon: '🧲', name: 'Magnet', max: 3, cost: 15, desc: 'Pull coins from further away' },
-    { id: 'overtime', icon: '⌛', name: 'Overtime', max: 3, cost: 20, desc: 'Powerups last 30% longer (cap 30s)' },
-    { id: 'regen', icon: '🌿', name: 'Regeneration', max: 2, cost: 45, desc: 'Regrow a heart every 40s (25s at rank 2)' },
+    { id: 'goldrush', icon: '💰', name: 'Gold Rush', max: 4, cost: 20, desc: '+25% coins' },
+    { id: 'goldrun', icon: '🏦', name: 'Double Gold', max: 1, cost: 80, desc: '×2 coins (stacks with Triple Gold for ×6)' },
+    { id: 'magnet', icon: '🧲', name: 'Magnet', max: 3, cost: 9, desc: 'Pull coins from further away' },
+    { id: 'overtime', icon: '⌛', name: 'Overtime', max: 3, cost: 15, desc: 'Powerups last 30% longer (cap 30s)' },
+    { id: 'regen', icon: '🌿', name: 'Regeneration', max: 2, cost: 60, desc: 'Regrow a heart every 40s (25s at rank 2)' },
     { id: 'nova', icon: '💫', name: 'Static Nova', max: 2, cost: 35, desc: 'Taking a hit blasts nearby monsters' },
     { id: 'impact', icon: '💥', name: 'Impact', max: 3, cost: 30, desc: '+15% bolt size, cleave reach and blast radius' },
     { id: 'split', icon: '🔱', name: 'Split Shot', max: 3, cost: 40, cls: 'wizard', desc: 'Bolts fire +1 projectile' },
     { id: 'pierce', icon: '🏹', name: 'Piercing Rounds', max: 3, cost: 30, cls: 'wizard', desc: 'Bolts pierce +1 monster' },
     { id: 'quick', icon: '💨', name: 'Quick Swing', max: 3, cost: 30, cls: 'barbarian', desc: '+10% swing speed' },
-    { id: 'cluster', icon: '🧨', name: 'Cluster Bombs', max: 3, cost: 40, cls: 'goblin', desc: '+1 grenade per throw (max 5)' },
+    { id: 'cluster', icon: '🧨', name: 'Cluster Bombs', max: 3, cost: 30, cls: 'goblin', desc: '+1 grenade per throw' },
     { id: 'fuse', icon: '⏲️', name: 'Short Fuse', max: 3, cost: 30, cls: 'goblin', desc: 'Grenades burst 20% sooner and throw 10% faster' }
 ];
 // One-level cards: last until the next level. `cost` = price on the first levels; it grows slowly with
 // the level (×5 by level 52, then flat — U.cardPrice). Cheap = nice to have, pricier = strong.
 const LEVEL_BUFFS = [
-    { id: 'brake', icon: '🐢', name: 'Road Brake', buff: true, cost: 15, weight: 0.5, desc: 'This level: the road moves at 60%' },
-    { id: 'magnetAll', icon: '🧲', name: 'Coin Magnet', buff: true, cost: 15, weight: 0.5, desc: 'This level: pull coins from the whole map' },
-    { id: 'fleet1', group: 'fleet', icon: '🏃', name: 'Fleet Foot I', buff: true, cost: 20, weight: 0.5, desc: 'This level: you run 150% fast' },
-    { id: 'fleet2', group: 'fleet', icon: '🐆', name: 'Fleet Foot II', buff: true, cost: 25, weight: 0.35, desc: 'This level: you run 200% fast' },
-    { id: 'feast', icon: '🍖', name: 'Feast', cost: 25, weight: 0.4, desc: 'Fully heal' },
-    { id: 'freeze1', group: 'freeze', icon: '🧊', name: 'Freeze I', buff: true, cost: 20, weight: 0.5, desc: 'This level: monsters move at 75%' },
+    { id: 'brake', icon: '🐢', name: 'Road Brake', buff: true, cost: 5, weight: 0.5, desc: 'This level: the road moves at 60%' },
+    { id: 'magnetAll', icon: '🧲', name: 'Coin Magnet', buff: true, cost: 10, weight: 0.5, desc: 'This level: pull coins from the whole map' },
+    { id: 'fleet1', group: 'fleet', icon: '🏃', name: 'Fleet Foot I', buff: true, cost: 10, weight: 0.5, desc: 'This level: you run 150% fast' },
+    { id: 'fleet2', group: 'fleet', icon: '🐆', name: 'Fleet Foot II', buff: true, cost: 13, weight: 0.35, desc: 'This level: you run 200% fast' },
+    { id: 'feast', icon: '🍖', name: 'Feast', cost: 5, weight: 0.4, desc: 'Fully heal' },
+    { id: 'freeze1', group: 'freeze', icon: '🧊', name: 'Freeze I', buff: true, cost: 10, weight: 0.5, desc: 'This level: monsters move at 75%' },
     { id: 'gold3', icon: '💰', name: 'Triple Gold', buff: true, cost: 30, weight: 0.5, desc: 'This level: ×3 coins' },
-    { id: 'fury1', group: 'fury', icon: '😤', name: 'Fury I', buff: true, cost: 35, weight: 0.5, desc: 'This level: attack 150% as often' },
-    { id: 'swarm', icon: '👯', name: 'Double Trouble', buff: true, cost: 35, weight: 0.45, desc: 'This level: twice the monsters — they all come in pairs. More kills, more coins!' },
-    { id: 'xp2', icon: '📘', name: 'Double Progress', buff: true, cost: 40, weight: 0.5, desc: 'This level: the level bar fills twice as fast' },
-    { id: 'freeze2', group: 'freeze', icon: '❄️', name: 'Freeze II', buff: true, cost: 30, weight: 0.35, desc: 'This level: monsters move at 50%' },
-    { id: 'fury2', group: 'fury', icon: '👹', name: 'Fury II', buff: true, cost: 50, weight: 0.35, desc: 'This level: attack twice as often' },
-    { id: 'dmg2', icon: '🗡️', name: 'Double Damage', buff: true, cost: 60, weight: 0.5, desc: 'This level: ×2 damage' }
+    { id: 'fury1', group: 'fury', icon: '😤', name: 'Fury I', buff: true, cost: 15, weight: 0.5, desc: 'This level: attack 150% as often' },
+    { id: 'fury2', group: 'fury', icon: '👹', name: 'Fury II', buff: true, cost: 20, weight: 0.35, desc: 'This level: attack twice as often' },
+    { id: 'swarm', icon: '👯', name: 'Double Trouble', buff: true, cost: 40, weight: 0.45, desc: 'This level: twice the monsters — they all come in pairs. More kills, more coins!' },
+    { id: 'xp2', icon: '📘', name: 'Double Progress', buff: true, cost: 10, weight: 0.5, desc: 'This level: the level bar fills twice as fast' },
+    { id: 'freeze2', group: 'freeze', icon: '❄️', name: 'Freeze II', buff: true, cost: 15, weight: 0.35, desc: 'This level: monsters move at 50%' },
+    { id: 'dmg2', icon: '🗡️', name: 'Double Damage', buff: true, cost: 12, weight: 0.5, desc: 'This level: ×2 damage' }
 ];
 LEVEL_BUFFS.forEach(b => { b.oneLevel = true; });
 
