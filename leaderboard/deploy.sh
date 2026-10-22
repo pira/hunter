@@ -31,11 +31,11 @@ if ! aws iam get-role --role-name "$NAME" >/dev/null 2>&1; then
   sleep 10
 fi
 aws iam put-role-policy --role-name "$NAME" --policy-name table-access --policy-document \
-  "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":[\"dynamodb:Query\",\"dynamodb:PutItem\",\"dynamodb:UpdateItem\"],\"Resource\":\"$TABLE_ARN\"}]}"
+  "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":[\"dynamodb:Query\",\"dynamodb:GetItem\",\"dynamodb:PutItem\",\"dynamodb:UpdateItem\",\"dynamodb:ConditionCheckItem\"],\"Resource\":\"$TABLE_ARN\"}]}"
 ROLE_ARN=$(aws iam get-role --role-name "$NAME" --query Role.Arn --output text)
 
 ZIP="$(mktemp -d)/lambda.zip"
-(cd "$HERE/lambda" && zip -q "$ZIP" index.mjs)
+(cd "$HERE/lambda" && zip -q "$ZIP" index.mjs app.mjs)
 
 if aws lambda get-function --function-name "$NAME" >/dev/null 2>&1; then
   echo "Updating function code"

@@ -115,7 +115,7 @@ const BOSSES = [
 class Game {
     constructor() {
         // Version system (bumped by the pre-commit hook, see VERSION-README.md)
-        this.version = "2.3.0";
+        this.version = "2.4.0";
         this.buildDate = "2026-10-22";
 
         this.canvas = document.getElementById('gameCanvas');
@@ -151,6 +151,12 @@ class Game {
 
         this.resetRun();
         this.showMenu();
+        // Deep link to a profile (?p=<id>) and a retry of any run that failed to upload last time.
+        const deep = new URLSearchParams(window.location.search).get('p');
+        if (deep) this.openProfile(deep);
+        Leaderboard.flushPending().then(res => {
+            if (res && this.state === 'menu') this.loadBoard(this.el.menuBoard, this.el.menuBoardTitle);
+        });
         this.frame = this.frame.bind(this);
         requestAnimationFrame(this.frame);
     }
@@ -167,7 +173,7 @@ class Game {
             banner: $('banner'), menu: $('menu'), menuBoard: $('menuBoard'), menuBoardTitle: $('menuBoardTitle'),
             playBtn: $('playBtn'), levelup: $('levelup'), levelupTitle: $('levelupTitle'), levelupSub: $('levelupSub'),
             cards: $('cards'), pauseOverlay: $('pause'), gameover: $('gameover'), killerIcon: $('killerIcon'),
-            killedBy: $('killedBy'), finalStats: $('finalStats'), nameForm: $('nameForm'), nameInput: $('nameInput'),
+            killedBy: $('killedBy'), finalStats: $('finalStats'),
             submitStatus: $('submitStatus'), finalBoard: $('finalBoard'), finalBoardTitle: $('finalBoardTitle'),
             againBtn: $('againBtn'), weaponBtn: $('weaponBtn'), pauseBtn: $('pauseBtn'), muteBtn: $('muteBtn'),
             version: $('version'), newBest: $('newBest'), coins: $('coins'), shopCoins: $('shopCoins'),
@@ -183,7 +189,6 @@ class Game {
         $('resumeBtn').addEventListener('click', () => this.resume());
         $('restartBtn').addEventListener('click', () => this.startRun());
         $('quitBtn').addEventListener('click', () => this.showMenu());
-        $('skipBtn').addEventListener('click', () => this.skipSubmit());
         this.el.pauseBtn.addEventListener('click', e => {
             e.currentTarget.blur();
             if (this.state === 'paused') this.resume();
@@ -197,10 +202,7 @@ class Game {
             e.preventDefault();
             this.cycleWeapon(1);
         });
-        this.el.nameForm.addEventListener('submit', e => {
-            e.preventDefault();
-            this.submitScore();
-        });
+        this.bindIdentity();
         this.el.muteBtn.textContent = Sfx.muted ? '🔇' : '🔊';
 
         // Weapon slots in the HUD
@@ -223,11 +225,15 @@ class Game {
             if (e.target && e.target.tagName === 'BUTTON' && (key === 'enter' || key === ' ') && e.target.closest('.overlay.show')) return;
             if (gameKeys.includes(key)) e.preventDefault();
 
+            if (this.el.profile.classList.contains('show')) {
+                if (key === 'escape') this.closeProfile();
+                return;
+            }
             if (this.state === 'menu' && (key === 'enter' || key === ' ')) {
                 this.startRun();
                 return;
             }
-            if (this.state === 'gameover' && key === 'enter' && this.submitted) {
+            if (this.state === 'gameover' && key === 'enter' && performance.now() - this.gameOverAt > 600) {
                 this.startRun();
                 return;
             }
@@ -582,6 +588,12 @@ class Game {
     }
 
     startRun() {
+        if (!Leaderboard.identity()) {
+            // Everyone gets a name before the first hunt (it's how scores and profiles are kept).
+            if (this.state !== 'menu') this.showMenu();
+            this.askName();
+            return;
+        }
         Sfx.unlock();
         Sfx.stopMusic();
         this.resetRun();
@@ -3055,6 +3067,148 @@ class Game {
         }
     }
 
+    // ------------------------------------------------------------------ identity + profile
+
+    bindIdentity() {
+        const $ = id => document.getElementById(id);
+        Object.assign(this.el, {
+            whoForm: $('whoForm'), whoInput: $('whoInput'), whoHello: $('whoHello'), whoName: $('whoName'),
+            whoNameText: $('whoNameText'), whoEdit: $('whoEdit'), whoAvatar: $('whoAvatar'), restoreRow: $('restoreRow'),
+            restoreInput: $('restoreInput'), profile: $('profile'), profileName: $('profileName'), profileSince: $('profileSince'),
+            profileStats: $('profileStats'), profileRuns: $('profileRuns'), profileOwn: $('profileOwn'), profileCode: $('profileCode'),
+            profileCodeText: $('profileCodeText'), profileAvatar: $('profileAvatar')
+        });
+        this.el.whoForm.addEventListener('submit', e => {
+            e.preventDefault();
+            const name = U.sanitizeName(this.el.whoInput.value);
+            if (!name) {
+                this.nudge(this.el.whoInput);
+                this.el.whoInput.focus();
+                return;
+            }
+            const first = !Leaderboard.identity();
+            Leaderboard.setName(name);
+            this.el.whoInput.blur();
+            this.refreshWho();
+            if (first) Sfx.arpeggio([523, 659, 784], 0.06, { type: 'triangle', volume: 0.1 });
+            if (this.el.profile.classList.contains('show')) this.openProfile(Leaderboard.identity().id);
+        });
+        $('restoreLink').addEventListener('click', () => {
+            this.el.restoreRow.hidden = !this.el.restoreRow.hidden;
+            if (!this.el.restoreRow.hidden) this.el.restoreInput.focus();
+        });
+        $('restoreBtn').addEventListener('click', () => {
+            const id = Leaderboard.restore(this.el.restoreInput.value);
+            if (!id) {
+                this.nudge(this.el.restoreInput);
+                return;
+            }
+            this.el.restoreInput.value = '';
+            this.el.restoreRow.hidden = true;
+            this.refreshWho();
+            this.banner('WELCOME BACK!', id.name);
+        });
+        this.el.whoName.addEventListener('click', () => {
+            const id = Leaderboard.identity();
+            if (id) this.openProfile(id.id);
+        });
+        this.el.whoEdit.addEventListener('click', () => this.askName(true));
+        $('profileClose').addEventListener('click', () => this.closeProfile());
+        this.el.profile.addEventListener('click', e => {
+            if (e.target === this.el.profile) this.closeProfile();
+        });
+        $('profileRename').addEventListener('click', () => {
+            this.closeProfile();
+            if (this.state === 'menu') this.askName(true);
+        });
+        $('profileCodeBtn').addEventListener('click', () => {
+            this.el.profileCode.hidden = !this.el.profileCode.hidden;
+            this.el.profileCodeText.textContent = Leaderboard.recoveryCode();
+        });
+        $('profileCopy').addEventListener('click', e => {
+            const btn = e.currentTarget;
+            const text = Leaderboard.recoveryCode();
+            const done = () => { btn.textContent = 'Copied ✓'; };
+            if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, () => {});
+        });
+        this.refreshWho();
+    }
+
+    nudge(el) {
+        el.classList.remove('shake');
+        void el.offsetWidth;
+        el.classList.add('shake');
+    }
+
+    refreshWho() {
+        const id = Leaderboard.identity();
+        this.el.whoForm.hidden = Boolean(id);
+        this.el.whoHello.hidden = !id;
+        if (id) this.el.whoNameText.textContent = id.name;
+    }
+
+    askName(rename = false) {
+        this.el.whoForm.hidden = false;
+        this.el.whoHello.hidden = true;
+        this.el.whoInput.value = Leaderboard.getName();
+        this.el.whoForm.querySelector('label').textContent = rename ? 'New name, hunter?' : 'What should we call you, hunter?';
+        this.nudge(this.el.whoForm);
+        setTimeout(() => {
+            this.el.whoInput.focus();
+            this.el.whoInput.select();
+        }, 50);
+    }
+
+    async openProfile(playerId) {
+        const el = this.el;
+        el.profile.classList.add('show');
+        el.profileName.textContent = '…';
+        el.profileSince.textContent = '';
+        el.profileStats.innerHTML = '';
+        el.profileRuns.innerHTML = '<li class="muted">Loading…</li>';
+        el.profileOwn.hidden = true;
+        el.profileCode.hidden = true;
+        this.profileFor = playerId;
+        const res = await Leaderboard.profile(playerId);
+        if (this.profileFor !== playerId || !el.profile.classList.contains('show')) return;
+        if (res.error) {
+            el.profileName.textContent = 'Hunter';
+            el.profileRuns.innerHTML = `<li class="muted">${res.error}</li>`;
+            return;
+        }
+        const p = res.player;
+        const esc = v => String(v ?? '').replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
+        el.profileName.textContent = p.name || 'Hunter';
+        el.profileSince.textContent = `${p.createdAt ? `Hunting since ${new Date(p.createdAt).toLocaleDateString()}` : ''}${res.source === 'local' ? ' · offline (this device)' : ''}`;
+        const stats = [
+            ['Best score', (p.bestScore || 0).toLocaleString(), 'hero'],
+            ['Best level', p.bestLevel || 0], ['Hunts', p.runs || 0], ['Kills', (p.kills || 0).toLocaleString()],
+            ['Bosses', p.bosses || 0], ['Play time', U.formatTime(p.playSeconds || 0)], ['Avg score', p.runs ? Math.round((res.runs || []).reduce((n, r) => n + r.score, 0) / Math.max(1, (res.runs || []).length)).toLocaleString() : 0]
+        ];
+        el.profileStats.innerHTML = stats.map(([k, v, cls]) => `<div class="${cls || ''}"><span>${k}</span><b>${esc(v)}</b></div>`).join('');
+        const runs = res.runs || [];
+        el.profileRuns.innerHTML = runs.length
+            ? runs.map((r, i) => `<li><span class="rank">${i + 1}</span><span><span class="pts">${(r.score || 0).toLocaleString()}</span> <span class="meta">Lv ${r.level} · ${r.kills} kills${r.bosses ? ` · ${r.bosses} 👑` : ''}</span></span>` +
+                `<span class="meta">${U.formatTime(r.duration || 0)}</span><span class="when">${Game.timeAgo(r.ts)}</span></li>`).join('')
+            : '<li class="muted">No hunts yet — go get them!</li>';
+        el.profileOwn.hidden = !res.mine;
+    }
+
+    closeProfile() {
+        this.el.profile.classList.remove('show');
+        this.profileFor = null;
+        if (window.location.search.includes('p=')) history.replaceState(null, '', window.location.pathname);
+    }
+
+    static timeAgo(ts) {
+        const s = Math.max(0, (Date.now() - Number(ts)) / 1000);
+        if (s < 60) return 'just now';
+        if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+        if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+        if (s < 86400 * 30) return `${Math.floor(s / 86400)}d ago`;
+        return new Date(Number(ts)).toLocaleDateString();
+    }
+
     // ------------------------------------------------------------------ game over + leaderboard
 
     showGameOver() {
@@ -3102,64 +3256,40 @@ class Game {
         } catch (e) { /* storage unavailable */ }
         this.el.newBest.hidden = !(this.score > best && this.score > 0);
 
-        this.submitted = false;
-        this.el.nameForm.hidden = this.score <= 0;
         this.el.submitStatus.textContent = '';
         this.el.finalBoard.innerHTML = '';
         this.el.finalBoardTitle.hidden = true;
-        this.el.againBtn.hidden = this.score > 0;
-        this.el.nameInput.value = Leaderboard.getName();
+        this.gameOverAt = performance.now();
         this.setOverlay('gameover');
-        if (this.score <= 0) {
-            this.submitted = true;
-            this.loadBoard(this.el.finalBoard, this.el.finalBoardTitle);
-        } else if (!this.isTouch) {
-            setTimeout(() => this.el.nameInput.focus(), 300);
-        }
+        if (this.score > 0) this.submitScore();
+        else this.loadBoard(this.el.finalBoard, this.el.finalBoardTitle);
+        setTimeout(() => {
+            if (this.state === 'gameover') this.el.againBtn.focus();
+        }, 300);
     }
 
+    // Runs are submitted automatically under the player's stored identity.
     async submitScore() {
-        if (this.submitted || this.submitting) return;
-        const name = U.sanitizeName(this.el.nameInput.value);
-        if (!name) {
-            this.el.submitStatus.textContent = 'Enter a name first';
-            this.el.nameInput.focus();
-            return;
-        }
-        this.submitting = true;
-        Leaderboard.setName(name);
-        this.el.nameInput.blur();
-        this.el.submitStatus.textContent = 'Saving…';
+        const id = Leaderboard.identity();
+        const name = (id && id.name) || 'Hunter';
+        this.el.submitStatus.textContent = 'Saving your hunt…';
         const entry = {
             name, score: this.score, level: this.level, kills: this.kills,
             combo: this.bestCombo, bosses: this.bossesSlain, duration: Math.max(1, Math.round(this.time))
         };
         const runId = this.runId;
         const result = await Leaderboard.submit(entry, this.runToken);
-        this.submitting = false;
         if (runId !== this.runId || this.state !== 'gameover') return; // player already moved on
-        this.submitted = true;
-        this.el.nameForm.hidden = true;
-        this.el.againBtn.hidden = false;
         if (result.source === 'global') {
-            this.el.submitStatus.textContent = `You placed #${result.rank} worldwide!`;
+            this.el.submitStatus.textContent = result.rank <= 10 ? `🏆 You placed #${result.rank} worldwide!` : `You placed #${result.rank} worldwide`;
         } else {
             this.el.submitStatus.textContent = result.error === 'disabled'
                 ? `Saved on this device (#${result.rank})`
                 : result.rejected
                     ? `Saved on this device (#${result.rank}) — global board refused it: ${result.error}`
-                    : `Saved on this device (#${result.rank}) — global board unreachable`;
+                    : `Saved on this device (#${result.rank}) — will upload when you're back online`;
         }
         this.renderBoard(this.el.finalBoard, this.el.finalBoardTitle, result.scores, result.source, { id: result.id, name, score: this.score });
-        this.el.againBtn.focus();
-    }
-
-    skipSubmit() {
-        this.submitted = true;
-        this.el.nameForm.hidden = true;
-        this.el.againBtn.hidden = false;
-        this.loadBoard(this.el.finalBoard, this.el.finalBoardTitle);
-        this.el.againBtn.focus();
     }
 
     async loadBoard(listEl, titleEl) {
@@ -3180,9 +3310,11 @@ class Game {
             const isMine = mine && !marked && ((mine.id && s.id === mine.id) || (!mine.id && s.name === mine.name && s.score === mine.score));
             if (isMine) marked = true;
             const name = String(s.name).replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
-            return `<li class="${isMine ? 'mine' : ''}"><span class="rank">${i + 1}</span><span class="name">${name}</span>` +
+            const pid = typeof s.playerId === 'string' && /^[0-9a-f-]{36}$/.test(s.playerId) ? ` data-pid="${s.playerId}"` : '';
+            return `<li class="${isMine ? 'mine' : ''}"${pid}><span class="rank">${i + 1}</span><span class="name">${name}</span>` +
                 `<span class="lvl">Lv ${Number(s.level) || 1}</span><span class="pts">${(Number(s.score) || 0).toLocaleString()}</span></li>`;
         }).join('');
+        listEl.querySelectorAll('li[data-pid]').forEach(li => li.addEventListener('click', () => this.openProfile(li.dataset.pid)));
     }
 }
 

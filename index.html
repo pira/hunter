@@ -213,12 +213,47 @@
         #finalStats b { font-family: var(--display); font-weight: normal; font-size: 1.25em; }
         #finalStats div:first-child { grid-column: span 3; }
         #finalStats div:first-child b { font-size: 2em; color: var(--gold); }
-        #nameForm label { display: block; font-size: .9em; color: #e2e8f0; margin-bottom: .4em; }
+        #whoForm label { display: block; font-family: var(--display); font-size: 1.1em; letter-spacing: .5px; color: #fde68a; margin-bottom: .5em; }
+        #who { margin: 0 0 1em; }
+        #whoForm .name-row + .name-row { margin-top: .5em; }
+        .btn.small { font-size: 1em; padding: .6em 1em; }
+        .link { margin-top: .5em; font-size: .78em; color: var(--muted); background: none; border: 0; text-decoration: underline; }
+        .who-hello { display: flex; align-items: center; justify-content: center; gap: .5em; }
+        .who-name { display: flex; align-items: center; gap: .6em; text-align: left; padding: .45em 1em .45em .5em; border-radius: 999px; border: 1px solid rgba(250,204,21,.35); background: rgba(250,204,21,.08); color: #e2e8f0; font-size: .9em; line-height: 1.15; transition: background .15s; }
+        .who-name:hover { background: rgba(250,204,21,.16); }
+        .who-name b { font-family: var(--display); font-weight: normal; font-size: 1.35em; color: var(--gold); letter-spacing: .5px; }
+        .who-avatar { width: 2.2em; height: 2.2em; display: grid; place-items: center; font-size: 1.3em; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #6d54e8, #2a1f6b); }
+        .who-avatar canvas, .avatar canvas { width: 100%; height: 100%; }
+        .shake { animation: nope .3s; }
+        /* profile */
+        #profile { z-index: 4; background: rgba(5, 8, 16, .7); }
+        .profile-panel { width: min(100%, 28em); text-align: left; }
+        .profile-head { display: flex; align-items: center; gap: .9em; padding-right: 2.5em; }
+        .avatar { flex: none; width: 2.1em; height: 2.1em; display: grid; place-items: center; font-size: 2.2em; border-radius: 22px; background: radial-gradient(circle at 40% 35%, #6d54e8, #2a1f6b); box-shadow: 0 6px 0 rgba(0,0,0,.35), inset 0 0 0 2px rgba(255,255,255,.12); }
+        #profileName { font-size: 2em; color: #fff; text-shadow: 0 3px 0 #7c2d12; word-break: break-word; }
+        .since { margin: .1em 0 0; color: var(--muted); font-size: .85em; }
+        .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 1em 0 .2em; }
+        .stat-grid div { background: rgba(255,255,255,.05); border-radius: 12px; padding: .5em .4em; text-align: center; display: flex; flex-direction: column; }
+        .stat-grid span { font-size: .68em; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+        .stat-grid b { font-family: var(--display); font-weight: normal; font-size: 1.3em; }
+        .stat-grid div.hero { grid-column: span 3; background: linear-gradient(90deg, rgba(250,204,21,.16), rgba(249,115,22,.12)); }
+        .stat-grid div.hero b { font-size: 2em; color: var(--gold); }
+        .runs { list-style: none; margin: .5em 0 0; padding: 0; font-size: .88em; }
+        .runs li { display: grid; grid-template-columns: 1.6em 1fr auto auto; gap: .6em; align-items: center; padding: .4em .6em; border-radius: 8px; }
+        .runs li:nth-child(odd) { background: rgba(255,255,255,.04); }
+        .runs li.muted { display: block; text-align: center; color: var(--muted); }
+        .runs .pts { font-family: var(--display); letter-spacing: .5px; color: #fff; }
+        .runs .meta { color: var(--muted); font-size: .85em; }
+        .runs .when { color: var(--muted); font-size: .78em; text-align: right; }
+        .profile-own { display: flex; flex-wrap: wrap; gap: .5em; justify-content: center; margin-top: 1em; }
+        .code-box { flex-basis: 100%; text-align: center; font-size: .82em; color: #cbd5e1; }
+        .code-box code { display: block; margin: .4em 0; padding: .6em; border-radius: 10px; background: #0b1220; border: 1px dashed #475569; word-break: break-all; font-size: .9em; color: #fde68a; -webkit-user-select: all; user-select: all; }
+        .board li[data-pid] { cursor: pointer; }
+        .board li[data-pid]:hover { background: rgba(255,255,255,.1); }
+        .board li[data-pid] .name::after { content: ' ›'; color: var(--muted); }
         .name-row { display: flex; gap: 8px; }
-        #nameInput { flex: 1; min-width: 0; font: inherit; font-size: 1.1em; padding: .6em .8em; border-radius: 12px; border: 2px solid #475569; background: #0b1220; color: #fff; outline: none; -webkit-user-select: text; user-select: text; touch-action: auto; }
-        #nameInput:focus { border-color: var(--gold); }
-        #nameForm .btn { font-size: 1em; padding: .6em 1em; }
-        #skipBtn { margin-top: .5em; font-size: .8em; color: var(--muted); background: none; border: 0; text-decoration: underline; }
+        #whoInput, #restoreInput { flex: 1; min-width: 0; font: inherit; font-size: 1.1em; padding: .6em .8em; border-radius: 12px; border: 2px solid #475569; background: #0b1220; color: #fff; outline: none; -webkit-user-select: text; user-select: text; touch-action: auto; }
+        #whoInput:focus, #restoreInput:focus { border-color: var(--gold); }
         #submitStatus { min-height: 1.3em; margin: .5em 0 0; color: #a7f3d0; font-size: .9em; }
         #againBtn { margin-top: 1em; }
 
@@ -279,6 +314,24 @@
                 <button id="menuFsBtn" class="icon-btn fs-btn panel-corner" aria-label="Fullscreen">⛶</button>
                 <div class="logo"><span class="wiz">🧙‍♂️</span><h1>MONSTER<br><span>HUNTER</span></h1></div>
                 <p class="tagline">Survive the horde. Chain kills. Slay the bosses.</p>
+                <div id="who">
+                    <form id="whoForm" autocomplete="off" hidden>
+                        <label for="whoInput">What should we call you, hunter?</label>
+                        <div class="name-row">
+                            <input id="whoInput" maxlength="16" placeholder="Your hunter name" autocomplete="nickname" enterkeyhint="go" spellcheck="false">
+                            <button class="btn primary small" type="submit">OK</button>
+                        </div>
+                        <div id="restoreRow" class="name-row" hidden>
+                            <input id="restoreInput" placeholder="Paste recovery code" autocomplete="off" spellcheck="false">
+                            <button id="restoreBtn" class="btn small" type="button">Restore</button>
+                        </div>
+                        <button id="restoreLink" class="link" type="button">I have a recovery code</button>
+                    </form>
+                    <div id="whoHello" class="who-hello" hidden>
+                        <button id="whoName" class="who-name" aria-label="Open your profile"><span class="who-avatar" id="whoAvatar">🧙‍♂️</span><span>Welcome back,<br><b id="whoNameText"></b></span></button>
+                        <button id="whoEdit" class="icon-btn" aria-label="Rename">✏️</button>
+                    </div>
+                </div>
                 <button id="playBtn" class="btn primary">▶ PLAY</button>
                 <div class="howto desktop-only">
                     <kbd>WASD</kbd> move · weapons fire on their own · hold <kbd>click</kbd> to aim<br>
@@ -303,6 +356,31 @@
             </div>
         </div>
 
+        <div id="profile" class="overlay">
+            <div class="panel profile-panel">
+                <button id="profileClose" class="icon-btn panel-corner" aria-label="Close">✕</button>
+                <div class="profile-head">
+                    <div id="profileAvatar" class="avatar">🧙‍♂️</div>
+                    <div>
+                        <h2 id="profileName">Hunter</h2>
+                        <p id="profileSince" class="since"></p>
+                    </div>
+                </div>
+                <div id="profileStats" class="stat-grid"></div>
+                <h3>⚔️ Recent hunts</h3>
+                <ol id="profileRuns" class="runs"></ol>
+                <div id="profileOwn" class="profile-own" hidden>
+                    <button id="profileRename" class="btn ghost">✏️ Rename</button>
+                    <button id="profileCodeBtn" class="btn ghost">🔑 Recovery code</button>
+                    <div id="profileCode" class="code-box" hidden>
+                        <p>Use this code to bring your hunter to another device. Keep it secret!</p>
+                        <code id="profileCodeText"></code>
+                        <button id="profileCopy" class="btn small">Copy</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div id="pause" class="overlay">
             <div class="panel">
                 <h2>PAUSED</h2>
@@ -320,14 +398,6 @@
                 <div class="killer"><canvas id="killerIcon" width="96" height="96" style="width:48px;height:48px"></canvas><span id="killedBy"></span></div>
                 <div id="newBest">★ NEW PERSONAL BEST ★</div>
                 <div id="finalStats"></div>
-                <form id="nameForm" autocomplete="off">
-                    <label for="nameInput">Enter your name for the leaderboard</label>
-                    <div class="name-row">
-                        <input id="nameInput" maxlength="16" placeholder="Your name" autocomplete="nickname" enterkeyhint="done" spellcheck="false">
-                        <button class="btn primary" type="submit">SAVE</button>
-                    </div>
-                    <button id="skipBtn" type="button">skip</button>
-                </form>
                 <p id="submitStatus"></p>
                 <h3 id="finalBoardTitle" hidden>🏆 Top Hunters</h3>
                 <ol id="finalBoard" class="board"></ol>
