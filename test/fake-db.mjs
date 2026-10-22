@@ -139,9 +139,15 @@ export function createFakeDb() {
                     .filter(it => !cond || evalCond(cond, it, input.ExpressionAttributeNames, v))
                     .sort((a, b) => (a.sk < b.sk ? -1 : a.sk > b.sk ? 1 : 0));
                 if (input.ScanIndexForward === false) rows.reverse();
-                if (input.Limit) rows = rows.slice(0, input.Limit);
-                if (input.Select === 'COUNT') return { Count: rows.length };
-                return { Items: clone(rows), Count: rows.length };
+                if (input.ExclusiveStartKey) rows = rows.slice(rows.findIndex(r => r.sk === input.ExclusiveStartKey.sk) + 1);
+                let LastEvaluatedKey;
+                if (input.Limit && rows.length > input.Limit) {
+                    rows = rows.slice(0, input.Limit);
+                    LastEvaluatedKey = { pk, sk: rows[rows.length - 1].sk };
+                }
+                if (input.FilterExpression) rows = rows.filter(it => evalCond(input.FilterExpression, it, input.ExpressionAttributeNames, v));
+                if (input.Select === 'COUNT') return { Count: rows.length, LastEvaluatedKey };
+                return { Items: clone(rows), Count: rows.length, LastEvaluatedKey };
             }
             case 'TransactWrite': {
                 const reasons = input.TransactItems.map(t => {

@@ -7,6 +7,7 @@ extendGame({
         // Coins scale with monster HP (unlike v2), so late levels pay more.
         if (Math.random() < chance) this.spawnCoins(m.x, m.y, U.coinDrop(base, this.level, 0.8 + Math.random() * 0.4), 2.2);
         if (m.minion) return;
+        if (!m.boss && Math.random() < (GEM_CHANCE[m.gk ? 'gatekeeper' : m.tier] || 0) * Math.sqrt(luck)) this.spawnGems(m.x, m.y, 1);
 
         // Powerups are throttled: one per DROP_COOLDOWN and never more than a few on the floor.
         const onField = this.powerups.filter(pu => !pu.loot).length;
@@ -38,12 +39,23 @@ extendGame({
         }
     },
 
+    /** Gems ride the coin physics but are worth a gem each, glow blue and live longer. */
+    spawnGems(x, y, n) {
+        for (let i = 0; i < n; i++) {
+            const a = Math.random() * TAU;
+            const v = 1.5 + Math.random() * 1.5;
+            this.coinDrops.push({ x, y, z: 6, vx: Math.cos(a) * v, vy: Math.sin(a) * v, vz: 5 + Math.random() * 2, gem: true, value: 1, life: 1500, t: 0, spin: Math.random() * TAU });
+        }
+        this.floater(x, y - 30, n > 1 ? `💎 ×${n}` : '💎', '#7dd3fc', 20);
+    },
+
     updateCoins() {
         const p = this.player;
         const magnet = this.magnetRadius;
+        const frozen = this.lootFrozen;
         for (const c of this.coinDrops) {
             c.t++;
-            c.life--;
+            if (!frozen) c.life--;
             c.spin += 0.18;
             c.x += c.vx;
             c.y += c.vy;
@@ -55,10 +67,16 @@ extendGame({
                 c.z = 0;
                 c.vz = Math.abs(c.vz) > 1 ? -c.vz * 0.45 : 0;
             }
+            // sides and top keep coins on screen; the bottom edge lets them go (the road carries them off)
             c.x = U.clamp(c.x, 8, this.W - 8);
-            c.y = U.clamp(c.y, 8, this.H - 8);
+            c.y = Math.max(8, c.y);
             const d = Math.hypot(p.x - c.x, p.y - c.y);
-            if (c.t > 18 && d < p.r + 12) {
+            if (c.t > 18 && d < p.r + 12 && c.gem) {
+                c.life = 0;
+                this.gems++;
+                this.floater(p.x, p.y - 34, '+1 💎', '#7dd3fc', 18);
+                Sfx.arpeggio([1318, 1760, 2093], 0.05, { type: 'triangle', volume: 0.1 });
+            } else if (c.t > 18 && d < p.r + 12) {
                 c.life = 0;
                 // fractional multipliers (Gold Rush, Greed Ring) accumulate until they make a whole coin
                 this.coinFrac = (this.coinFrac || 0) + c.value * this.coinMult;
@@ -69,9 +87,9 @@ extendGame({
                 this.coinFloat.n += gain;
                 Sfx.coin(c.value >= 5);
             } else if (c.t > 18 && d < magnet) {
-                const pull = 0.1 + 0.25 * (1 - d / magnet);
-                c.x += (p.x - c.x) * pull;
-                c.y += (p.y - c.y) * pull;
+                this.glideTo(c, p, d);
+            } else {
+                c.mv = 0;
             }
         }
         this.coinDrops = this.coinDrops.filter(c => c.life > 0);
@@ -79,6 +97,19 @@ extendGame({
             this.floater(p.x + 18, p.y - 28, `+${this.coinFloat.n} 🪙`, '#ffd60a', 15);
             this.coinFloat = { n: 0, t: 0 };
         }
+    },
+
+    /** Pickups drift towards you, speeding up to ~8 px/step: about 2–3 s across the whole map. */
+    glideTo(o, p, d) {
+        o.mv = Math.min(8, (o.mv || 1.2) + 0.15);
+        const k = Math.min(1, o.mv / Math.max(1, d));
+        o.x += (p.x - o.x) * k;
+        o.y += (p.y - o.y) * k;
+    },
+
+    /** Loot timers (pickup lifetimes, active effects) pause between levels. */
+    get lootFrozen() {
+        return this.phase === 'loot' || this.phase === 'travel' || this.phase === 'shop' || this.phase === 'intro';
     },
 
     spawnPowerup(x, y, type, { pop = false, loot = false, speed = 2.5 } = {}) {
@@ -92,8 +123,11 @@ extendGame({
 
     updatePowerups() {
         const p = this.player;
+        // Timers stand still from the end of an encounter until the next level's fight begins,
+        // so boss loot isn't wasted on the shop and the travel.
+        const frozen = this.lootFrozen;
         TIMED_POWERUPS.forEach(t => {
-            if (this.timers[t] > 0) {
+            if (this.timers[t] > 0 && !frozen) {
                 this.timers[t]--;
                 if (this.timers[t] === 0) this.floater(p.x, p.y - 36, `${POWERUPS[t].name} over`, '#cccccc', 14);
             }
@@ -101,10 +135,10 @@ extendGame({
         const magnet = this.magnetRadius;
         for (const pu of this.powerups) {
             pu.t++;
-            pu.life--;
+            if (!frozen) pu.life--;
             if (pu.vx || pu.vy || pu.z > 0 || pu.vz) {
                 pu.x = U.clamp(pu.x + pu.vx, 20, this.W - 20);
-                pu.y = U.clamp(pu.y + pu.vy, 20, this.H - 20);
+                pu.y = Math.max(20, pu.y + pu.vy);
                 pu.vx *= 0.92;
                 pu.vy *= 0.92;
                 pu.z += pu.vz;
@@ -120,9 +154,9 @@ extendGame({
                 this.collectPowerup(pu);
                 pu.life = 0;
             } else if (pu.t > 15 && d2 < magnet * magnet) {
-                // Gentle pull once you're close, so pickups feel snappy.
-                pu.x += (p.x - pu.x) * 0.08;
-                pu.y += (p.y - pu.y) * 0.08;
+                this.glideTo(pu, p, Math.sqrt(d2));
+            } else {
+                pu.mv = 0;
             }
         }
         this.powerups = this.powerups.filter(pu => pu.life > 0);
@@ -194,23 +228,30 @@ extendGame({
         Sfx.arpeggio([1568, 1318, 1568, 1318], 0.05, { type: 'triangle', volume: 0.08 });
     },
 
-    // Poison: while the timer runs, your hits poison monsters for 4 s; they infect whoever they touch.
-    poisonHit(m) {
-        if (!(this.timers.poison > 0) || m.boss && m.poison > 0) return;
-        m.poison = Math.round(4 * 60 * GAME_SPEED);
+    // Poison Cloud: a cloud of green smoke around you; every half second it takes 1 HP off every
+    // monster inside it.
+    poisonHit() {},
+
+    updatePoisonCloud() {
+        if (!(this.timers.poison > 0) || this.lootFrozen) return;
+        const p = this.player;
+        this.poisonT = (this.poisonT || 0) + 1;
+        if (this.poisonT % 3 === 0) {
+            const a = Math.random() * TAU;
+            const r = Math.random() * POISON_RADIUS;
+            this.particle({ x: p.x + Math.cos(a) * r, y: p.y + Math.sin(a) * r * 0.7, vx: (Math.random() - 0.5) * 0.4, vy: -0.25, life: 40, size: 6 + Math.random() * 8, grow: 0.25, color: 'rgba(132,204,22,0.16)', kind: 'smoke' });
+        }
+        if (this.poisonT % 27 !== 0) return;
+        for (const m of this.monsters) {
+            if (m.dead || m.dying) continue;
+            if (U.distanceSquared(m.x, m.y, p.x, p.y) < (POISON_RADIUS + m.size * 0.5) ** 2) {
+                m.poison = 30;
+                this.damageMonster(m, 1, { sound: false, aoe: true, dot: true, numColor: '#bef264' });
+            }
+        }
     },
 
     updatePoison(m) {
-        m.poison--;
-        if (m.poison % 27 === 0) {
-            this.damageMonster(m, 0.25 * U.hpScale(this.level) * this.damageMult, { sound: false, aoe: true, dot: true });
-            this.particle({ x: m.x + (Math.random() - 0.5) * m.size, y: m.y + m.size * 0.5, vx: 0, vy: 0.6, life: 20, size: 2.5, color: '#84cc16', kind: 'spark', drag: 1 });
-        }
-        if (m.poison % 10 === 0) {
-            for (const o of this.monsters) {
-                if (o === m || o.dead || o.poison > 0 || o.boss) continue;
-                if (U.distanceSquared(o.x, o.y, m.x, m.y) < (o.size + m.size + 4) ** 2) o.poison = Math.round(3 * 60 * GAME_SPEED);
-            }
-        }
+        m.poison--; // only tints the monster while it sits in the cloud
     }
 });

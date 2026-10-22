@@ -3,7 +3,7 @@
 class Game {
     constructor() {
         // Version system (bumped by the pre-commit hook, see VERSION-README.md)
-        this.version = "3.1.1";
+        this.version = "3.2.0";
         this.buildDate = "2026-10-22";
 
         this.canvas = document.getElementById('gameCanvas');
@@ -64,7 +64,7 @@ class Game {
             killedBy: $('killedBy'), finalStats: $('finalStats'),
             submitStatus: $('submitStatus'), finalBoard: $('finalBoard'), finalBoardTitle: $('finalBoardTitle'),
             againBtn: $('againBtn'), pauseBtn: $('pauseBtn'), muteBtn: $('muteBtn'),
-            version: $('version'), newBest: $('newBest'), coins: $('coins'), shopCoins: $('shopCoins'),
+            version: $('version'), newBest: $('newBest'), coins: $('coins'), gems: $('gems'), shopCoins: $('shopCoins'),
             continueBtn: $('continueBtn'), fsBtn: $('fsBtn'), menuFsBtn: $('menuFsBtn'), soundChip: $('soundChip'),
             iosHint: $('iosHint'), iosHintClose: $('iosHintClose'), bankBox: $('bankBox'), wheel: $('wheel'), potText: $('potText'),
             spinBtn: $('spinBtn'), keepBtn: $('keepBtn'), profileShop: $('profileShop')
@@ -103,13 +103,30 @@ class Game {
         });
         this.bindIdentity();
         this.bindClassPicker();
+        this.boardSel = { board: Leaderboard.board, cls: '' };
         document.getElementById('boardTabs').addEventListener('click', e => {
             const btn = e.target.closest('button[data-board]');
             if (!btn) return;
-            document.querySelectorAll('#boardTabs button').forEach(b => b.classList.toggle('on', b === btn));
-            this.loadBoard(this.el.menuBoard, this.el.menuBoardTitle, btn.dataset.board);
+            this.boardSel.board = btn.dataset.board;
+            this.showBoardTabs();
+            this.loadBoard(this.el.menuBoard, this.el.menuBoardTitle, this.boardSel.board, this.boardSel.cls);
+        });
+        document.getElementById('clsTabs').addEventListener('click', e => {
+            const btn = e.target.closest('button[data-cls]');
+            if (!btn) return;
+            this.boardSel.cls = btn.dataset.cls;
+            this.showBoardTabs();
+            this.loadBoard(this.el.menuBoard, this.el.menuBoardTitle, this.boardSel.board, this.boardSel.cls);
         });
         this.el.muteBtn.textContent = Sfx.muted ? '🔇' : '🔊';
+        const musicBtns = [$('musicBtn'), $('menuMusicBtn')];
+        const showMusic = () => musicBtns.forEach(b => b.classList.toggle('off', !Sfx.musicOn));
+        musicBtns.forEach(b => b.addEventListener('click', e => {
+            e.currentTarget.blur();
+            Sfx.toggleMusic();
+            showMusic();
+        }));
+        showMusic();
     }
 
     // Class picker on the menu: remembered between visits, changeable before every run.
@@ -118,8 +135,11 @@ class Game {
         this.cls = CLASSES[saved] ? saved : 'wizard';
         this.el.classPicker.innerHTML = CLASS_ORDER.map(id => {
             const c = CLASSES[id];
+            const pips = n => Array.from({ length: 5 }, (_, i) => `<em class="${i < n ? 'on' : ''}"></em>`).join('');
+            const speed = U.clamp(Math.round((c.speed - 2) / 0.65), 1, 5);
             return `<button class="cls" data-cls="${id}" style="--c:${c.color}" aria-label="${c.name}">` +
-                `<canvas width="120" height="120"></canvas><b>${c.name}</b><small>${'❤️'.repeat(c.hearts)}</small></button>`;
+                `<canvas width="120" height="120"></canvas><b>${c.name}</b><small>${'❤️'.repeat(c.hearts)}</small>` +
+                `<span class="cstat" title="Power">💪<span>${pips(c.power)}</span></span><span class="cstat" title="Speed">👟<span>${pips(speed)}</span></span></button>`;
         }).join('');
         this.el.classInfo = document.getElementById('classInfo');
         this.el.classPicker.querySelectorAll('.cls').forEach(btn => {
@@ -165,12 +185,16 @@ class Game {
             }
             if (this.state === 'transition') return;
             if (this.state === 'levelup') {
-                const idx = ['1', '2', '3'].indexOf(key);
+                const idx = ['1', '2', '3', '4'].indexOf(key);
                 if (idx >= 0) this.buyCard(idx);
                 else if (key === 'enter' || key === ' ' || key === 'c') this.closeShop();
                 return;
             }
             if (key === 'm') this.toggleMute();
+            if (key === 'b') {
+                Sfx.toggleMusic();
+                document.querySelectorAll('.music-btn').forEach(b => b.classList.toggle('off', !Sfx.musicOn));
+            }
             if (key === 'p' || key === 'escape') {
                 if (this.state === 'playing') this.pause();
                 else if (this.state === 'paused') this.resume();
@@ -242,10 +266,19 @@ class Game {
         const onFsChange = () => {
             const full = this.isFullscreen();
             if (full && this.runActive()) this.lockOrientation();
-            // Leaving fullscreen in the middle of a run (Esc, back gesture, notification shade) pauses it.
-            if (!full && this.state === 'playing') this.pause();
+            // Whatever was held while the browser switched modes never gets its key-up / pointer-up.
+            this.releaseInput();
+            // The viewport settles over a few frames; measure again until it has.
+            this.settleResize();
+            if (!full) {
+                // Left fullscreen (Esc, the browser's exit button, back gesture): pause, and don't
+                // force it back on Resume — only the ⛶ button or the next run re-enters it.
+                this.noAutoFs = true;
+                if (this.state === 'playing') this.pause();
+            }
             this.el.fsBtn.textContent = this.el.menuFsBtn.textContent = full ? '🗗' : '⛶';
         };
+        window.addEventListener('focus', () => this.settleResize());
         document.addEventListener('fullscreenchange', onFsChange);
         document.addEventListener('webkitfullscreenchange', onFsChange);
         const toggle = e => {
@@ -255,6 +288,7 @@ class Game {
                 this.exitFullscreen();
             } else {
                 this.storeSet('hunter.fullscreen', '1');
+                this.noAutoFs = false;
                 this.enterFullscreen(true);
             }
         };
@@ -271,7 +305,10 @@ class Game {
         }, { passive: false });
 
         document.addEventListener('visibilitychange', () => {
-            if (!document.hidden && this.runActive()) this.acquireWakeLock();
+            if (document.hidden) return;
+            this.releaseInput();
+            this.settleResize();
+            if (this.runActive()) this.acquireWakeLock();
         });
 
         // Sound health: show a chip when the context stays silent (iOS interruption, dead output device).
@@ -368,8 +405,28 @@ class Game {
     }
 
     // Run started or resumed: go fullscreen, keep the screen on, watch audio health.
-    enterGameMode() {
-        this.enterFullscreen();
+    /** Drop held keys, mouse buttons and the touch stick (lost key-up / pointer-up events). */
+    releaseInput() {
+        this.keys = {};
+        if (this.mouse) this.mouse.down = false;
+        this.releaseStick();
+        if (document.activeElement && document.activeElement !== document.body && document.activeElement.tagName !== 'INPUT') document.activeElement.blur();
+    }
+
+    settleResize() {
+        clearTimeout(this.settleTimer);
+        let n = 0;
+        const again = () => {
+            this.resize(); // no-op unless the viewport really changed
+            if (++n < 4) this.settleTimer = setTimeout(again, [60, 250, 600][n - 1]);
+        };
+        again();
+        this.lastTime = performance.now();
+    }
+
+    enterGameMode(fresh = false) {
+        if (fresh) this.noAutoFs = false;
+        if (!this.noAutoFs) this.enterFullscreen();
         if (this.isFullscreen()) this.lockOrientation();
         this.acquireWakeLock();
         Sfx.setActive(true);
@@ -461,6 +518,8 @@ class Game {
         this.coinsEarned = 0;
         this.coinsSpent = 0;
         this.coinFrac = 0;
+        this.gems = 0;
+        this.artCards = [];
         this.hits = 0;
         this.levelCoinsStart = 0;
         this.incomeEMA = 0;
@@ -518,6 +577,7 @@ class Game {
 
     showMenu() {
         Sfx.stopMusic();
+        Sfx.setBgmLevel(0.22);
         this.leaveGameMode();
         this.state = 'menu';
         this.resetRun();
@@ -526,8 +586,8 @@ class Game {
         this.el.bossBar.hidden = true;
         this.attract = [];
         for (let i = 0; i < 9; i++) this.attract.push(this.makeMonster(this.pickType(['small', 'medium', 'large'][i % 3]), Math.random() * this.W, Math.random() * this.H, 'random'));
-        document.querySelectorAll('#boardTabs button').forEach(b => b.classList.toggle('on', b.dataset.board === Leaderboard.board));
-        this.loadBoard(this.el.menuBoard, this.el.menuBoardTitle);
+        this.showBoardTabs();
+        this.loadBoard(this.el.menuBoard, this.el.menuBoardTitle, this.boardSel.board, this.boardSel.cls);
     }
 
     startRun() {
@@ -553,7 +613,8 @@ class Game {
         this.chargeMult = this.artefactMult('charge');
         this.statsLog = /[?&]stats\b/.test(window.location.search) ? this.makeStatsLog() : null;
         this.startLevel();
-        this.enterGameMode();
+        Sfx.setBgmLevel(0.15);
+        this.enterGameMode(true);
         this.banner('HUNT!', `${this.biome.name} · fill the bar to clear the level`);
         Sfx.arpeggio([392, 523, 659], 0.08, { type: 'triangle', volume: 0.12 });
         Leaderboard.startRun().then(token => {
@@ -567,6 +628,7 @@ class Game {
         this.keys = {};
         this.state = 'paused';
         this.setOverlay('pause');
+        Sfx.setBgmLevel(0.09);
         const owned = UPGRADES.filter(u => this.stack(u.id) > 0);
         document.getElementById('pauseUps').innerHTML = owned.length
             ? owned.map(u => `<span class="up">${u.icon} ${u.name}<sup>${this.stack(u.id)}/${u.max}</sup></span>`).join('')
@@ -579,6 +641,7 @@ class Game {
         this.state = 'playing';
         this.setOverlay(null);
         this.lastTime = performance.now();
+        Sfx.setBgmLevel(0.15);
         this.enterGameMode();
     }
 
@@ -658,6 +721,7 @@ class Game {
         this.updateBullets();
         this.updateGrenades();
         this.updateStorm();
+        this.updatePoisonCloud();
         this.updateLightning();
         this.updateDecals();
         this.updateMonsters(false);

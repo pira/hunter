@@ -696,6 +696,8 @@ extendGame({
         const bonus = 300 * this.bossCount * (b.boss.big ? 2 : 1);
         this.score += bonus;
         this.floater(b.x, b.y - b.size - 10, `BOSS SLAIN +${bonus}`, '#ffd60a', 30);
+        // gems: small bosses 1–2, big bosses 3–5
+        this.spawnGems(b.x, b.y, b.boss.big ? 3 + Math.floor(Math.random() * 3) : 1 + (Math.random() < 0.5 ? 1 : 0));
         Sfx.arpeggio([523, 659, 784, 1046, 1318], 0.09, { type: 'triangle', volume: 0.12 });
         this.monsters.forEach(m => { if (m.minion || m.lichAdd || m.body === b) m.behavior = 'flee'; });
         this.encounterWon();

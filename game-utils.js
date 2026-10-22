@@ -186,9 +186,11 @@
     }
 
     /** Price of a shop card: permanent = static base × (1 + 0.75 × rank); one-level = share of income. */
+    // Permanent (whole-run) cards cost several times their base: they keep paying off all run.
+    const PERMANENT_PRICE_MULT = 3;
     function cardPrice(card, rank, expected, incomeEMA) {
         if (card.share) return Math.max(card.cost, Math.round(card.share * Math.max(expected, incomeEMA || 0)));
-        return Math.round(card.cost * (1 + 0.75 * rank));
+        return Math.round(card.cost * PERMANENT_PRICE_MULT * (1 + 0.75 * rank));
     }
 
     /** Coins a player can expect to earn during a level (kills + level bonus + encounter loot). */

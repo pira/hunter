@@ -3,16 +3,29 @@
    (hunter.profileCache) so artefacts and skins also apply offline. Extends Game (js/core.js). */
 
 extendGame({
-    /** Artefact bonuses from the cached profile, applied at the start of every run. */
+    /** Bonuses for this run: the (up to 4) slotted artefacts plus the worn skin's perk. */
     loadArtefacts() {
         const cache = Leaderboard.cachedProfile() || {};
-        const tiers = cache.artefacts || {};
         const bonus = {};
-        for (const [id, tier] of Object.entries(tiers)) {
-            const def = ARTEFACTS[id];
-            if (def && tier > 0) bonus[def.stat] = (bonus[def.stat] || 0) + def.values[Math.min(4, tier)] / 100;
+        const slots = this.activeSlots(cache);
+        for (const key of slots) {
+            const a = this.parseArt(key);
+            if (a) bonus[a.def.stat] = (bonus[a.def.stat] || 0) + a.def.values[a.tier] / 100;
         }
-        this.artefacts = { tiers, mult: key => 1 + (bonus[key] || 0) };
+        const perk = this.skin && SKIN_PERKS[this.skin];
+        if (perk) bonus[perk.stat] = (bonus[perk.stat] || 0) + perk.pct / 100;
+        this.artefacts = { slots, mult: key => 1 + (bonus[key] || 0) };
+    },
+
+    parseArt(key) {
+        const m = /^([a-z]+)_([1-4])$/.exec(key || '');
+        return m && ARTEFACTS[m[1]] ? { id: m[1], tier: Number(m[2]), def: ARTEFACTS[m[1]] } : null;
+    },
+
+    /** Slotted artefacts; profiles cached before v3.2 still have the old one-tier-per-id map. */
+    activeSlots(cache) {
+        if (Array.isArray(cache.slots)) return cache.slots.filter(k => (cache.arts || {})[k] > 0).slice(0, MAX_SLOTS);
+        return Object.entries(cache.artefacts || {}).filter(([id, t]) => ARTEFACTS[id] && t > 0).slice(0, MAX_SLOTS).map(([id, t]) => `${id}_${Math.min(4, t)}`);
     },
 
     equippedSkin(cls) {
@@ -224,80 +237,122 @@ extendGame({
             return;
         }
         const gold = player.gold || 0;
-        const arts = player.artefacts || {};
+        const gems = player.gems || 0;
+        const arts = player.arts || {};
+        const slots = this.activeSlots(player);
         const skins = player.skins || {};
         const equipped = player.equipped || {};
-        const best = player.bestLevel || 0;
+        const icon = player.icon || null;
         const online = Leaderboard.enabled;
-        const artRows = Object.entries(ARTEFACTS).map(([id, a]) => {
-            const tier = arts[id] || 0;
-            if (!mine && !tier) return '';
-            const next = tier < 4 ? TIERS[tier + 1] : null;
-            const val = v => `${v > 0 ? '+' : ''}${v}%`;
-            const now = tier ? `<span class="tier" style="--t:${TIERS[tier].color}">${TIERS[tier].label} ${val(a.values[tier])}</span>` : '<span class="tier none">not owned</span>';
-            let action = '';
-            if (mine && next) {
-                const locked = best < next.gate;
-                const poor = gold < next.price;
-                action = `<button class="buy" data-buy="artefact" data-id="${id}" data-tier="${tier + 1}" ${locked || poor || !online ? 'disabled' : ''}>` +
-                    (locked ? `🔒 Lv ${next.gate}` : `${tier ? '⬆' : 'Buy'} ${val(a.values[tier + 1])} · 🪙${next.price.toLocaleString()}`) + '</button>';
-            } else if (mine) {
-                action = '<span class="maxed">MAX</span>';
-            }
-            return `<li><span class="ai">${a.icon}</span><span class="an"><b>${a.name}</b><small>${a.what}</small></span>${now}${action}</li>`;
+        const off = online ? '' : 'disabled';
+        const pct = v => `${v > 0 ? '+' : ''}${v}%`;
+        const chip = (id, tier, n) => `<span class="tier" style="--t:${TIERS[tier].color}">${TIERS[tier].label}${n > 1 ? ` ×${n}` : ''} <i>${pct(ARTEFACTS[id].values[tier])}</i></span>`;
+
+        // the four slots: what's active in runs
+        const slotBoxes = Array.from({ length: MAX_SLOTS }, (_, i) => {
+            const a = this.parseArt(slots[i]);
+            if (!a) return `<div class="slot empty">${mine ? 'empty<small>equip below</small>' : '—'}</div>`;
+            return `<div class="slot" style="--t:${TIERS[a.tier].color}"><span class="si">${a.def.icon}</span><b>${pct(a.def.values[a.tier])}</b><small>${a.def.what}</small>` +
+                (mine ? `<button class="x" data-unslot="${a.id}" ${off} aria-label="Unequip">✕</button>` : '') + '</div>';
         }).join('');
+
+        const artRows = Object.entries(ARTEFACTS).map(([id, a]) => {
+            const owned = [1, 2, 3, 4].map(t => arts[`${id}_${t}`] || 0);
+            const best = owned.reduce((b, n, i) => (n > 0 ? i + 1 : b), 0);
+            if (!mine && !best) return '';
+            const chips = best ? owned.map((n, i) => (n ? chip(id, i + 1, n) : '')).join('') : '<span class="tier none">not owned</span>';
+            let actions = '';
+            if (mine) {
+                const slotted = this.parseArt(slots.find(k => k.startsWith(`${id}_`)));
+                if (best && (!slotted || slotted.tier < best)) {
+                    const full = !slotted && slots.length >= MAX_SLOTS;
+                    actions += `<button class="buy equip" data-slot="${id}_${best}" ${full || !online ? 'disabled' : ''}>${full ? 'Slots full' : slotted ? `Use ${TIERS[best].label}` : 'Equip'}</button>`;
+                } else if (slotted) {
+                    actions += '<span class="maxed">EQUIPPED</span>';
+                }
+                const mergeTier = [1, 2, 3].find(t => owned[t - 1] >= 3);
+                if (mergeTier) {
+                    const cost = MERGE_GEMS[mergeTier + 1];
+                    actions += `<button class="buy merge" data-merge="${id}" data-tier="${mergeTier + 1}" ${gems < cost || !online ? 'disabled' : ''}>3→1 ${TIERS[mergeTier + 1].label} · 💎${cost}</button>`;
+                }
+                actions += `<button class="buy" data-buy="artefact" data-id="${id}" ${gold < ARTEFACT_PRICE || !online ? 'disabled' : ''}>+1 · 🪙${ARTEFACT_PRICE.toLocaleString()}</button>`;
+            }
+            return `<li><span class="ai">${a.icon}</span><span class="an"><b>${a.name}</b><small>${a.what}</small><span class="chips">${chips}</span></span><span class="acts">${actions}</span></li>`;
+        }).join('');
+
         const skinCards = CLASS_ORDER.map(cls => {
             const list = Object.entries(SKINS).filter(([, s]) => s.cls === cls);
             const cards = list.map(([id, s]) => {
                 const owned = Boolean(skins[id]);
                 if (!mine && !owned) return '';
                 const on = equipped[cls] === id;
+                const isIcon = icon && icon.skin === id;
                 const price = SKIN_PRICES[s.rarity];
+                const perk = SKIN_PERKS[id];
                 let btn = '';
                 if (mine) {
                     btn = on ? `<button class="buy on" data-equip="${cls}" data-skin="">Wearing ✓</button>`
-                        : owned ? `<button class="buy" data-equip="${cls}" data-skin="${id}" ${online ? '' : 'disabled'}>Wear</button>`
-                            : `<button class="buy" data-buy="skin" data-id="${id}" ${gold < price || !online ? 'disabled' : ''}>🪙${price.toLocaleString()}</button>`;
+                        : owned ? `<button class="buy" data-equip="${cls}" data-skin="${id}" ${off}>Wear</button>`
+                            : price.gold ? `<button class="buy" data-buy="skin" data-id="${id}" ${gold < price.gold || !online ? 'disabled' : ''}>🪙${price.gold.toLocaleString()}</button>`
+                                : `<button class="buy gem" data-buy="skin" data-id="${id}" ${gems < price.gems || !online ? 'disabled' : ''}>💎${price.gems}</button>`;
+                    if (owned) btn += `<button class="icon-pick ${isIcon ? 'on' : ''}" data-icon="${cls}" data-skin="${id}" ${off} title="Use as profile icon">${isIcon ? '⭐ icon' : '☆ icon'}</button>`;
                 }
                 return `<div class="skin ${s.rarity} ${on ? 'on' : ''}"><canvas data-cls="${cls}" data-skin="${id}" width="96" height="96"></canvas>` +
-                    `<b>${s.name}</b><small style="color:${TIERS[RARITY[s.rarity]].color}">${TIERS[RARITY[s.rarity]].label}</small>${btn}</div>`;
+                    `<b>${s.name}</b><small style="color:${TIERS[RARITY[s.rarity]].color}">${TIERS[RARITY[s.rarity]].label}</small>` +
+                    (perk ? `<small class="perk">${pct(perk.pct)} ${STAT_NAMES[perk.stat]}</small>` : '') + `${btn}</div>`;
             }).join('');
             return cards ? `<div class="skin-row"><span class="skin-cls">${CLASSES[cls].icon}</span>${cards}</div>` : '';
         }).join('');
+
         el.innerHTML =
-            `<div class="gold-line">💰 <b>${gold.toLocaleString()}</b> gold${mine ? '<small>Unspent coins are banked when a hunt ends.</small>' : ''}</div>` +
-            (artRows ? `<h3>✨ Artefacts</h3><ul class="arts">${artRows}</ul>` : '') +
-            (skinCards ? `<h3>🎨 Skins</h3>${skinCards}` : (mine ? '' : '')) +
+            `<div class="gold-line">💰 <b>${gold.toLocaleString()}</b> gold <span class="gem-count">💎 <b>${gems.toLocaleString()}</b> gems</span>` +
+            (mine ? '<small>Unspent coins are banked when a hunt ends. Gems drop rarely — bosses always drop some.</small>' : '') + '</div>' +
+            `<h3>🎒 Equipped artefacts <small>${slots.length}/${MAX_SLOTS} · active in every hunt</small></h3><div class="slots">${slotBoxes}</div>` +
+            (artRows ? `<h3>✨ Collection${mine ? ' <small>merge 3 of a kind into the next tier</small>' : ''}</h3><ul class="arts">${artRows}</ul>` : '') +
+            (skinCards ? `<h3>🎨 Skins${mine ? ' <small>rare and better skins give a small bonus</small>' : ''}</h3>${skinCards}` : '') +
             (mine && !online ? '<p class="since">The shop needs the online leaderboard.</p>' : '');
         el.querySelectorAll('canvas[data-skin]').forEach(cv => this.drawPortrait(cv, cv.dataset.cls, cv.dataset.skin));
-        el.querySelectorAll('button[data-buy]').forEach(btn => btn.addEventListener('click', () => this.shopBuy(btn)));
-        el.querySelectorAll('button[data-equip]').forEach(btn => btn.addEventListener('click', () => this.shopEquip(btn)));
+        const act = (sel, fn) => el.querySelectorAll(sel).forEach(btn => btn.addEventListener('click', () => this.shopAction(btn, fn)));
+        act('button[data-buy]', b => Leaderboard.buy(b.dataset.buy, b.dataset.id));
+        act('button[data-equip]', b => Leaderboard.equip(b.dataset.equip, b.dataset.skin));
+        act('button[data-icon]', b => Leaderboard.meta('icon', { cls: b.dataset.icon, skin: b.dataset.skin }));
+        act('button[data-merge]', b => Leaderboard.meta('merge', { id: b.dataset.merge, tier: Number(b.dataset.tier) }));
+        act('button[data-slot]', b => {
+            const id = b.dataset.slot.split('_')[0];
+            const next = slots.filter(k => !k.startsWith(`${id}_`));
+            const i = slots.findIndex(k => k.startsWith(`${id}_`));
+            next.splice(i < 0 ? next.length : i, 0, b.dataset.slot);
+            return Leaderboard.meta('slots', { slots: next.slice(0, MAX_SLOTS) });
+        });
+        act('button[data-unslot]', b => Leaderboard.meta('slots', { slots: slots.filter(k => !k.startsWith(`${b.dataset.unslot}_`)) }));
     },
 
-    async shopBuy(btn) {
+    async shopAction(btn, fn) {
         btn.disabled = true;
         try {
-            const res = await Leaderboard.buy(btn.dataset.buy, btn.dataset.id, btn.dataset.tier ? Number(btn.dataset.tier) : undefined);
-            Sfx.arpeggio([659, 880, 1175, 1568], 0.06, { type: 'triangle', volume: 0.12 });
+            const res = await fn(btn);
+            if (btn.dataset.merge) {
+                Sfx.arpeggio([523, 784, 1046, 1568, 2093], 0.07, { type: 'triangle', volume: 0.13 });
+            } else if (btn.dataset.buy) {
+                Sfx.arpeggio([659, 880, 1175, 1568], 0.06, { type: 'triangle', volume: 0.12 });
+            } else {
+                Sfx.tone(988, { duration: 0.08, type: 'triangle', volume: 0.1 });
+            }
             this.loadArtefacts();
             this.renderShop(res.player, true);
-            this.el.profileStats.querySelector('[data-gold]')?.replaceChildren(String(res.player.gold));
+            if (btn.dataset.equip === this.cls) this.pickClass(this.cls, true);
+            this.drawAvatar(this.el.profileAvatar, ...this.profileLook(res.player, true));
+            if (btn.dataset.merge) this.el.profileShop.querySelector('.arts')?.classList.add('flash');
         } catch (e) {
             btn.textContent = e.message || 'Error';
             Sfx.tone(160, { duration: 0.15, type: 'square', volume: 0.08 });
         }
     },
 
-    async shopEquip(btn) {
-        btn.disabled = true;
-        try {
-            const res = await Leaderboard.equip(btn.dataset.equip, btn.dataset.skin);
-            Sfx.tone(988, { duration: 0.08, type: 'triangle', volume: 0.1 });
-            this.renderShop(res.player, true);
-            if (btn.dataset.equip === this.cls) this.pickClass(this.cls, true);
-            this.drawAvatar(this.el.profileAvatar, this.cls, this.equippedSkin(this.cls));
-        } catch (e) {
-            btn.textContent = e.message || 'Error';
-        }
+    /** [cls, skin] for a profile's avatar: the chosen icon, else the class they play. */
+    profileLook(p, mine, fallbackCls) {
+        if (p && p.icon && CLASSES[p.icon.cls]) return [p.icon.cls, p.icon.skin && (p.skins || {})[p.icon.skin] ? p.icon.skin : ''];
+        const cls = CLASSES[fallbackCls] ? fallbackCls : mine && CLASSES[this.cls] ? this.cls : 'wizard';
+        return [cls, mine ? this.equippedSkin(cls) : ((p && p.equipped) || {})[cls] || ''];
     }
 });

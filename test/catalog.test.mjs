@@ -5,14 +5,13 @@ import * as server from '../leaderboard/lambda/catalog.mjs';
 
 // Evaluate the client's data tables (classic script) and compare with the server catalog.
 const src = readFileSync(new URL('../js/config-data.js', import.meta.url), 'utf8');
-const client = new Function('GameUtils', `${src}; return { TIERS, ARTEFACTS, SKINS, SKIN_PRICES };`)({});
+const client = new Function('GameUtils', `${src}; return { ARTEFACTS, ARTEFACT_PRICE, MERGE_GEMS, MAX_SLOTS, SKINS, SKIN_PRICES };`)({});
 
 describe('meta catalog: client and server agree', () => {
-    it('has the same tier prices and gates', () => {
-        for (let t = 1; t <= 4; t++) {
-            assert.equal(client.TIERS[t].price, server.TIERS[t].price);
-            assert.equal(client.TIERS[t].gate, server.TIERS[t].gate);
-        }
+    it('has the same artefact price, merge costs and slot count', () => {
+        assert.equal(client.ARTEFACT_PRICE, server.ARTEFACT_PRICE);
+        assert.deepEqual(client.MERGE_GEMS, server.MERGE_GEMS);
+        assert.equal(client.MAX_SLOTS, server.MAX_SLOTS);
     });
     it('has the same artefacts', () => {
         assert.deepEqual(Object.keys(client.ARTEFACTS).sort(), [...server.ARTEFACTS].sort());

@@ -227,17 +227,76 @@ describe('lambda: banking, wheel and meta shop', () => {
         assert.equal((await api.call('POST', `/player/${PID}/spin`, { secret: SECRET, pot: pot.id, spins: 0 })).status, 409);
     });
 
-    it('buys artefact tiers in order, gated by gold and best level', async () => {
+    it('buys basic artefacts for gold, merges three into the next tier for gems, and slots them', async () => {
         const api = rigged();
-        await finishRun(api, 1500);
-        const buy = (id, tier) => api.call('POST', `/player/${PID}/buy`, { secret: SECRET, item: 'artefact', id, tier });
-        assert.equal((await buy('greed', 2)).status, 409); // tier 1 first
-        const ok = await buy('greed', 1);
+        await finishRun(api, 1500, { gems: 3, artCards: ['greed'] });
+        const p = `/player/${PID}`;
+        const buy = id => api.call('POST', `${p}/buy`, { secret: SECRET, item: 'artefact', id });
+        const ok = await buy('greed');
         assert.equal(ok.status, 200);
-        assert.equal(ok.body.player.artefacts.greed, 1);
+        assert.equal(ok.body.player.arts.greed_1, 2);
+        assert.deepEqual(ok.body.player.slots, ['greed_1']);
         assert.equal(ok.body.player.gold, 500);
-        assert.equal((await buy('greed', 2)).status, 403); // best level 5 < 10
-        assert.equal((await buy('whetstone', 1)).status, 409); // not enough gold
+        const merge = tier => api.call('POST', `${p}/merge`, { secret: SECRET, id: 'greed', tier });
+        assert.equal((await merge(2)).status, 409); // only two
+        await finishRun(api, 1500, { artCards: ['greed'] });
+        const merged = await merge(2);
+        assert.equal(merged.status, 200);
+        assert.equal(merged.body.player.arts.greed_1, undefined);
+        assert.equal(merged.body.player.arts.greed_2, 1);
+        assert.equal(merged.body.player.gems, 1);
+        assert.deepEqual(merged.body.player.slots, ['greed_2']);
+        assert.equal((await merge(3)).status, 409);
+        await buy('boots');
+        const slots = s => api.call('POST', `${p}/slots`, { secret: SECRET, slots: s });
+        assert.equal((await slots(['greed_2', 'boots_1'])).status, 200);
+        assert.equal((await slots(['greed_2', 'greed_2'])).status, 400); // same artefact twice
+        assert.equal((await slots(['rune_1'])).status, 403); // not owned
+        assert.equal((await slots(['a_1', 'b_1', 'c_1', 'd_1', 'e_1'])).status, 400);
+        assert.equal((await buy('rune')).status, 200);
+        assert.equal((await buy('rune')).status, 409); // gold spent
+        const pub = await api.call('GET', p);
+        assert.deepEqual(pub.body.player.slots, ['greed_2', 'boots_1', 'rune_1']); // a new kind takes a free slot
+        assert.equal(pub.body.player.secretHash, undefined);
+    });
+
+    it('caps gems and artefact cards per run', async () => {
+        const api = rigged();
+        assert.equal((await finishRun(api, 0, { gems: 500 })).status, 422);
+        assert.equal((await finishRun(api, 0, { artCards: ['greed', 'greed', 'greed'] })).status, 422);
+        assert.equal((await finishRun(api, 0, { artCards: ['nope'] })).status, 400);
+    });
+
+    it('upgrades P7 profiles: tier map becomes owned and slotted items', async () => {
+        const api = rigged();
+        await finishRun(api, 0);
+        const m = t.db.get(`player#${PID}`, 'meta');
+        delete m.arts; delete m.slots; delete m.gems;
+        m.artefacts = { greed: 3, boots: 1 };
+        await t.db.send('Put', { Item: m });
+        const res = await finishRun(api, 0);
+        assert.deepEqual(res.body.player.arts, { greed_3: 1, boots_1: 1 });
+        assert.deepEqual(res.body.player.slots, ['greed_3', 'boots_1']);
+        assert.equal(t.db.get(`player#${PID}`, 'meta').artefacts, undefined);
+    });
+
+    it('sets the public icon to an owned skin and filters the board by class', async () => {
+        const api = rigged();
+        await finishRun(api, 400);
+        const icon = (cls, skin) => api.call('POST', `/player/${PID}/icon`, { secret: SECRET, cls, skin });
+        assert.equal((await icon('wizard', 'frost')).status, 403);
+        await api.call('POST', `/player/${PID}/buy`, { secret: SECRET, item: 'skin', id: 'frost' });
+        assert.deepEqual((await icon('wizard', 'frost')).body.player.icon, { cls: 'wizard', skin: 'frost' });
+        assert.equal((await icon('goblin', 'frost')).status, 400);
+        // legendary skins cost gems
+        assert.equal((await api.call('POST', `/player/${PID}/buy`, { secret: SECRET, item: 'skin', id: 'shadow' })).status, 409);
+        const token = (await api.call('POST', '/run')).body.token;
+        api.advance(130_000);
+        await api.call('POST', '/scores', { ...run({ level: 5, score: 900 }), board: 'v3', cls: 'goblin', token });
+        const res = await t.call('GET', '/scores', undefined, '1.2.3.4', { board: 'v3', cls: 'goblin' });
+        assert.deepEqual(res.body.scores.map(s => s.cls), ['goblin']);
+        const all = await t.call('GET', '/scores', undefined, '1.2.3.4', { board: 'v3' });
+        assert.equal(all.body.scores.length, 2);
     });
 
     it('buys and equips skins; equipping needs ownership; the board shows the equipped skin', async () => {

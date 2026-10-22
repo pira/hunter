@@ -18,26 +18,27 @@ const DISPLAY_FONT = '"Lilita One","Arial Rounded MT Bold",system-ui,sans-serif'
 // Player classes: one primary weapon each, plus a super charged by kills (Space / SUPER button).
 const CLASSES = {
     wizard: {
-        name: 'Wizard', icon: '🧙', hearts: 3, speed: 4.4, primary: 'bolt', color: '#8b5cf6',
+        name: 'Wizard', icon: '🧙', hearts: 2, speed: 2.86, power: 2, primary: 'bolt', color: '#8b5cf6',
         weapon: 'Magic Bolt', blurb: 'Auto-aiming magic bolts', superName: 'Arcane Nova', superBlurb: 'Rings of giant piercing bolts'
     },
     barbarian: {
-        name: 'Barbarian', icon: '🪓', hearts: 4, speed: 4.2, primary: 'cleave', color: '#f97316',
+        name: 'Barbarian', icon: '🪓', hearts: 4, speed: 4.2, power: 5, primary: 'cleave', color: '#f97316',
         weapon: 'Cleave', blurb: 'Huge axe swings hit everything in front', superName: 'Whirlwind', superBlurb: '5 s of invincible spinning havoc'
     },
     goblin: {
-        name: 'Goblin', icon: '💣', hearts: 3, speed: 4.8, primary: 'grenade', color: '#22c55e',
+        name: 'Goblin', icon: '💣', hearts: 3, speed: 5.2, power: 4, primary: 'grenade', color: '#22c55e',
         weapon: 'Grenades', blurb: 'Lobbed bombs with a big boom', superName: 'Bombardment', superBlurb: 'Bombs in all four directions'
     }
 };
 const CLASS_ORDER = ['wizard', 'barbarian', 'goblin'];
 const PRIMARY = {
-    bolt: { cooldown: 32, damage: 1, speed: 9, radius: 4.5 },
+    bolt: { cooldown: 32, damage: 0.7, speed: 9, radius: 4.5 },
     cleave: { cooldown: 64, damage: 10, reach: 80, arc: (70 * Math.PI) / 180, swing: 12 },
-    grenade: { cooldown: 66, damage: 8, radius: 38, range: 220, fuse: 60 }
+    grenade: { cooldown: 66, damage: 8, radius: 38, range: 240, fuse: 60, speed: 8.45, bounces: 5 }
 };
 // Super meter charge per kill (0–100). Gatekeeper/boss values are used by the encounter system.
 const SUPER_CHARGE = { small: 2, medium: 3, large: 5, elite: 6, legendary: 10, mythic: 12, ancient: 15, ultimate: 25, gatekeeper: 35, boss: 100 };
+const GRENADE_G = 0.5; // grenade gravity (px/step²) for the bounce arcs
 const WHIRLWIND_STEPS = Math.round(5 * 60 * GAME_SPEED);
 const STORM = { duration: Math.round(15 * 60 * GAME_SPEED), every: Math.round(3 * 60 * GAME_SPEED), range: 260, jump: 120, jumps: 5, damage: 6, falloff: 0.65 };
 
@@ -79,21 +80,22 @@ const COIN_DROPS = {
 const POWERUPS = {
     storm: { emoji: '🌩️', name: 'Storm', color: '#7dd3fc', timed: true, secs: 15, weight: 0.8 },
     overcharge: { emoji: '🔋', name: 'Overcharge', color: '#facc15', weight: 0.5 },
-    poison: { emoji: '🧪', name: 'Poison', color: '#84cc16', timed: true, secs: 12, weight: 0.7 },
+    poison: { emoji: '🧪', name: 'Poison Cloud', color: '#84cc16', timed: true, secs: 12, weight: 0.7 },
     stun: { emoji: '💫', name: 'Stun', color: '#fde047', weight: 0.25 },
     rapidFire: { emoji: '⚡', name: 'Rapid Fire', color: '#00CED1', timed: true, secs: 10, weight: 0.9 },
     invincible: { emoji: '🛡️', name: 'Invincible', color: '#7CFC00', timed: true, secs: 10, weight: 0.35 },
     freeze: { emoji: '❄️', name: 'Freeze', color: '#87CEEB', timed: true, secs: 10, weight: 0.7 },
     roadBrake: { emoji: '🐢', name: 'Road Brake', color: '#a3a3a3', timed: true, secs: 10, weight: 0.6 },
-    magnet: { emoji: '🧲', name: 'Magnet', color: '#f43f5e', timed: true, secs: 6, weight: 0.7 },
+    magnet: { emoji: '🧲', name: 'Magnet', color: '#f43f5e', timed: true, secs: 15, weight: 0.7 },
     coins2: { emoji: '🪙', tag: '×2', name: 'Coins ×2', color: '#FFC300', timed: true, secs: 10, weight: 0.8 },
     coins3: { emoji: '🪙', tag: '×3', name: 'Coins ×3', color: '#FF8C00', timed: true, secs: 10, weight: 0.4 },
     heart: { emoji: '❤️', name: 'Extra Life', color: '#FF1493', weight: 1 },
     quake: { emoji: '🌋', name: 'Earthquake', color: '#FF4500', weight: 0.3 }
 };
 const TIMED_POWERUPS = Object.keys(POWERUPS).filter(k => POWERUPS[k].timed);
+const POISON_RADIUS = 78;
 
-// Permanent shop cards. Price = cost × (1 + 0.75 × rank already owned) — a finite sink (D3).
+// Permanent shop cards. Price = cost × 3 × (1 + 0.75 × rank already owned) — a finite sink (D3).
 const UPGRADES = [
     { id: 'power', icon: '💪', name: 'Power', max: 5, cost: 30, desc: '+20% damage' },
     { id: 'haste', icon: '⏱️', name: 'Haste', max: 5, cost: 30, desc: '+15% attack speed' },
@@ -110,7 +112,7 @@ const UPGRADES = [
     { id: 'impact', icon: '💥', name: 'Impact', max: 3, cost: 30, desc: '+15% bolt size, cleave reach and blast radius' },
     { id: 'split', icon: '🔱', name: 'Split Shot', max: 3, cost: 36, cls: 'wizard', desc: 'Bolts fire +1 projectile' },
     { id: 'pierce', icon: '🏹', name: 'Piercing Rounds', max: 3, cost: 30, cls: 'wizard', desc: 'Bolts pierce +1 monster' },
-    { id: 'reach', icon: '📏', name: 'Long Reach', max: 3, cost: 24, cls: 'barbarian', desc: '+25% cleave reach' },
+    { id: 'reach', icon: '📏', name: 'Longer Handle', max: 3, cost: 24, cls: 'barbarian', desc: 'Axe handle +10% longer (10 → 20 → 30%): more reach' },
     { id: 'quick', icon: '💨', name: 'Quick Swing', max: 3, cost: 30, cls: 'barbarian', desc: '+25% swing speed' },
     { id: 'cluster', icon: '🧨', name: 'Cluster Bombs', max: 3, cost: 36, cls: 'goblin', desc: '+1 grenade per throw (max 5)' },
     { id: 'fuse', icon: '⏲️', name: 'Short Fuse', max: 3, cost: 30, cls: 'goblin', desc: 'Grenades burst 20% sooner and throw 10% faster' }
@@ -146,28 +148,43 @@ const BIG_BOSSES = [
     { name: 'Lich', voice: 'lich', title: 'King of the Restless Dead', color: '#3b2f6b', accent: '#a78bfa', size: 38, hp: 220, speed: 0.8, pattern: 'lich', big: true }
 ];
 
-// ---------------------------------------------------------------------- meta progression (P7)
+// ---------------------------------------------------------------------- meta progression (P7, v3.2)
 // Must match leaderboard/lambda/catalog.mjs (test/catalog.test.mjs checks it).
+// Rarity tiers (display only): artefact tiers 1–4 and skin rarities share these colours.
 const TIERS = [
     null,
-    { name: 'basic', label: 'Basic', color: '#cbd5e1', price: 1000, gate: 0 },
-    { name: 'rare', label: 'Rare', color: '#60a5fa', price: 4000, gate: 10 },
-    { name: 'legendary', label: 'Legendary', color: '#f59e0b', price: 15000, gate: 20 },
-    { name: 'mythic', label: 'Mythic', color: '#e879f9', price: 60000, gate: 30 }
+    { name: 'basic', label: 'Basic', color: '#cbd5e1' },
+    { name: 'rare', label: 'Rare', color: '#60a5fa' },
+    { name: 'legendary', label: 'Legendary', color: '#f59e0b' },
+    { name: 'mythic', label: 'Mythic', color: '#e879f9' }
 ];
-// Permanent artefacts: small bonuses, all owned ones active. values[tier] replaces the previous tier.
+// Artefacts are collected items: basic ones cost gold (or come from the rare in-run artefact card),
+// three of a tier merge into one of the next tier for gems. Up to MAX_SLOTS different ones are
+// slotted in the profile and only those are active in runs. values[tier] is the bonus in %.
+const ARTEFACT_PRICE = 1000;
+const MERGE_GEMS = [0, 0, 2, 5, 15];
+const MAX_SLOTS = 4;
 const ARTEFACTS = {
-    greed: { icon: '💍', name: 'Greed Ring', stat: 'gold', what: 'gold', values: [0, 1, 3, 5, 7] },
-    whetstone: { icon: '🪨', name: 'Whetstone', stat: 'damage', what: 'damage', values: [0, 1, 2, 3, 5] },
-    rune: { icon: '🌀', name: 'Quickening Rune', stat: 'rate', what: 'attack speed', values: [0, 1, 2, 3, 5] },
-    shard: { icon: '🔷', name: 'Storm Shard', stat: 'charge', what: 'super charge', values: [0, 2, 4, 6, 10] },
-    boots: { icon: '🥾', name: 'Wind Boots', stat: 'speed', what: 'move speed', values: [0, 1, 2, 3, 5] },
-    idol: { icon: '🗿', name: 'Luck Idol', stat: 'luck', what: 'drop chance', values: [0, 2, 4, 6, 10] },
+    greed: { icon: '💍', name: 'Greed Ring', stat: 'gold', what: 'gold', values: [0, 1, 2, 3, 4] },
+    whetstone: { icon: '🪨', name: 'Whetstone', stat: 'damage', what: 'damage', values: [0, 1, 2, 3, 4] },
+    rune: { icon: '🌀', name: 'Quickening Rune', stat: 'rate', what: 'attack speed', values: [0, 1, 2, 3, 4] },
+    shard: { icon: '🔷', name: 'Storm Shard', stat: 'charge', what: 'super charge', values: [0, 2, 4, 6, 8] },
+    boots: { icon: '🥾', name: 'Wind Boots', stat: 'speed', what: 'move speed', values: [0, 1, 2, 3, 4] },
+    idol: { icon: '🗿', name: 'Luck Idol', stat: 'luck', what: 'drop chance', values: [0, 2, 4, 6, 8] },
     charm: { icon: '🧿', name: 'Road Charm', stat: 'road', what: 'road speed', values: [0, -2, -4, -6, -8] },
-    hourglass: { icon: '⏳', name: 'Hourglass', stat: 'timed', what: 'timed effects', values: [0, 2, 5, 8, 12] },
-    amulet: { icon: '🛡️', name: 'Guardian Amulet', stat: 'guard', what: 'chance to ignore a hit', values: [0, 1, 2, 3, 5] }
+    hourglass: { icon: '⏳', name: 'Hourglass', stat: 'timed', what: 'timed effects', values: [0, 2, 4, 6, 8] },
+    amulet: { icon: '🛡️', name: 'Guardian Amulet', stat: 'guard', what: 'chance to ignore a hit', values: [0, 1, 2, 3, 4] }
 };
-const SKIN_PRICES = { basic: 300, rare: 2000, legendary: 8000, mythic: 30000 };
+const SKIN_PRICES = { basic: { gold: 300 }, rare: { gold: 2000 }, legendary: { gems: 25 }, mythic: { gems: 60 } };
+// What a skin adds in runs (rare and up): a small themed bonus, same stat keys as artefacts.
+const SKIN_PERKS = {
+    flame: { stat: 'damage', pct: 3 }, shadow: { stat: 'rate', pct: 5 }, celestial: { stat: 'charge', pct: 8 },
+    warlord: { stat: 'gold', pct: 3 }, lava: { stat: 'damage', pct: 5 }, titan: { stat: 'luck', pct: 8 },
+    pirate: { stat: 'gold', pct: 3 }, toxic: { stat: 'timed', pct: 5 }, king: { stat: 'gold', pct: 8 }
+};
+const STAT_NAMES = { gold: 'gold', damage: 'damage', rate: 'attack speed', charge: 'super charge', speed: 'move speed', luck: 'drop chance', road: 'road speed', timed: 'timed effects', guard: 'dodge' };
+// Gems: very rare drops, likelier from harder monsters; bosses always drop some.
+const GEM_CHANCE = { small: 0.0005, medium: 0.001, large: 0.003, elite: 0.006, legendary: 0.01, mythic: 0.015, ancient: 0.025, ultimate: 0.06, gatekeeper: 0.25 };
 // Cosmetic skins per class: palette overrides for js/sprites.js + extras (headgear, trail, aura, kill burst).
 const SKINS = {
     frost: { cls: 'wizard', rarity: 'basic', name: 'Frost Mage', palette: { robe: '#38bdf8', robeDark: '#0369a1', hat: '#0284c7', trim: '#e0f2fe', hatBand: '#e0f2fe', star: '#ffffff', orb: '#e0f2fe' } },

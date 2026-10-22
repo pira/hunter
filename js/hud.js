@@ -70,6 +70,10 @@ extendGame({
             shown.map(u => `<span class="up" title="${u.name}">${u.icon}<sup>${this.stack(u.id)}</sup></span>`).join('') +
             (hidden > 0 ? `<button class="up more" data-more="1" aria-label="All upgrades">+${hidden}</button>` : ''));
         this.setText('coins', this.el.coins, `🪙 ${this.coins}`);
+        if (this.gems > 0) {
+            this.el.gems.hidden = false;
+            this.setText('gems', this.el.gems, `💎 ${this.gems}`);
+        } else if (!this.el.gems.hidden) this.el.gems.hidden = true;
 
         if (this.boss) {
             const pct = this.bossHealth();
@@ -145,6 +149,8 @@ extendGame({
             ['Bosses', this.bossesSlain],
             ['Time', U.formatTime(this.time)]
         ];
+        if (this.gems > 0) stats.push(['Gems', `💎 ${this.gems}`]);
+        if (this.artCards.length) stats.push(['Artefacts', this.artCards.map(id => ARTEFACTS[id].icon).join('')]);
         this.el.finalStats.innerHTML = stats.map(([k2, v]) => `<div><span>${k2}</span><b>${v}</b></div>`).join('');
 
         let best = 0;
@@ -174,7 +180,7 @@ extendGame({
         const name = (id && id.name) || 'Hunter';
         this.el.submitStatus.textContent = 'Saving your hunt…';
         const entry = {
-            name, cls: this.cls, skin: this.skin || undefined, coins: Math.max(0, Math.floor(this.coins)), score: this.score, level: this.level, kills: this.kills,
+            name, cls: this.cls, skin: this.skin || undefined, coins: Math.max(0, Math.floor(this.coins)), gems: this.gems || 0, artCards: this.artCards && this.artCards.length ? this.artCards : undefined, score: this.score, level: this.level, kills: this.kills,
             combo: this.bestCombo, bosses: this.bossesSlain, duration: Math.max(1, Math.round(this.time))
         };
         const runId = this.runId;
@@ -193,15 +199,25 @@ extendGame({
         if (result.pot) this.showPot(result.pot, result.player && result.player.gold);
     },
 
-    async loadBoard(listEl, titleEl, board = Leaderboard.board) {
-        listEl.innerHTML = '<li class="muted">Loading…</li>';
-        const { scores, source } = await Leaderboard.top(10, board);
-        this.renderBoard(listEl, titleEl, scores, source, null, board);
+    showBoardTabs() {
+        const sel = this.boardSel || { board: Leaderboard.board, cls: '' };
+        document.querySelectorAll('#boardTabs button').forEach(b => b.classList.toggle('on', b.dataset.board === sel.board));
+        document.querySelectorAll('#clsTabs button').forEach(b => b.classList.toggle('on', b.dataset.cls === sel.cls));
+        document.getElementById('clsTabs').hidden = sel.board !== 'v3';
     },
 
-    renderBoard(listEl, titleEl, scores, source, mine, board = Leaderboard.board) {
+    async loadBoard(listEl, titleEl, board = Leaderboard.board, cls = '') {
+        listEl.innerHTML = '<li class="muted">Loading…</li>';
+        const want = `${board}|${cls}`;
+        listEl.dataset.want = want;
+        const { scores, source } = await Leaderboard.top(10, board, board === 'v3' ? cls : '');
+        if (listEl.dataset.want !== want) return; // a newer tab click won
+        this.renderBoard(listEl, titleEl, scores, source, null, board, cls);
+    },
+
+    renderBoard(listEl, titleEl, scores, source, mine, board = Leaderboard.board, cls = '') {
         titleEl.hidden = false;
-        titleEl.textContent = (board === 'v2' ? '🏆 Classic Hunters' : '🏆 Top Hunters') + (source === 'global' ? '' : ' (this device)');
+        titleEl.textContent = (board === 'v2' ? '🏆 Classic Hunters' : cls && CLASSES[cls] ? `🏆 Top ${CLASSES[cls].name}s` : '🏆 Top Hunters') + (source === 'global' ? '' : ' (this device)');
         if (!scores.length) {
             listEl.innerHTML = '<li class="muted">No scores yet — be the first!</li>';
             return;

@@ -152,13 +152,13 @@
         },
 
         /** Top scores. Returns { scores, source: 'global' | 'local' }. */
-        async top(limit = 10, board = this.board) {
+        async top(limit = 10, board = this.board, cls = '') {
             try {
-                const body = await request(`/scores?limit=${limit}&board=${board}`);
+                const body = await request(`/scores?limit=${limit}&board=${board}${cls ? `&cls=${encodeURIComponent(cls)}` : ''}`);
                 return { scores: body.scores || [], source: 'global' };
             } catch (e) {
                 if (board !== this.board) return { scores: [], source: 'local' };
-                return { scores: readLocal().slice(0, limit), source: 'local' };
+                return { scores: readLocal().filter(s => !cls || s.cls === cls).slice(0, limit), source: 'local' };
             }
         },
 
@@ -243,7 +243,7 @@
 
         spin(pot, spins) { return this.meta('spin', { pot, spins }); },
         bank(pot) { return this.meta('bank', { pot }); },
-        buy(item, id, tier) { return this.meta('buy', { item, id, tier }); },
+        buy(item, id) { return this.meta('buy', { item, id }); },
         equip(cls, skin) { return this.meta('equip', { cls, skin }); },
 
         /** Refresh the cached own profile (gold, artefacts, skins) in the background. */

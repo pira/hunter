@@ -215,7 +215,7 @@ extendGame({
      * The one damage pipeline. opts: kx/ky knockback, crit, sound flavour, src = where the hit came
      * from (for directional shields), aoe = explosions/lightning ignore shields.
      */
-    damageMonster(m, dmg, { kx = 0, ky = 0, crit = false, sound = 'thwack', src = null, aoe = false, dot = false } = {}) {
+    damageMonster(m, dmg, { kx = 0, ky = 0, crit = false, sound = 'thwack', src = null, aoe = false, dot = false, numColor = null } = {}) {
         if (m.dead || m.dying || m.invulnerable) return;
         if (m.shielded) {
             if (this.frameNo - (m.lastClink || 0) > 10) {
@@ -249,10 +249,12 @@ extendGame({
             m.kby += ky * weight;
         }
         this.addProgress(effective);
-        if (crit) this.floater(m.x, m.y - m.size - 6, `${Math.round(dmg)}!`, '#ffd60a', 20);
-        else if ((m.boss || m.gk) && this.frameNo - (m.lastNum || 0) > 6) {
+        // damage numbers on every hit (v2 style); crits are big and gold
+        if (crit) this.floater(m.x, m.y - m.size - 6, `${Game.fmtDmg(dmg)}!`, '#ffd60a', 20);
+        else if (this.frameNo - (m.lastNum || 0) > 4) {
             m.lastNum = this.frameNo;
-            this.floater(m.x + (Math.random() - 0.5) * m.size, m.y - m.size - 4, `${Math.round(dmg * 10) / 10}`, '#ffffff', 14);
+            const big = m.boss || m.gk;
+            this.floater(m.x + (Math.random() - 0.5) * m.size, m.y - m.size - 4, Game.fmtDmg(dmg), numColor || (big ? '#ffffff' : '#ffe4b5'), big ? 14 : 12, true);
         }
         if (!dot) this.poisonHit(m);
         if (m.onHurt) m.onHurt(m);

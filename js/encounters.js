@@ -22,7 +22,8 @@ extendGame({
     // ------------------------------------------------------------------ level flow
 
     startLevel() {
-        this.phase = 'fight';
+        this.phase = 'intro';
+        this.introT = this.level > 1 ? 50 : 10;
         this.progress = 0;
         this.target = U.levelDamage(this.level);
         this.biome = this.biomeFor(this.level);
@@ -60,17 +61,25 @@ extendGame({
         } else if (this.phase === 'loot') {
             if (--this.lootT <= 0) this.startTravel();
         } else if (this.phase === 'travel') {
-            // the road rushes on; leftover loot flies to you
+            // the road rushes on; leftover loot glides to you (magnet covers the whole screen now)
+            for (const c of this.coinDrops) c.t = Math.max(c.t, 19);
+            for (const pu of this.powerups) pu.t = Math.max(pu.t, 16);
+        } else if (this.phase === 'intro') {
+            // the hero walks to the middle; the road waits, then the level begins
             const p = this.player;
-            for (const c of this.coinDrops) {
-                c.x += (p.x - c.x) * 0.12;
-                c.y += (p.y - c.y) * 0.12;
-                c.t = Math.max(c.t, 19);
+            const tx = this.W / 2;
+            const ty = this.H * 0.62;
+            const d = Math.hypot(tx - p.x, ty - p.y);
+            if (d > 2) {
+                const v = Math.min(d, 4.5);
+                p.vx = ((tx - p.x) / d) * v;
+                p.vy = ((ty - p.y) / d) * v;
+            } else {
+                p.vx = p.vy = 0;
             }
-            for (const pu of this.powerups) {
-                pu.x += (p.x - pu.x) * 0.1;
-                pu.y += (p.y - pu.y) * 0.1;
-                pu.t = Math.max(pu.t, 16);
+            if (--this.introT <= 0 && d < 30) {
+                this.phase = 'fight';
+                if (this.level > 1) this.banner(`LEVEL ${this.level}`, this.biome.name);
             }
         }
     },
@@ -177,6 +186,10 @@ extendGame({
 
     // ------------------------------------------------------------------ gatekeepers
 
+    get chargeLength() {
+        return Math.max(this.W, this.H) * 0.5;
+    },
+
     gkHp(base) {
         return Math.round(base * U.hpScale(this.level) * (1 + 0.12 * (this.level - 1)));
     },
@@ -209,8 +222,8 @@ extendGame({
         } else if (id === 'bomber') {
             this.makeGatekeeper('bomber', cx, -40, { homeY: Math.max(this.H * 0.17, this.topSafe + 10), every: twin ? 70 : 95, mines: twin ? 2 : 1, harmless: false });
         } else if (id === 'charger') {
-            this.makeGatekeeper('charger', cx, -50, { mode: 'aim', t: 0 });
-            if (twin) this.makeGatekeeper('charger', cx, -50, { mode: 'aim', t: -90 });
+            this.makeGatekeeper('charger', cx - (twin ? 80 : 0), -50, { mode: 'enter', t: 0, dir: Math.PI / 2 });
+            if (twin) this.makeGatekeeper('charger', cx + 80, -50, { mode: 'enter', t: -60, dir: Math.PI / 2 });
         } else if (id === 'totem') {
             this.makeGatekeeper('totem', twin ? L + (R - L) * 0.3 : cx, this.H * 0.3, { spawnT: 0 });
             if (twin) this.makeGatekeeper('totem', L + (R - L) * 0.7, this.H * 0.36, { spawnT: 0 });
@@ -277,25 +290,42 @@ extendGame({
                 break;
             }
             case 'charger': {
-                if (m.mode === 'aim') {
+                // Aims from wherever it stands, charges half the map, stops (dizzy — your chance,
+                // melee heroes!), then aims again from the new spot. Never warps back to the top.
+                if (m.mode === 'enter') {
+                    m.y += (Math.max(80, this.topSafe + 30) - m.y) * 0.06;
+                    if (m.t > 50) { m.mode = 'aim'; m.t = 0; }
+                } else if (m.mode === 'aim') {
                     if (m.t < 0) break;
-                    m.y += (Math.max(70, this.topSafe) - m.y) * 0.08;
-                    m.x += U.clamp(p.x - m.x, -2.2, 2.2) * freeze;
-                    m.lane = m.t > 20;
+                    const a = Math.atan2(p.y - m.y, p.x - m.x);
+                    if (m.t < 50) m.dir = a; // the line locks 25 steps before the charge
+                    m.lane = m.t > 8;
                     if (m.t > 75) {
                         m.mode = 'charge';
                         m.t = 0;
+                        m.run = 0;
                         Sfx.tone(140, { duration: 0.3, type: 'sawtooth', volume: 0.1, slide: 200, bus: 'sfx' });
                     }
-                } else {
+                } else if (m.mode === 'charge') {
                     m.lane = false;
-                    m.y += 9 * freeze;
-                    if (m.t % 2 === 0) this.particle({ x: m.x, y: m.y - m.size, vx: 0, vy: -1, life: 16, size: m.size * 0.7, grow: -0.5, color: 'rgba(185,28,28,0.5)', kind: 'smoke' });
-                    if (m.y > this.H + 60) {
-                        m.y = -50;
-                        m.mode = 'aim';
+                    const v = 9 * freeze;
+                    m.x += Math.cos(m.dir) * v;
+                    m.y += Math.sin(m.dir) * v;
+                    m.run += v;
+                    if (m.t % 2 === 0) this.particle({ x: m.x, y: m.y, vx: 0, vy: 0, life: 16, size: m.size * 0.7, grow: -0.5, color: 'rgba(185,28,28,0.5)', kind: 'smoke' });
+                    const pad = m.size + 6;
+                    const out = m.x < pad || m.x > this.W - pad || m.y < this.topSafe * 0.6 || m.y > this.H - pad;
+                    if (m.run >= this.chargeLength || out) {
+                        m.x = U.clamp(m.x, pad, this.W - pad);
+                        m.y = U.clamp(m.y, this.topSafe * 0.6, this.H - pad);
+                        m.mode = 'dizzy';
                         m.t = 0;
+                        this.shake(6);
+                        this.ring(m.x, m.y, m.size * 2, '#fca5a5', 16);
                     }
+                } else if (m.mode === 'dizzy') {
+                    m.lane = false;
+                    if (m.t > 80) { m.mode = 'aim'; m.t = 0; }
                 }
                 break;
             }
@@ -587,8 +617,27 @@ extendGame({
         const fill = m.flash > 0 ? '#ffffff' : m.color;
         const s = m.size;
         if (m.ai === 'charger' && m.lane) {
-            ctx.fillStyle = `rgba(255,40,40,${0.18 + 0.12 * Math.sin(m.t * 0.6)})`;
-            ctx.fillRect(m.x - s, m.y, s * 2, this.H);
+            // the charge path: half the map, from where it stands
+            ctx.save();
+            ctx.translate(m.x, m.y);
+            ctx.rotate(m.dir);
+            ctx.fillStyle = `rgba(255,40,40,${0.16 + 0.12 * Math.sin(m.t * 0.6)})`;
+            ctx.fillRect(0, -s, this.chargeLength + s, s * 2);
+            ctx.fillStyle = `rgba(255,255,255,${0.3 + 0.2 * Math.sin(m.t * 0.6)})`;
+            ctx.font = `20px ${DISPLAY_FONT}`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            for (let x = 60; x < this.chargeLength; x += 70) ctx.fillText('➤', x, 0);
+            ctx.restore();
+        }
+        if (m.ai === 'charger' && m.mode === 'dizzy') {
+            ctx.fillStyle = '#fde047';
+            for (let i = 0; i < 3; i++) {
+                const a = m.t * 0.2 + (i * TAU) / 3;
+                ctx.beginPath();
+                ctx.arc(m.x + Math.cos(a) * s * 0.9, m.y - s * 1.2 + Math.sin(a) * 4, 3, 0, TAU);
+                ctx.fill();
+            }
         }
         if (m.ai === 'totem' && m.beamT > 0 && m.beams) {
             ctx.strokeStyle = `rgba(74,222,128,${m.beamT / 20})`;
@@ -667,7 +716,7 @@ extendGame({
             ctx.arc(0, s * 0.9, s * 0.4, 0, TAU);
             ctx.fill();
         } else if (m.ai === 'charger') {
-            ctx.rotate(m.mode === 'charge' ? 0 : Math.sin(m.t * 0.5) * 0.08);
+            ctx.rotate((m.mode === 'charge' ? 0 : Math.sin(m.t * 0.5) * 0.08) + (m.dir || Math.PI / 2) - Math.PI / 2);
             Game.drawShape(ctx, 'circle', s, fill);
             ctx.fillStyle = '#fef3c7';
             ctx.strokeStyle = '#000';

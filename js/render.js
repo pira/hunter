@@ -41,10 +41,14 @@ extendGame({
         this.particle({ x, y, vx: 0, vy: 0, life, size: radius, color, kind: 'ring', drag: 1 });
     },
 
-    floater(x, y, text, color, size) {
-        if (this.floaters.length > 50) this.floaters.shift();
+    floater(x, y, text, color, size, small = false) {
+        // damage numbers make way first, so level messages are never pushed out
+        if (this.floaters.length > 90) {
+            const i = this.floaters.findIndex(f => f.small);
+            this.floaters.splice(i >= 0 ? i : 0, 1);
+        }
         const margin = Math.min(this.W / 2, text.length * size * 0.3 + 6);
-        this.floaters.push({ x: U.clamp(x, margin, this.W - margin), y: U.clamp(y, size, this.H - size), text, color, size, life: 50, max: 50 });
+        this.floaters.push({ x: U.clamp(x, margin, this.W - margin), y: U.clamp(y, size, this.H - size), text, color, size, life: small ? 34 : 50, max: small ? 34 : 50, small });
     },
 
     updateParticles() {
@@ -124,6 +128,10 @@ extendGame({
 
     drawCoin(ctx, c) {
         if ((c.life < 180 || c.y > this.H - 80) && Math.floor(c.t / 6) % 2 === 0) return;
+        if (c.gem) {
+            this.drawGem(ctx, c.x, c.y - c.z, 8, c.t, c.y);
+            return;
+        }
         const r = c.value >= 5 ? 7 : 5;
         const sx = Math.max(0.2, Math.abs(Math.cos(c.spin)));
         ctx.fillStyle = 'rgba(0,0,0,0.2)';
@@ -142,6 +150,62 @@ extendGame({
         ctx.beginPath();
         ctx.ellipse(c.x - r * 0.3 * sx, y - r * 0.3, r * 0.3 * sx, r * 0.3, 0, 0, TAU);
         ctx.fill();
+    },
+
+    /** A faceted blue diamond with a soft glow and a twinkle. */
+    drawGem(ctx, x, y, r, t = 0, groundY = y) {
+        ctx.fillStyle = 'rgba(0,0,0,0.2)';
+        ctx.beginPath();
+        ctx.ellipse(x, groundY + r * 0.9, r * 0.8, r * 0.3, 0, 0, TAU);
+        ctx.fill();
+        const glow = ctx.createRadialGradient(x, y, 1, x, y, r * 2.6);
+        glow.addColorStop(0, 'rgba(125,211,252,0.55)');
+        glow.addColorStop(1, 'rgba(125,211,252,0)');
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(x, y, r * 2.6, 0, TAU);
+        ctx.fill();
+        const top = y - r * 0.55;
+        ctx.lineJoin = 'round';
+        ctx.lineWidth = 1.2;
+        ctx.strokeStyle = '#0c4a6e';
+        // crown and pavilion
+        ctx.fillStyle = '#38bdf8';
+        ctx.beginPath();
+        ctx.moveTo(x - r, top);
+        ctx.lineTo(x - r * 0.5, y - r);
+        ctx.lineTo(x + r * 0.5, y - r);
+        ctx.lineTo(x + r, top);
+        ctx.lineTo(x, y + r * 1.1);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = '#bae6fd';
+        ctx.beginPath();
+        ctx.moveTo(x - r * 0.5, y - r);
+        ctx.lineTo(x + r * 0.5, y - r);
+        ctx.lineTo(x + r * 0.3, top);
+        ctx.lineTo(x - r * 0.3, top);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = '#0284c7';
+        ctx.beginPath();
+        ctx.moveTo(x + r * 0.3, top);
+        ctx.lineTo(x + r, top);
+        ctx.lineTo(x, y + r * 1.1);
+        ctx.closePath();
+        ctx.fill();
+        const tw = Math.max(0, Math.sin(t * 0.12));
+        if (tw > 0.6) {
+            ctx.strokeStyle = `rgba(255,255,255,${(tw - 0.6) * 2.5})`;
+            ctx.lineWidth = 1.5;
+            const sx = x - r * 0.45;
+            const sy = y - r * 0.75;
+            ctx.beginPath();
+            ctx.moveTo(sx - 4, sy); ctx.lineTo(sx + 4, sy);
+            ctx.moveTo(sx, sy - 4); ctx.lineTo(sx, sy + 4);
+            ctx.stroke();
+        }
     },
 
     drawPowerup(ctx, pu) {
@@ -195,9 +259,9 @@ extendGame({
     },
 
     drawGrenade(ctx, g) {
-        this.drawShadow(ctx, g.x, g.y + 6, 5);
+        this.drawShadow(ctx, g.x, g.y + 6, Math.max(2.5, 5 - (g.z || 0) * 0.05));
         ctx.save();
-        ctx.translate(g.x, g.y);
+        ctx.translate(g.x, g.y - (g.z || 0));
         ctx.rotate(g.spin);
         ctx.fillStyle = '#2d6a4f';
         ctx.beginPath();
@@ -210,7 +274,7 @@ extendGame({
         ctx.strokeStyle = urgent ? (Math.floor(g.timer / 3) % 2 ? '#ff3b30' : '#fff') : '#ffd60a';
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.arc(g.x, g.y, 9, -Math.PI / 2, -Math.PI / 2 + TAU * (g.timer / (g.fuse || 64)));
+        ctx.arc(g.x, g.y - (g.z || 0), 9, -Math.PI / 2, -Math.PI / 2 + TAU * (g.timer / (g.fuse || 64)));
         ctx.stroke();
     },
 
@@ -490,6 +554,19 @@ extendGame({
         const breathe = moving ? 0 : Math.sin(this.frameNo * 0.06) * 0.6;
         const feetY = p.y + 14 * scale;
         this.drawShadow(ctx, p.x, feetY, 12 * scale);
+        if (this.timers.poison > 0) {
+            // the poison cloud you carry around
+            const r = POISON_RADIUS;
+            const wob = Math.sin(this.frameNo * 0.05) * 4;
+            const g = ctx.createRadialGradient(p.x, p.y, 8, p.x, p.y, r + wob);
+            g.addColorStop(0, 'rgba(163,230,53,0.05)');
+            g.addColorStop(0.7, 'rgba(132,204,22,0.2)');
+            g.addColorStop(1, 'rgba(101,163,13,0)');
+            ctx.fillStyle = g;
+            ctx.beginPath();
+            ctx.ellipse(p.x, p.y, r + wob, (r + wob) * 0.85, 0, 0, TAU);
+            ctx.fill();
+        }
         const fx = this.skinExtras();
         if (fx.aura) {
             // mythic skins glow
@@ -574,7 +651,7 @@ extendGame({
             if (sweep < 1 || t < 0.8) {
                 const hx = p.x + Math.cos(a1) * 10;
                 const hy = p.y - 4 + Math.sin(a1) * 10;
-                Game.drawAxe(ctx, pal, hx, hy, a1 + Math.PI / 2, Math.min(1.25, c.reach / 70));
+                Game.drawAxe(ctx, pal, hx, hy, a1 + Math.PI / 2, Math.min(1.25, this.impactMult * 1.1), 1 + 0.1 * this.stack('reach'));
             }
         }
     },
@@ -603,7 +680,7 @@ extendGame({
         this.blitSprite(ctx, 'barbarian', this.skin, 0, p.x, p.y + 14, 1, face * Math.max(0.35, Math.abs(Math.cos(spin))), 'noweapon');
         for (const off of [0, Math.PI]) {
             const a = spin + off;
-            Game.drawAxe(ctx, pal, p.x + Math.cos(a) * 12, p.y - 6 + Math.sin(a) * 12, a + Math.PI / 2, reach / 70);
+            Game.drawAxe(ctx, pal, p.x + Math.cos(a) * 12, p.y - 6 + Math.sin(a) * 12, a + Math.PI / 2, Math.min(1.25, this.impactMult * 1.1), 1 + 0.1 * this.stack('reach'));
         }
     },
 
@@ -819,6 +896,13 @@ extendGame({
         ctx.arc(ax + this.stick.dx * r, ay + this.stick.dy * r, r * 0.4, 0, TAU);
         ctx.fill();
         ctx.globalAlpha = 1;
+    }
+});
+
+Object.assign(Game, {
+    /** 0.7 → "0.7", 2 → "2", 13.4 → "13" */
+    fmtDmg(d) {
+        return d < 10 ? String(Math.round(d * 10) / 10) : String(Math.round(d));
     }
 });
 

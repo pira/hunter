@@ -191,10 +191,25 @@ extendGame({
         this.headerShown = false;
     },
 
+    /** Rarely (~6%), the shop also offers a basic artefact for the profile collection. */
+    artefactCard() {
+        const cap = 1 + Math.floor(this.level / 5); // the server accepts this many per run
+        if (!Leaderboard.enabled || !Leaderboard.identity() || this.artCards.length >= cap || Math.random() > 0.06) return null;
+        const ids = Object.keys(ARTEFACTS);
+        const id = ids[Math.floor(Math.random() * ids.length)];
+        const a = ARTEFACTS[id];
+        return {
+            id: `art:${id}`, artefact: id, icon: a.icon, name: a.name, desc: `Keep forever: +${Math.abs(a.values[1])}% ${a.what}. Slot it in your profile; merge 3 to upgrade.`,
+            price: Math.max(40, Math.round(1.5 * Math.max(this.expectedIncome(this.level), this.incomeEMA || 0)))
+        };
+    },
+
     prepareCards(mode) {
         const { permanent, buffs } = this.availableCards();
         const cards = U.dealCards(permanent, buffs, 3);
         this.cardChoices = cards.map(c => ({ ...c, price: this.cardPrice(c), sold: false }));
+        const art = this.artefactCard();
+        if (art) this.cardChoices.push({ ...art, sold: false });
         this.cardMode = mode;
         this.cardHeader();
 
@@ -203,9 +218,11 @@ extendGame({
             const pips = Number.isFinite(c.max) && c.max > 1
                 ? `<div class="pips">${Array.from({ length: c.max }, (_, k) => `<i class="${k < rank ? 'on' : k === rank ? 'next' : ''}"></i>`).join('')}</div>`
                 : '';
-            const tag = c.cls ? `<span class="tag">${CLASSES[c.cls].icon} ${CLASSES[c.cls].name}</span>`
-                : c.buff ? '<span class="tag buff">1 level</span>' : '';
-            return `<button class="card" data-i="${i}" style="--d:${i * 70}ms"><span class="num">${i + 1}</span>` +
+            const kind = c.artefact ? 'art' : c.share ? 'lvl' : 'perm';
+            const tag = c.artefact ? '<span class="tag art">✨ ARTEFACT</span>'
+                : c.share ? `<span class="tag lvl">${c.buff ? 'THIS LEVEL' : 'NOW'}</span>`
+                    : `<span class="tag perm">PERMANENT${c.cls ? ` · ${CLASSES[c.cls].icon}` : ''}</span>`;
+            return `<button class="card ${kind}" data-i="${i}" style="--d:${i * 70}ms"><span class="num">${i + 1}</span>` +
                 `<span class="cicon">${c.icon}</span><span class="cname">${c.name}</span>${tag}` +
                 `<span class="cdesc">${c.desc}</span>${pips}<span class="price">🪙 ${c.price}</span></button>`;
         }).join('');
@@ -242,7 +259,13 @@ extendGame({
         this.coins -= card.price;
         this.coinsSpent = (this.coinsSpent || 0) + card.price;
         card.sold = true;
-        this.applyCard(card);
+        if (card.artefact) {
+            this.artCards.push(card.artefact);
+            this.floater(this.player.x, this.player.y - 50, `${card.icon} added to your collection!`, '#f0abfc', 18);
+            Sfx.arpeggio([784, 988, 1318, 1568, 2093], 0.06, { type: 'triangle', volume: 0.12 });
+        } else {
+            this.applyCard(card);
+        }
         Sfx.arpeggio([659, 880, 1175], 0.05, { type: 'triangle', volume: 0.1 });
         this.refreshShop();
     },

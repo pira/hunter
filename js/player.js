@@ -80,6 +80,12 @@ extendGame({
             ix = this.stick.dx;
             iy = this.stick.dy;
         }
+        if (this.phase === 'intro') {
+            // walking to the start position on its own (see updateLevelFlow)
+            const n = U.normalizeVector(p.vx, p.vy);
+            ix = n.x;
+            iy = n.y;
+        }
 
         const speed = p.baseSpeed * this.moveMult;
         p.vx = U.lerp(p.vx, ix * speed, 0.3);

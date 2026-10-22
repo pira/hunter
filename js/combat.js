@@ -34,7 +34,7 @@ extendGame({
     },
 
     get cleaveReach() {
-        return PRIMARY.cleave.reach * (1 + 0.25 * this.stack('reach')) * this.impactMult;
+        return PRIMARY.cleave.reach * (1 + 0.1 * this.stack('reach')) * this.impactMult;
     },
 
     get blastRadius() {
@@ -148,14 +148,17 @@ extendGame({
         const count = Math.min(5, 2 + this.stack('cluster')); // goblins always throw a pair
         const dirs = all ? 4 : 1;
         const base = aim ? Math.atan2(aim.y - p.y, aim.x - p.x) : -Math.PI / 2;
-        const range = all ? def.range : Math.min(def.range, Math.hypot(aim.x - p.x, aim.y - p.y) + 10);
+        const range = all ? def.range : Math.min(def.range, Math.hypot(aim.x - p.x, aim.y - p.y));
         const fuse = Math.round(def.fuse * Math.pow(0.8, this.stack('fuse')));
         for (let d = 0; d < dirs; d++) {
             for (let i = 0; i < count; i++) {
                 const a = base + (d * TAU) / 4 + (i - (count - 1) / 2) * 0.32;
+                // lob so the first bounce lands on the target, then hop up to `bounces` times
+                const dist = Math.max(30, range * (all ? 0.7 + 0.3 * Math.random() : 1));
+                const flight = dist / def.speed;
                 this.grenades.push({
-                    x: p.x, y: p.y, sx: p.x, sy: p.y, vx: Math.cos(a) * 6.5, vy: Math.sin(a) * 6.5,
-                    range: range * (all ? 0.75 + 0.25 * Math.random() : 1), timer: fuse, fuse, spin: 0,
+                    x: p.x, y: p.y, sx: p.x, sy: p.y, z: 6, vx: Math.cos(a) * def.speed, vy: Math.sin(a) * def.speed,
+                    vz: GRENADE_G * flight / 2, bounces: 0, timer: fuse, fuse, spin: 0,
                     radius: this.blastRadius * blastMult, damage: def.damage
                 });
             }
@@ -165,16 +168,32 @@ extendGame({
 
     updateGrenades() {
         for (const g of this.grenades) {
-            const travelled = Math.hypot(g.x - g.sx, g.y - g.sy);
-            if (travelled < g.range) {
-                g.x += g.vx;
-                g.y += g.vy;
-                g.spin += 0.3;
-                for (const m of this.monsters) {
-                    if (!m.dead && U.distanceSquared(g.x, g.y, m.x, m.y) < (5 + m.size) ** 2) {
-                        g.range = 0; // stick to the first monster touched
-                        break;
-                    }
+            g.x += g.vx;
+            g.y += g.vy;
+            g.z += g.vz;
+            g.vz -= GRENADE_G;
+            g.spin += 0.05 * Math.hypot(g.vx, g.vy);
+            const over = (g.vx || g.vy) && this.monsters.some(m => !m.dead && !m.dying && !m.hidden && U.distanceSquared(g.x, g.y, m.x, m.y) < (4 + m.size) ** 2);
+            // flying over a monster: stop and drop straight onto it
+            if (over && g.z > 0) {
+                g.vx = 0;
+                g.vy = 0;
+                g.vz = Math.min(g.vz, -1);
+            }
+            if (g.z <= 0) {
+                // touching the ground (or resting): right on a monster → boom now; otherwise bounce on
+                g.z = 0;
+                const hit = this.monsters.some(m => !m.dead && !m.dying && !m.hidden && U.distanceSquared(g.x, g.y, m.x, m.y) < (6 + m.size) ** 2);
+                if (hit) {
+                    g.timer = 0;
+                } else if (g.bounces < PRIMARY.grenade.bounces) {
+                    g.bounces++;
+                    g.vz = Math.abs(g.vz) * 0.55;
+                    g.vx *= 0.6;
+                    g.vy *= 0.6;
+                    if (g.bounces === 1) Sfx.hit(8, { volume: 0.08, flavor: 'thwack' });
+                } else {
+                    g.vx = g.vy = g.vz = 0; // resting; goes off on its fuse
                 }
             }
             g.timer--;
@@ -330,7 +349,7 @@ extendGame({
     // ---- Storm: chain lightning every 3 s while the timer runs
 
     updateStorm() {
-        if (!(this.timers.storm > 0)) return;
+        if (!(this.timers.storm > 0) || this.lootFrozen) return;
         if (--this.stormClock <= 0) {
             this.stormClock = STORM.every;
             this.stormStrike();

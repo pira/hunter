@@ -342,20 +342,22 @@ Object.assign(Game, {
     },
 
     /** Two-headed axe; (x, y) is the hand, `rot` tilts it, `s` scales. */
-    drawAxe(g, p, x, y, rot, s) {
+    drawAxe(g, p, x, y, rot, s, handle = 1) {
         g.save();
         g.translate(x, y);
         g.rotate(rot);
         g.scale(s, s);
+        const top = -28 * handle; // Longer Handle card stretches the shaft, not the blades
         g.strokeStyle = OUTLINE;
         g.lineWidth = 4.4;
         g.beginPath();
         g.moveTo(0, 6);
-        g.lineTo(0, -28);
+        g.lineTo(0, top);
         g.stroke();
         g.strokeStyle = p.axeHandle;
         g.lineWidth = 2.6;
         g.stroke();
+        g.translate(0, top + 28);
         for (const side of [-1, 1]) {
             g.beginPath();
             g.moveTo(0, -27);

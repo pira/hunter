@@ -159,6 +159,8 @@
         .board .pts { font-family: var(--display); letter-spacing: .5px; }
         #version { color: #475569; font-size: .7em; margin-top: 1em; }
         .panel-corner { position: absolute; top: .7em; right: .7em; }
+        .panel-corner.left { right: auto; left: .7em; }
+        .music-btn.off { opacity: .45; text-decoration: line-through; }
         .fs-btn { font-size: 1.05em; }
         body.no-fs .fs-btn { display: none !important; }
         .hint { margin: .9em auto 0; padding: .5em 2.2em .5em .8em; position: relative; border-radius: 12px; background: rgba(91,63,209,.25); border: 1px solid rgba(167,139,250,.45); color: #e9e5ff; font-size: .85em; line-height: 1.4; }
@@ -191,15 +193,17 @@
         .pips i.on { background: var(--gold); }
         .pips i.next { background: #fff; box-shadow: 0 0 8px #fff; animation: throb .5s infinite alternate; }
         body.touch .card .num { display: none; }
-        #coins { font-family: var(--display); font-size: 1.1em; color: var(--gold); text-shadow: 0 2px 0 rgba(0,0,0,.55); }
+        #coins, #gems { font-family: var(--display); font-size: 1.1em; color: var(--gold); text-shadow: 0 2px 0 rgba(0,0,0,.55); }
+        .purse { display: flex; gap: 10px; align-items: baseline; }
+        #gems { color: #7dd3fc; }
         #shopCoins { font-family: var(--display); font-size: 1.6em; color: var(--gold); text-shadow: 0 3px 0 rgba(0,0,0,.5); margin: -.4em 0 .6em; }
         #levelupSub .gold { color: var(--gold); font-weight: normal; font-family: var(--display); }
         #continueBtn { margin-top: 1.1em; }
         .shop-hint { color: var(--muted); font-size: .75em; margin: .6em 0 0; }
         .card .price { margin-top: auto; padding-top: .4em; font-family: var(--display); font-size: 1.25em; letter-spacing: .5px; }
         .card.afford .price { color: var(--gold); }
-        .card.afford { border-color: rgba(255,214,10,.45); }
-        .card.poor { cursor: not-allowed; background: linear-gradient(180deg, #161b24, #0c1018); }
+        .card.card.afford { border-color: rgba(255,214,10,.6); }
+        .card.card.poor { cursor: not-allowed; background: linear-gradient(180deg, #161b24, #0c1018); }
         .card.poor > :not(.price) { filter: grayscale(.9); opacity: .45; }
         .card.poor:hover { transform: none; border-color: rgba(255,255,255,.18); }
         .card.poor .price { color: #ff4d4d; text-shadow: 0 0 10px rgba(255,60,60,.35); }
@@ -208,6 +212,15 @@
         .card.nope { animation: nope .3s; }
         @keyframes nope { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
         .tag.buff { color: #a7f3d0; background: rgba(74,222,128,.12); }
+        /* shop cards: teal = this level only, gold = whole run, rarity glow = artefact */
+        .tag.lvl { color: #99f6e4; background: rgba(45,212,191,.16); letter-spacing: .5px; }
+        .tag.perm { color: #fde68a; background: rgba(250,204,21,.16); letter-spacing: .5px; }
+        .tag.art { color: #f5d0fe; background: rgba(232,121,249,.2); letter-spacing: .5px; }
+        .card.lvl { background: linear-gradient(180deg, #134e4a, #0f172a 70%); border-color: rgba(45,212,191,.35); }
+        .card.perm { background: linear-gradient(180deg, #3f2d0c, #0f172a 70%); border-color: rgba(250,204,21,.3); }
+        .card.art { background: linear-gradient(180deg, #4a1d5c, #1e1b4b 70%); border-color: #e879f9; box-shadow: 0 8px 0 rgba(0,0,0,.35), 0 0 22px rgba(232,121,249,.45); }
+        .card.art .cicon { animation: artGlow 1.6s ease-in-out infinite alternate; }
+        @keyframes artGlow { from { filter: drop-shadow(0 0 2px #f0abfc); } to { filter: drop-shadow(0 0 12px #e879f9); } }
         .tag.new { color: #fecaca; background: rgba(248,113,113,.16); }
         .pu { position: relative; }
         .pu i { position: absolute; right: 1px; top: 0; font-style: normal; font-family: var(--display); font-size: .45em; color: #fff; text-shadow: 0 1px 2px #000; }
@@ -242,6 +255,10 @@
         .cls canvas { width: 4.2em; height: 4.2em; }
         .cls b { font-family: var(--display); font-weight: normal; font-size: 1em; letter-spacing: .5px; }
         .cls small { font-size: .6em; letter-spacing: 1px; }
+        .cstat { display: flex; align-items: center; gap: .25em; font-size: .6em; line-height: 1; }
+        .cstat > span { display: flex; gap: 2px; }
+        .cstat em { width: .55em; height: .55em; border-radius: 50%; background: rgba(255,255,255,.18); }
+        .cstat em.on { background: var(--c); box-shadow: 0 0 4px var(--c); }
         .cls:hover { transform: translateY(-3px); }
         .cls.on { border-color: var(--c); background: radial-gradient(circle at 50% 35%, color-mix(in srgb, var(--c) 45%, transparent), rgba(255,255,255,.03) 70%); box-shadow: 0 0 18px color-mix(in srgb, var(--c) 55%, transparent); transform: translateY(-3px); }
         .cls.on b { color: #fff; }
@@ -284,7 +301,28 @@
         .gold-line b { font-family: var(--display); font-weight: normal; color: var(--gold); font-size: 1.3em; letter-spacing: .5px; }
         .gold-line small { display: block; color: var(--muted); font-size: .72em; }
         .arts { list-style: none; padding: 0; margin: .4em 0 0; }
-        .arts li { display: grid; grid-template-columns: 1.8em 1fr auto auto; gap: .5em; align-items: center; padding: .35em .4em; border-radius: 10px; font-size: .85em; }
+        .arts li { display: grid; grid-template-columns: 1.8em 1fr auto; gap: .5em; align-items: center; padding: .4em .4em; border-radius: 10px; font-size: .85em; }
+        .arts .chips { display: flex; flex-wrap: wrap; gap: .25em .5em; margin-top: .15em; }
+        .arts .chips .tier i { font-style: normal; opacity: .8; font-family: inherit; font-size: .9em; }
+        .arts .acts { display: flex; flex-direction: column; gap: .25em; align-items: stretch; }
+        .arts.flash { animation: artsFlash .8s ease-out; }
+        @keyframes artsFlash { 0% { box-shadow: 0 0 0 0 rgba(232,121,249,.8); } 100% { box-shadow: 0 0 0 16px rgba(232,121,249,0); } }
+        .buy.merge { background: linear-gradient(180deg, #f0abfc, #c026d3); color: #2e0536; box-shadow: 0 2px 0 #701a75; }
+        .buy.equip, .buy.gem { background: linear-gradient(180deg, #7dd3fc, #0284c7); color: #062033; box-shadow: 0 2px 0 #075985; }
+        .buy.merge:disabled, .buy.equip:disabled, .buy.gem:disabled { background: #334155; color: #94a3b8; box-shadow: none; }
+        .profile-shop h3 small { font-family: var(--body, inherit); font-size: .6em; color: var(--muted); letter-spacing: 0; margin-left: .4em; }
+        .gem-count { margin-left: .8em; }
+        .gem-count b { color: #7dd3fc; }
+        .slots { display: grid; grid-template-columns: repeat(4, 1fr); gap: .5em; margin-top: .4em; }
+        .slot { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 4.6em; padding: .35em .2em; border-radius: 12px; border: 2px solid var(--t); background: radial-gradient(circle at 50% 30%, color-mix(in srgb, var(--t) 28%, transparent), rgba(255,255,255,.03)); text-align: center; line-height: 1.15; }
+        .slot .si { font-size: 1.6em; }
+        .slot b { font-family: var(--display); font-weight: normal; color: var(--t); }
+        .slot small { font-size: .68em; color: var(--muted); }
+        .slot.empty { border: 2px dashed rgba(255,255,255,.18); background: rgba(255,255,255,.03); color: var(--muted); font-size: .8em; }
+        .slot .x { position: absolute; top: 2px; right: 4px; border: 0; background: none; color: var(--muted); font-size: .8em; padding: 2px; }
+        .skin .perk { color: #a7f3d0; }
+        .icon-pick { border: 0; border-radius: 8px; padding: .15em .4em; margin-top: .15em; font-size: .75em; background: rgba(255,255,255,.08); color: #e2e8f0; }
+        .icon-pick.on { background: rgba(250,204,21,.25); color: #fde68a; }
         .arts li:nth-child(odd) { background: rgba(255,255,255,.04); }
         .arts .ai { font-size: 1.4em; }
         .arts .an { display: flex; flex-direction: column; line-height: 1.2; }
@@ -308,6 +346,9 @@
         .board-tabs { display: flex; justify-content: center; gap: 4px; margin: .35em 0 0; }
         .board-tabs button { border: 1px solid var(--line); background: transparent; color: var(--muted); border-radius: 999px; padding: .2em .8em; font-size: .75em; }
         .board-tabs button.on { background: rgba(250,204,21,.15); color: var(--gold); border-color: rgba(250,204,21,.5); }
+        .cls-tabs { margin-top: .25em; }
+        .cls-tabs button { font-size: .7em; padding: .15em .6em; }
+        .cls-tabs[hidden] { display: none; }
         .board .cls-i { font-size: .85em; margin-right: .25em; }
         .board li[data-pid] { cursor: pointer; }
         .board li[data-pid]:hover { background: rgba(255,255,255,.1); }
@@ -352,12 +393,13 @@
                 <div id="hearts"></div>
                 <div id="superBar" title="Super meter"><div id="superFill"></div></div>
                 <div class="lvl"><span id="levelLabel">LV 1</span><div class="xpbar"><div id="xpFill"></div></div></div>
-                <div id="coins">🪙 0</div>
+                <div class="purse"><span id="coins">🪙 0</span><span id="gems" hidden>💎 0</span></div>
             </div>
             <div class="hud-center"><div id="score">0</div></div>
             <div class="hud-right">
                 <div id="powerups"></div>
                 <button id="fsBtn" class="icon-btn fs-btn" aria-label="Fullscreen">⛶</button>
+                <button id="musicBtn" class="icon-btn music-btn" aria-label="Toggle music">🎵</button>
                 <button id="muteBtn" class="icon-btn" aria-label="Toggle sound">🔊</button>
                 <button id="pauseBtn" class="icon-btn" aria-label="Pause">⏸</button>
             </div>
@@ -375,6 +417,7 @@
         <div id="menu" class="overlay">
             <div class="panel">
                 <button id="menuFsBtn" class="icon-btn fs-btn panel-corner" aria-label="Fullscreen">⛶</button>
+                <button id="menuMusicBtn" class="icon-btn music-btn panel-corner left" aria-label="Toggle music">🎵</button>
                 <div class="logo"><canvas id="logoHero" class="wiz" width="160" height="160"></canvas><h1>MONSTER<br><span>HUNTER</span></h1></div>
                 <p class="tagline">Survive the horde. Chain kills. Slay the bosses.</p>
                 <div id="who">
@@ -400,12 +443,13 @@
                 <button id="playBtn" class="btn primary">▶ PLAY</button>
                 <div class="howto desktop-only">
                     <kbd>WASD</kbd> move · you attack on your own · hold <kbd>click</kbd> to aim<br>
-                    <kbd>Space</kbd> SUPER when the bar is full · <kbd>P</kbd> pause · <kbd>M</kbd> mute
+                    <kbd>Space</kbd> SUPER when the bar is full · <kbd>P</kbd> pause · <kbd>M</kbd> mute · <kbd>B</kbd> music
                 </div>
                 <div class="howto touch-only">Drag anywhere to move · you attack on your own<br>Tap ⚡ SUPER when the bar is full</div>
                 <div id="iosHint" class="hint" hidden>📲 Tap <b>Share</b> → <b>Add to Home Screen</b> to play fullscreen <button id="iosHintClose" aria-label="Dismiss">✕</button></div>
                 <h3 id="menuBoardTitle">🏆 Top Hunters</h3>
                 <div class="board-tabs" id="boardTabs"><button data-board="v3" class="on">Monster Road</button><button data-board="v2">Classic</button></div>
+                <div class="board-tabs cls-tabs" id="clsTabs"><button data-cls="" class="on">All</button><button data-cls="wizard">🧙 Wizard</button><button data-cls="barbarian">🪓 Barbarian</button><button data-cls="goblin">💣 Goblin</button></div>
                 <ol id="menuBoard" class="board"></ol>
                 <div id="version"></div>
             </div>
@@ -418,7 +462,7 @@
                 <div id="shopCoins">🪙 0</div>
                 <div id="cards"></div>
                 <button id="continueBtn" class="btn primary">CONTINUE ▶</button>
-                <p class="shop-hint desktop-only"><kbd>1</kbd>–<kbd>3</kbd> buy · <kbd>Enter</kbd> continue</p>
+                <p class="shop-hint desktop-only"><kbd>1</kbd>–<kbd>4</kbd> buy · <kbd>Enter</kbd> continue</p>
             </div>
         </div>
 

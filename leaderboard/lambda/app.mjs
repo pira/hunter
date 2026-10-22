@@ -4,14 +4,17 @@
 // Get | Put | Update | Query | TransactWrite. index.mjs wires it to the real SDK, tests to a fake.
 //
 // Routes
-//   GET  /scores?limit=10            top scores
+//   GET  /scores?limit=10&board=v3&cls=wizard   top scores (cls filters the v3 board by class)
 //   POST /run                        start a run, returns a signed single-use token
 //   POST /scores                     submit a finished run (optionally with playerId + secret)
 //   GET  /player/{id}                public profile + last 20 runs
 //   POST /player/{id}/name           rename { secret, name }
 //   POST /player/{id}/spin           double-or-nothing on the run's pot { secret, pot, spins }
 //   POST /player/{id}/bank           close the pot { secret, pot }
-//   POST /player/{id}/buy            artefact tier or skin { secret, item: 'artefact'|'skin', id, tier? }
+//   POST /player/{id}/buy            basic artefact (gold) or skin (gold/gems) { secret, item: 'artefact'|'skin', id }
+//   POST /player/{id}/merge          3 × tier-1 → 1 × tier (gems) { secret, id, tier }
+//   POST /player/{id}/slots          artefacts active in runs { secret, slots: ['greed_2', …] } (≤4, distinct ids)
+//   POST /player/{id}/icon           public profile icon { secret, cls, skin ('' = class default) }
 //   POST /player/{id}/equip          wear an owned skin { secret, cls, skin ('' = none) }
 //
 // Items (single table):
@@ -23,7 +26,7 @@
 //   pk="player#<pid>"  sk="run#<ts>#<id>"                 run history
 //   pk="pot#<nonce>"   sk="pot"                           the run's banked gold on the wheel (TTL 24 h)
 import { createHmac, createHash, randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
-import { TIERS, ARTEFACTS, SKINS, SKIN_PRICES, WHEEL_WIN } from './catalog.mjs';
+import { ARTEFACTS, ARTEFACT_PRICE, MERGE_GEMS, MAX_SLOTS, artKey, SKINS, SKIN_PRICES, WHEEL_WIN } from './catalog.mjs';
 
 export const BOARD = 'board#v2';
 export const BOARD_V3 = 'board#v3';
@@ -34,7 +37,7 @@ export const MAX_RUN_MS = 6 * 3600 * 1000;
 export const SUBMITS_PER_MINUTE = 6;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const SECRET_RE = /^[A-Za-z0-9_-]{32,128}$/;
-const PUBLIC_META = ['name', 'bestScore', 'bestLevel', 'runs', 'kills', 'bosses', 'playSeconds', 'createdAt', 'updatedAt', 'gold', 'artefacts', 'skins', 'equipped'];
+const PUBLIC_META = ['name', 'bestScore', 'bestLevel', 'runs', 'kills', 'bosses', 'playSeconds', 'createdAt', 'updatedAt', 'gold', 'gems', 'arts', 'slots', 'icon', 'skins', 'equipped'];
 const POT_RE = /^[A-Za-z0-9_-]{6,40}$/;
 const POT_TTL = 24 * 3600;
 
@@ -71,6 +74,49 @@ export function coinCap(kills, bosses, level) {
     return Math.round(200 + kills * 12 * hpScale + bosses * 600 + level * 120);
 }
 
+// Upper bound on gems one run can find (rare drops, bosses drop a few).
+export function gemCap(kills, bosses, level) {
+    return 2 + bosses * 6 + Math.floor(kills / 100) + level;
+}
+
+/** Brings any stored profile to the current shape: gems, arts {id_tier: n}, slots, icon.
+ *  P7 profiles kept one artefact tier per id in `artefacts`; those become owned + slotted items. */
+export function upgradeMeta(meta) {
+    const m = { ...meta };
+    m.gold = m.gold || 0;
+    m.gems = m.gems || 0;
+    m.skins = { ...(m.skins || {}) };
+    m.equipped = { ...(m.equipped || {}) };
+    if (!m.arts) {
+        m.arts = {};
+        m.slots = [];
+        for (const [id, tier] of Object.entries(m.artefacts || {})) {
+            if (!ARTEFACTS.includes(id) || !(tier >= 1 && tier <= 4)) continue;
+            m.arts[artKey(id, tier)] = 1;
+            if (m.slots.length < MAX_SLOTS) m.slots.push(artKey(id, tier));
+        }
+    } else {
+        m.arts = { ...m.arts };
+    }
+    delete m.artefacts;
+    m.slots = Array.isArray(m.slots) ? [...m.slots] : [];
+    if (m.icon === undefined) m.icon = null;
+    m.version = m.version || 0;
+    return m;
+}
+
+const parseArt = key => {
+    const m = /^([a-z]+)_([1-4])$/.exec(typeof key === 'string' ? key : '');
+    return m && ARTEFACTS.includes(m[1]) ? { id: m[1], tier: Number(m[2]) } : null;
+};
+
+/** Adds a basic artefact; it takes a free slot if that artefact isn't slotted yet. */
+function grantBasic(m, id) {
+    const k = artKey(id, 1);
+    m.arts[k] = (m.arts[k] || 0) + 1;
+    if (m.slots.length < MAX_SLOTS && !m.slots.some(s => s.startsWith(`${id}_`))) m.slots.push(k);
+}
+
 export function sanitizeName(name) {
     if (typeof name !== 'string') return '';
     return name.replace(/[\u0000-\u001F\u007F<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 16);
@@ -101,13 +147,26 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
         return { issuedAt, nonce: parts[1] };
     }
 
-    async function topScores(board, limit) {
-        const out = await send('Query', {
-            KeyConditionExpression: 'pk = :pk',
-            ExpressionAttributeValues: { ':pk': board },
-            Limit: limit
-        });
-        return (out.Items || []).map(({ id, name, score, level, kills, combo, bosses, duration, ts, playerId, cls, skin }) =>
+    async function topScores(board, limit, cls) {
+        let items;
+        if (!cls) {
+            items = (await send('Query', { KeyConditionExpression: 'pk = :pk', ExpressionAttributeValues: { ':pk': board }, Limit: limit })).Items || [];
+        } else {
+            // per-class view of the v3 board: filtered pages, best first, until enough rows
+            items = [];
+            let ExclusiveStartKey;
+            let pages = 0;
+            do {
+                const out = await send('Query', {
+                    KeyConditionExpression: 'pk = :pk', FilterExpression: 'cls = :c',
+                    ExpressionAttributeValues: { ':pk': board, ':c': cls }, Limit: 300, ExclusiveStartKey
+                });
+                items.push(...(out.Items || []));
+                ExclusiveStartKey = out.LastEvaluatedKey;
+            } while (ExclusiveStartKey && items.length < limit && ++pages < 10);
+            items = items.slice(0, limit);
+        }
+        return items.map(({ id, name, score, level, kills, combo, bosses, duration, ts, playerId, cls, skin }) =>
             ({ id, name, score, level, kills, combo, bosses, duration, ts, playerId, cls, skin }));
     }
 
@@ -146,6 +205,7 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
 
     function publicMeta(pid, meta) {
         const out = { id: pid };
+        meta = upgradeMeta(meta);
         for (const k of PUBLIC_META) if (meta[k] !== undefined) out[k] = meta[k];
         return out;
     }
@@ -179,16 +239,26 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
                 if (!isInt(body.coins, 0, 100_000_000)) throw new HttpError(400, 'invalid coins');
                 out.coins = body.coins;
             }
+            if (body.gems !== undefined) {
+                if (!isInt(body.gems, 0, 100_000)) throw new HttpError(400, 'invalid gems');
+                out.gems = body.gems;
+            }
+            if (body.artCards !== undefined) {
+                if (!Array.isArray(body.artCards) || body.artCards.length > 200 || !body.artCards.every(a => ARTEFACTS.includes(a))) throw new HttpError(400, 'invalid artefacts');
+                out.artCards = body.artCards;
+            }
         }
         return out;
     }
 
     /** v3: levels are earned by damage over time, so the level is bounded by the run length. */
     function checkPlausibleV3(run) {
-        const { score, level, kills, combo, duration, bosses, coins } = run;
+        const { score, level, kills, combo, duration, bosses, coins, gems, artCards } = run;
         if (level > 2 + Math.floor(duration / MIN_LEVEL_SECONDS)) throw new HttpError(422, 'implausible level');
         if (score > 1000 + duration * 4000 || kills > 60 + duration * 25 || combo > kills) throw new HttpError(422, 'implausible score');
         if (coins !== undefined && coins > coinCap(kills, bosses, level)) throw new HttpError(422, 'implausible coins');
+        if (gems !== undefined && gems > gemCap(kills, bosses, level)) throw new HttpError(422, 'implausible gems');
+        if (artCards && artCards.length > 1 + Math.floor(level / 5)) throw new HttpError(422, 'implausible artefacts');
     }
 
     function checkPlausible(run) {
@@ -222,7 +292,7 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
         const board = v3 ? BOARD_V3 : BOARD;
         const sk = `${pad(MAX_SCORE - run.score, 9)}#${pad(ts, 14)}#${id}`;
         const nonceItem = { pk: 'nonce', sk: token.nonce, ttl: Math.floor(ts / 1000) + 8 * 3600 };
-        const { coins: unspent, ...shown } = run;
+        const { coins: unspent, gems: _gems, artCards: _cards, ...shown } = run;
         const boardItem = { pk: board, sk, id, ...shown, ts };
         if (pid) boardItem.playerId = pid;
         // The skin shown on the board is whatever the profile has equipped — never the client's word.
@@ -258,7 +328,7 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
         };
         for (let attempt = 0; attempt < 3; attempt++) {
             const next = {
-                ...(meta || newMeta(pid, secret, ts)),
+                ...upgradeMeta(meta || newMeta(pid, secret, ts)),
                 name: run.name,
                 updatedAt: ts
             };
@@ -270,10 +340,9 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
             next.bestLevel = Math.max(next.bestLevel || 0, run.level);
             next.version = (meta ? meta.version || 0 : 0) + 1;
             // Unspent gold is banked 100% at death (D5); the pot lets it ride on the wheel.
-            next.gold = (next.gold || 0) + unspent;
-            next.artefacts = next.artefacts || {};
-            next.skins = next.skins || {};
-            next.equipped = next.equipped || {};
+            next.gold += unspent;
+            next.gems += run.gems || 0;
+            for (const a of run.artCards || []) grantBasic(next, a);
             const metaPut = meta
                 ? { Put: { Item: next, ConditionExpression: '#v = :v', ExpressionAttributeNames: { '#v': 'version' }, ExpressionAttributeValues: { ':v': meta.version || 0 } } }
                 : { Put: { Item: next, ConditionExpression: 'attribute_not_exists(pk)' } };
@@ -303,20 +372,45 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
     function newMeta(pid, secret, ts) {
         return {
             pk: `player#${pid}`, sk: 'meta', secretHash: sha256(secret), createdAt: ts, runs: 0, kills: 0, bosses: 0, playSeconds: 0,
-            bestScore: 0, bestLevel: 0, gold: 0, artefacts: {}, skins: {}, equipped: {}, version: 0
+            bestScore: 0, bestLevel: 0, gold: 0, gems: 0, arts: {}, slots: [], icon: null, skins: {}, equipped: {}, version: 0
         };
     }
 
     /** Profiles created before the meta shop lack its maps; add them so nested updates work. */
     async function ensureMaps(pid, meta) {
-        if (meta.artefacts && meta.skins && meta.equipped && meta.gold !== undefined) return meta;
+        if (meta.skins && meta.equipped && meta.gold !== undefined && meta.version !== undefined) return meta;
         const out = await send('Update', {
             Key: { pk: `player#${pid}`, sk: 'meta' },
-            UpdateExpression: 'SET artefacts = if_not_exists(artefacts, :m), skins = if_not_exists(skins, :m), equipped = if_not_exists(equipped, :m), gold = if_not_exists(gold, :z)',
+            UpdateExpression: 'SET skins = if_not_exists(skins, :m), equipped = if_not_exists(equipped, :m), gold = if_not_exists(gold, :z), version = if_not_exists(version, :z)',
             ExpressionAttributeValues: { ':m': {}, ':z': 0 },
             ReturnValues: 'ALL_NEW'
         });
         return out.Attributes;
+    }
+
+    /** Read-modify-write of the own profile under the version lock (spins bump it too). */
+    async function mutateMeta(pid, body, change) {
+        let meta = await ownProfile(pid, body);
+        const h = sha256(body.secret);
+        for (let attempt = 0; attempt < 4; attempt++) {
+            const next = upgradeMeta(meta);
+            change(next); // throws HttpError when the action isn't allowed
+            next.version = (meta.version || 0) + 1;
+            next.updatedAt = now();
+            try {
+                await send('Put', {
+                    Item: next,
+                    ConditionExpression: '#v = :v AND secretHash = :h',
+                    ExpressionAttributeNames: { '#v': 'version' },
+                    ExpressionAttributeValues: { ':v': meta.version || 0, ':h': h }
+                });
+                return { player: publicMeta(pid, next) };
+            } catch (e) {
+                if (e.name !== 'ConditionalCheckFailedException') throw e;
+                meta = await ownProfile(pid, body);
+            }
+        }
+        throw new HttpError(409, 'profile busy, try again');
     }
 
     async function ownProfile(pid, body) {
@@ -389,68 +483,88 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
         return { gold: meta.gold || 0, pot: { id: body.pot, amount: pot.amount, spins: pot.spins, status: pot.status === 'open' ? 'banked' : pot.status } };
     }
 
-    // ---- meta shop: artefact tiers and cosmetic skins; every write is conditioned on gold
+    // ---- meta shop: basic artefacts and skins, merging, slots, icon
 
-    async function buy(pid, body) {
-        const meta = await ownProfile(pid, body);
-        const h = sha256(body.secret);
-        let update;
-        if (body.item === 'artefact') {
-            const tier = body.tier;
-            if (!ARTEFACTS.includes(body.id) || !isInt(tier, 1, 4)) throw new HttpError(400, 'invalid artefact');
-            const { price, gate } = TIERS[tier];
-            const current = (meta.artefacts || {})[body.id] || 0;
-            if (current !== tier - 1) throw new HttpError(409, 'buy the previous tier first');
-            if ((meta.bestLevel || 0) < gate) throw new HttpError(403, `reach level ${gate} first`);
-            update = {
-                UpdateExpression: 'SET gold = gold - :p, artefacts.#a = :t ADD version :one',
-                ConditionExpression: `secretHash = :h AND gold >= :p AND bestLevel >= :g AND ${tier === 1 ? 'attribute_not_exists(artefacts.#a)' : 'artefacts.#a = :prev'}`,
-                ExpressionAttributeNames: { '#a': body.id },
-                ExpressionAttributeValues: { ':p': price, ':t': tier, ':one': 1, ':h': h, ':g': gate, ...(tier > 1 ? { ':prev': tier - 1 } : {}) }
-            };
-        } else if (body.item === 'skin') {
-            const skin = SKINS[body.id];
-            if (!skin) throw new HttpError(400, 'invalid skin');
-            if ((meta.skins || {})[body.id]) throw new HttpError(409, 'already owned');
-            const price = SKIN_PRICES[skin.rarity];
-            update = {
-                UpdateExpression: 'SET gold = gold - :p, skins.#s = :yes ADD version :one',
-                ConditionExpression: 'secretHash = :h AND gold >= :p AND attribute_not_exists(skins.#s)',
-                ExpressionAttributeNames: { '#s': body.id },
-                ExpressionAttributeValues: { ':p': price, ':yes': true, ':one': 1, ':h': h }
-            };
-        } else {
-            throw new HttpError(400, 'invalid item');
-        }
-        try {
-            const out = await send('Update', { Key: { pk: `player#${pid}`, sk: 'meta' }, ReturnValues: 'ALL_NEW', ...update });
-            return { player: publicMeta(pid, out.Attributes) };
-        } catch (e) {
-            if (e.name === 'ConditionalCheckFailedException') throw new HttpError(409, 'not enough gold');
-            throw e;
-        }
+    function buy(pid, body) {
+        return mutateMeta(pid, body, m => {
+            if (body.item === 'artefact') {
+                if (!ARTEFACTS.includes(body.id)) throw new HttpError(400, 'invalid artefact');
+                if (m.gold < ARTEFACT_PRICE) throw new HttpError(409, 'not enough gold');
+                m.gold -= ARTEFACT_PRICE;
+                grantBasic(m, body.id);
+            } else if (body.item === 'skin') {
+                const skin = SKINS[body.id];
+                if (!skin) throw new HttpError(400, 'invalid skin');
+                if (m.skins[body.id]) throw new HttpError(409, 'already owned');
+                const price = SKIN_PRICES[skin.rarity];
+                if (price.gold) {
+                    if (m.gold < price.gold) throw new HttpError(409, 'not enough gold');
+                    m.gold -= price.gold;
+                } else {
+                    if (m.gems < price.gems) throw new HttpError(409, 'not enough gems');
+                    m.gems -= price.gems;
+                }
+                m.skins[body.id] = true;
+            } else {
+                throw new HttpError(400, 'invalid item');
+            }
+        });
     }
 
-    async function equip(pid, body) {
-        await ownProfile(pid, body);
-        const cls = body.cls;
-        const skin = body.skin || '';
-        if (!['wizard', 'barbarian', 'goblin'].includes(cls)) throw new HttpError(400, 'invalid class');
-        if (skin && (!SKINS[skin] || SKINS[skin].cls !== cls)) throw new HttpError(400, 'invalid skin');
-        try {
-            const out = await send('Update', {
-                Key: { pk: `player#${pid}`, sk: 'meta' },
-                UpdateExpression: 'SET equipped.#c = :s ADD version :one',
-                ConditionExpression: `secretHash = :h${skin ? ' AND attribute_exists(skins.#s)' : ''}`,
-                ExpressionAttributeNames: { '#c': cls, ...(skin ? { '#s': skin } : {}) },
-                ExpressionAttributeValues: { ':s': skin, ':one': 1, ':h': sha256(body.secret) },
-                ReturnValues: 'ALL_NEW'
-            });
-            return { player: publicMeta(pid, out.Attributes) };
-        } catch (e) {
-            if (e.name === 'ConditionalCheckFailedException') throw new HttpError(403, 'you do not own that skin');
-            throw e;
-        }
+    function merge(pid, body) {
+        return mutateMeta(pid, body, m => {
+            const { id, tier } = body;
+            if (!ARTEFACTS.includes(id) || !isInt(tier, 2, 4)) throw new HttpError(400, 'invalid merge');
+            const lower = artKey(id, tier - 1);
+            const upper = artKey(id, tier);
+            if ((m.arts[lower] || 0) < 3) throw new HttpError(409, 'need three to merge');
+            if (m.gems < MERGE_GEMS[tier]) throw new HttpError(409, 'not enough gems');
+            m.gems -= MERGE_GEMS[tier];
+            m.arts[lower] -= 3;
+            if (!m.arts[lower]) delete m.arts[lower];
+            m.arts[upper] = (m.arts[upper] || 0) + 1;
+            // the merged item replaces a weaker one of the same kind in the slots
+            const i = m.slots.findIndex(s => parseArt(s)?.id === id);
+            if (i >= 0 && parseArt(m.slots[i]).tier < tier) m.slots[i] = upper;
+            else if (i < 0 && m.slots.length < MAX_SLOTS) m.slots.push(upper);
+        });
+    }
+
+    function setSlots(pid, body) {
+        return mutateMeta(pid, body, m => {
+            const slots = body.slots;
+            if (!Array.isArray(slots) || slots.length > MAX_SLOTS) throw new HttpError(400, 'invalid slots');
+            const ids = new Set();
+            for (const k of slots) {
+                const a = parseArt(k);
+                if (!a || ids.has(a.id)) throw new HttpError(400, 'invalid slots');
+                if (!(m.arts[k] > 0)) throw new HttpError(403, 'you do not own that artefact');
+                ids.add(a.id);
+            }
+            m.slots = [...slots];
+        });
+    }
+
+    function setIcon(pid, body) {
+        return mutateMeta(pid, body, m => {
+            const { cls } = body;
+            const skin = body.skin || '';
+            if (!CLASSES.includes(cls)) throw new HttpError(400, 'invalid class');
+            if (skin && (!SKINS[skin] || SKINS[skin].cls !== cls)) throw new HttpError(400, 'invalid skin');
+            if (skin && !m.skins[skin]) throw new HttpError(403, 'you do not own that skin');
+            m.icon = { cls, skin };
+        });
+    }
+
+    function equip(pid, body) {
+        return mutateMeta(pid, body, m => {
+            const { cls } = body;
+            const skin = body.skin || '';
+            if (!CLASSES.includes(cls)) throw new HttpError(400, 'invalid class');
+            if (skin && (!SKINS[skin] || SKINS[skin].cls !== cls)) throw new HttpError(400, 'invalid skin');
+            if (skin && !m.skins[skin]) throw new HttpError(403, 'you do not own that skin');
+            m.equipped[cls] = skin;
+        });
     }
 
     async function getPlayer(pid) {
@@ -512,7 +626,9 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
         try {
             if (method === 'GET' && path === '/scores') {
                 const limit = Math.min(50, Math.max(1, Number(query.limit) || 10));
-                return json(200, { scores: await topScores(query.board === 'v3' ? BOARD_V3 : BOARD, limit) });
+                const v3 = query.board === 'v3';
+                const cls = v3 && CLASSES.includes(query.cls) ? query.cls : undefined;
+                return json(200, { scores: await topScores(v3 ? BOARD_V3 : BOARD, limit, cls) });
             }
             if (method === 'POST' && path === '/run') return json(200, { token: makeToken() });
             if (method === 'POST' && path === '/scores') return json(200, await submit(parseBody(event), ip));
@@ -525,6 +641,9 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
                 if (method === 'POST' && action === '/bank') return json(200, await bank(pid, parseBody(event)));
                 if (method === 'POST' && action === '/buy') return json(200, await buy(pid, parseBody(event)));
                 if (method === 'POST' && action === '/equip') return json(200, await equip(pid, parseBody(event)));
+                if (method === 'POST' && action === '/merge') return json(200, await merge(pid, parseBody(event)));
+                if (method === 'POST' && action === '/slots') return json(200, await setSlots(pid, parseBody(event)));
+                if (method === 'POST' && action === '/icon') return json(200, await setIcon(pid, parseBody(event)));
             }
             return json(404, { error: 'not found' });
         } catch (e) {

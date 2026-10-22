@@ -1,18 +1,17 @@
-// Meta shop catalog: artefacts and skins. Must match ARTEFACTS / SKINS in js/config-data.js
+// Meta shop catalog: artefacts, skins, gem prices. Must match js/config-data.js
 // (test/catalog.test.mjs checks that they do).
 
-// Tier 1–4 = basic, rare, legendary, mythic. Price and the best level needed to buy each tier.
-export const TIERS = [
-    null,
-    { name: 'basic', price: 1000, gate: 0 },
-    { name: 'rare', price: 4000, gate: 10 },
-    { name: 'legendary', price: 15000, gate: 20 },
-    { name: 'mythic', price: 60000, gate: 30 }
-];
-
+// Artefacts are collected items. Only basic ones are sold (gold) or won (the rare in-run artefact
+// card); three of a tier merge into one of the next tier for gems. Up to 4 different artefacts sit
+// in the profile's slots and are the ones active in runs.
 export const ARTEFACTS = ['greed', 'whetstone', 'rune', 'shard', 'boots', 'idol', 'charm', 'hourglass', 'amulet'];
+export const ARTEFACT_PRICE = 1000; // gold, basic tier
+export const MERGE_GEMS = [0, 0, 2, 5, 15]; // gems to merge 3 × tier-1 into one of this tier (2..4)
+export const MAX_SLOTS = 4;
+export const artKey = (id, tier) => `${id}_${tier}`;
 
-export const SKIN_PRICES = { basic: 300, rare: 2000, legendary: 8000, mythic: 30000 };
+// Skins: basic/rare cost gold, legendary/mythic cost gems.
+export const SKIN_PRICES = { basic: { gold: 300 }, rare: { gold: 2000 }, legendary: { gems: 25 }, mythic: { gems: 60 } };
 export const SKINS = {
     frost: { cls: 'wizard', rarity: 'basic' },
     flame: { cls: 'wizard', rarity: 'rare' },
@@ -28,4 +27,5 @@ export const SKINS = {
     king: { cls: 'goblin', rarity: 'mythic' }
 };
 
+export const CLASSES = ['wizard', 'barbarian', 'goblin'];
 export const WHEEL_WIN = 0.5; // chance to double the pot; at 0.5 average gold is unchanged
