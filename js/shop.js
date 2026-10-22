@@ -41,7 +41,7 @@ extendGame({
         this.coins += bonus;
         this.coinsEarned += bonus;
         this.el.levelupTitle.textContent = `LEVEL ${this.level - this.pendingLevels + 1}!`;
-        this.el.levelupSub.innerHTML = `Spend coins on upgrades · <b class="gold">+${bonus} 🪙</b> level bonus`;
+        this.el.levelupSub.innerHTML = `Spend coins on upgrades · <b class="gold">+${bonus} ${COIN}</b> level bonus`;
         Sfx.play('levelUp', { volume: 0.6 });
     },
 
@@ -224,7 +224,7 @@ extendGame({
                     : `<span class="tag perm">PERMANENT${c.cls ? ` · ${CLASSES[c.cls].icon}` : ''}</span>`;
             return `<button class="card ${kind}" data-i="${i}" style="--d:${i * 70}ms"><span class="num">${i + 1}</span>` +
                 `<span class="cicon">${c.icon}</span><span class="cname">${c.name}</span>${tag}` +
-                `<span class="cdesc">${c.desc}</span>${pips}<span class="price">🪙 ${c.price}</span></button>`;
+                `<span class="cdesc">${c.desc}</span>${pips}<span class="price">${COIN} ${c.price}</span></button>`;
         }).join('');
         this.el.cards.querySelectorAll('.card').forEach(btn =>
             btn.addEventListener('click', () => this.buyCard(Number(btn.dataset.i))));
@@ -232,13 +232,13 @@ extendGame({
     },
 
     refreshShop() {
-        this.el.shopCoins.textContent = `🪙 ${this.coins}`;
+        this.el.shopCoins.innerHTML = `${COIN} ${this.coins}<span class="g">${GEM} ${this.gems || 0}</span>`;
         this.el.cards.querySelectorAll('.card').forEach(btn => {
             const c = this.cardChoices[Number(btn.dataset.i)];
             btn.classList.toggle('sold', c.sold);
             btn.classList.toggle('afford', !c.sold && c.price <= this.coins);
             btn.classList.toggle('poor', !c.sold && c.price > this.coins);
-            btn.querySelector('.price').textContent = c.sold ? '✓ BOUGHT' : `🪙 ${c.price}`;
+            btn.querySelector('.price').innerHTML = c.sold ? '✓ BOUGHT' : `${COIN} ${c.price}`;
         });
     },
 

@@ -160,7 +160,6 @@
         #version { color: #475569; font-size: .7em; margin-top: 1em; }
         .panel-corner { position: absolute; top: .7em; right: .7em; }
         .panel-corner.left { right: auto; left: .7em; }
-        .music-btn.off { opacity: .45; text-decoration: line-through; }
         .fs-btn { font-size: 1.05em; }
         body.no-fs .fs-btn { display: none !important; }
         .hint { margin: .9em auto 0; padding: .5em 2.2em .5em .8em; position: relative; border-radius: 12px; background: rgba(91,63,209,.25); border: 1px solid rgba(167,139,250,.45); color: #e9e5ff; font-size: .85em; line-height: 1.4; }
@@ -245,6 +244,10 @@
         .link { margin-top: .5em; font-size: .78em; color: var(--muted); background: none; border: 0; text-decoration: underline; }
         .who-hello { display: flex; align-items: center; justify-content: center; gap: .5em; }
         .who-name { display: flex; align-items: center; gap: .6em; text-align: left; padding: .45em 1em .45em .5em; border-radius: 999px; border: 1px solid rgba(250,204,21,.35); background: rgba(250,204,21,.08); color: #e2e8f0; font-size: .9em; line-height: 1.15; transition: background .15s; }
+        .who-purse { display: block; margin-top: .2em; font-size: .85em; color: #fde68a; white-space: nowrap; }
+        .who-purse:empty { display: none; }
+        .who-purse .g { color: #7dd3fc; margin-left: .6em; }
+        #shopCoins .g { color: #7dd3fc; margin-left: .7em; }
         .who-name:hover { background: rgba(250,204,21,.16); }
         .who-name b { font-family: var(--display); font-weight: normal; font-size: 1.35em; color: var(--gold); letter-spacing: .5px; }
         .who-avatar { width: 2.2em; height: 2.2em; display: grid; place-items: center; font-size: 1.3em; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #6d54e8, #2a1f6b); }
@@ -255,6 +258,11 @@
         .cls canvas { width: 4.2em; height: 4.2em; }
         .cls b { font-family: var(--display); font-weight: normal; font-size: 1em; letter-spacing: .5px; }
         .cls small { font-size: .6em; letter-spacing: 1px; }
+        /* UI icons drawn like the drops: gold coin, coin pouch (a pile of coins), blue diamond (gem) */
+        .coin, .pouch, .gem { display: inline-block; width: 1em; height: 1em; vertical-align: -.14em; background: center / contain no-repeat; }
+        .coin { background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='-10 -10 20 20'><circle r='8.6' fill='%23ffd60a' stroke='%23a66a00' stroke-width='1.6'/><circle r='5.6' fill='none' stroke='%23e0a800' stroke-width='1.2'/><ellipse cx='-3' cy='-3.4' rx='2.2' ry='1.5' fill='%23fff7c2' opacity='.85'/></svg>"); }
+        .pouch { width: 1.1em; background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='-10 -10.5 20 18.5'><path d='M-3.5-4C-9-2-9 7 0 7S9-2 3.5-4Z' fill='%23b7792f' stroke='%235b3410' stroke-width='1.4'/><path d='M-3.5-4L-5.5-8.5L-2-6.5L0-9L2-6.5L5.5-8.5L3.5-4Z' fill='%23c98a3c' stroke='%235b3410' stroke-width='1.4' stroke-linejoin='round'/><path d='M-3.8-4H3.8' stroke='%23ffd60a' stroke-width='1.8'/><circle cx='0' cy='2' r='2.5' fill='%23ffd60a' stroke='%23a66a00' stroke-width='.8'/></svg>"); }
+        .gem { background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='-10 -10 20 20'><path d='M-8-3.5L-4-8H4L8-3.5L0 8.5Z' fill='%2338bdf8' stroke='%230c4a6e' stroke-width='1.2' stroke-linejoin='round'/><path d='M-4-8H4L2.4-3.5H-2.4Z' fill='%23bae6fd'/><path d='M2.4-3.5H8L0 8.5Z' fill='%230284c7'/></svg>"); }
         .cdmg { font-size: .62em; line-height: 1; color: #fecaca; white-space: nowrap; }
         .cdmg b { font-family: var(--display); font-weight: normal; color: #fff; font-size: 1.15em; }
         .cdmg i { font-style: normal; color: var(--muted); font-size: .85em; }
@@ -396,13 +404,12 @@
                 <div id="hearts"></div>
                 <div id="superBar" title="Super meter"><div id="superFill"></div></div>
                 <div class="lvl"><span id="levelLabel">LV 1</span><div class="xpbar"><div id="xpFill"></div></div></div>
-                <div class="purse"><span id="coins">🪙 0</span><span id="gems" hidden>💎 0</span></div>
+                <div class="purse"><span id="coins"><i class="coin"></i> 0</span><span id="gems" hidden><i class="gem"></i> 0</span></div>
             </div>
             <div class="hud-center"><div id="score">0</div></div>
             <div class="hud-right">
                 <div id="powerups"></div>
                 <button id="fsBtn" class="icon-btn fs-btn" aria-label="Fullscreen">⛶</button>
-                <button id="musicBtn" class="icon-btn music-btn" aria-label="Toggle music">🎵</button>
                 <button id="muteBtn" class="icon-btn" aria-label="Toggle sound">🔊</button>
                 <button id="pauseBtn" class="icon-btn" aria-label="Pause">⏸</button>
             </div>
@@ -420,7 +427,6 @@
         <div id="menu" class="overlay">
             <div class="panel">
                 <button id="menuFsBtn" class="icon-btn fs-btn panel-corner" aria-label="Fullscreen">⛶</button>
-                <button id="menuMusicBtn" class="icon-btn music-btn panel-corner left" aria-label="Toggle music">🎵</button>
                 <div class="logo"><canvas id="logoHero" class="wiz" width="160" height="160"></canvas><h1>MONSTER<br><span>HUNTER</span></h1></div>
                 <p class="tagline">Survive the horde. Chain kills. Slay the bosses.</p>
                 <div id="who">
@@ -437,7 +443,7 @@
                         <button id="restoreLink" class="link" type="button">I have a recovery code</button>
                     </form>
                     <div id="whoHello" class="who-hello" hidden>
-                        <button id="whoName" class="who-name" aria-label="Open your profile"><span class="who-avatar" id="whoAvatar">🧙‍♂️</span><span>Welcome back,<br><b id="whoNameText"></b></span></button>
+                        <button id="whoName" class="who-name" aria-label="Open your profile"><span class="who-avatar" id="whoAvatar">🧙‍♂️</span><span>Welcome back,<br><b id="whoNameText"></b><span id="whoPurse" class="who-purse"></span></span></button>
                         <button id="whoEdit" class="icon-btn" aria-label="Rename">✏️</button>
                     </div>
                 </div>
@@ -446,7 +452,7 @@
                 <button id="playBtn" class="btn primary">▶ PLAY</button>
                 <div class="howto desktop-only">
                     <kbd>WASD</kbd> move · you attack on your own · hold <kbd>click</kbd> to aim<br>
-                    <kbd>Space</kbd> SUPER when the bar is full · <kbd>P</kbd> pause · <kbd>M</kbd> mute · <kbd>B</kbd> music
+                    <kbd>Space</kbd> SUPER when the bar is full · <kbd>P</kbd> pause · <kbd>M</kbd> mute
                 </div>
                 <div class="howto touch-only">Drag anywhere to move · you attack on your own<br>Tap ⚡ SUPER when the bar is full</div>
                 <div id="iosHint" class="hint" hidden>📲 Tap <b>Share</b> → <b>Add to Home Screen</b> to play fullscreen <button id="iosHintClose" aria-label="Dismiss">✕</button></div>
@@ -462,7 +468,7 @@
             <div class="lu">
                 <h2 id="levelupTitle">LEVEL 2!</h2>
                 <p id="levelupSub">Spend coins on upgrades</p>
-                <div id="shopCoins">🪙 0</div>
+                <div id="shopCoins"><i class="coin"></i> 0</div>
                 <div id="cards"></div>
                 <button id="continueBtn" class="btn primary">CONTINUE ▶</button>
                 <p class="shop-hint desktop-only"><kbd>1</kbd>–<kbd>4</kbd> buy · <kbd>Enter</kbd> continue</p>

@@ -198,11 +198,12 @@ describe('GameUtils economy', () => {
         const perm = { cost: 20 };
         assert.equal(GameUtils.cardPrice(perm, 0, 2), 60);
         assert.equal(GameUtils.cardPrice(perm, 2, 30), 150);
-        const buff = { cost: 70, oneLevel: true };
-        assert.equal(GameUtils.cardPrice(buff, 0, 2), 70);
-        assert.equal(GameUtils.cardPrice(buff, 0, 1), 70);
-        assert.ok(GameUtils.cardPrice(buff, 0, 12) > 3 * 70);
-        assert.equal(GameUtils.cardPrice({ cost: 20, oneLevel: true }, 0, 2) % 5, 0);
+        const freeze = { cost: 20, oneLevel: true };
+        assert.equal(GameUtils.cardPrice(freeze, 0, 1), 20);
+        assert.equal(GameUtils.cardPrice(freeze, 0, 2), 20);
+        assert.equal(GameUtils.cardPrice(freeze, 0, 52), 100);
+        assert.equal(GameUtils.cardPrice(freeze, 0, 80), 100);
+        assert.equal(GameUtils.cardPrice({ cost: 35, oneLevel: true }, 0, 10) % 5, 0);
     });
 
     it('expects more income on later levels', () => {

@@ -64,15 +64,15 @@ extendGame({
         const shown = owned.slice(0, owned.length > room ? Math.max(0, room - 1) : room);
         const hidden = owned.length - shown.length;
         this.setHtml('powerups', this.el.powerups,
-            active.map(t => `<span class="pu" style="--c:${POWERUPS[t].color}">${POWERUPS[t].emoji}${POWERUPS[t].tag ? `<i>${POWERUPS[t].tag}</i>` : ''}` +
+            active.map(t => `<span class="pu" style="--c:${POWERUPS[t].color}">${POWERUPS[t].pouch ? COIN : POWERUPS[t].emoji}${POWERUPS[t].tag ? `<i>${POWERUPS[t].tag}</i>` : ''}` +
                 `<b>${Math.ceil(this.timers[t] / (60 * GAME_SPEED))}</b></span>`).join('') +
             buffs.map(bf => `<span class="pu buff" title="${bf.name}">${bf.icon}<b>LV</b></span>`).join('') +
             shown.map(u => `<span class="up" title="${u.name}">${u.icon}<sup>${this.stack(u.id)}</sup></span>`).join('') +
             (hidden > 0 ? `<button class="up more" data-more="1" aria-label="All upgrades">+${hidden}</button>` : ''));
-        this.setText('coins', this.el.coins, `🪙 ${this.coins}`);
+        this.setHtml('coins', this.el.coins, `${COIN} ${this.coins}`);
         if (this.gems > 0) {
             this.el.gems.hidden = false;
-            this.setText('gems', this.el.gems, `💎 ${this.gems}`);
+            this.setHtml('gems', this.el.gems, `${GEM} ${this.gems}`);
         } else if (!this.el.gems.hidden) this.el.gems.hidden = true;
 
         if (this.boss) {
@@ -149,7 +149,7 @@ extendGame({
             ['Bosses', this.bossesSlain],
             ['Time', U.formatTime(this.time)]
         ];
-        if (this.gems > 0) stats.push(['Gems', `💎 ${this.gems}`]);
+        if (this.gems > 0) stats.push(['Gems', `${GEM} ${this.gems}`]);
         if (this.artCards.length) stats.push(['Artefacts', this.artCards.map(id => ARTEFACTS[id].icon).join('')]);
         this.el.finalStats.innerHTML = stats.map(([k2, v]) => `<div><span>${k2}</span><b>${v}</b></div>`).join('');
 

@@ -188,12 +188,15 @@
     /**
      * Price of a shop card.
      * Permanent (whole run): cost × 3 × (1 + 0.75 × rank owned) — a finite sink that doesn't inflate.
-     * One level: `cost` is the price at level 2 and grows with the level's expected income, so the
-     * strong ones (Fury II, Double Damage) stay a real choice and the weak ones (Road Brake) stay cheap.
+     * One level: `cost` is the price on the first levels, rising +8% of it per level up to ×5 at
+     * level 52 (Freeze I: 20 → ~100), rounded to 5.
      */
     const PERMANENT_PRICE_MULT = 3;
+    function oneLevelScale(level) {
+        return Math.min(5, 1 + 0.08 * Math.max(0, level - 2));
+    }
     function cardPrice(card, rank, level = 2) {
-        if (card.oneLevel) return Math.max(5, Math.round((card.cost * expectedIncome(Math.max(2, level))) / expectedIncome(2) / 5) * 5);
+        if (card.oneLevel) return Math.max(5, Math.round((card.cost * oneLevelScale(level)) / 5) * 5);
         return Math.round(card.cost * PERMANENT_PRICE_MULT * (1 + 0.75 * rank));
     }
 

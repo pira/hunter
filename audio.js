@@ -176,13 +176,6 @@
             } catch (e) { /* not supported */ }
             this.build();
             Object.entries(SAMPLES).forEach(([name, def]) => this.load(name, def.src));
-            try {
-                this.musicOn = localStorage.getItem('hunter.music') !== '0';
-            } catch (e) {
-                this.musicOn = true;
-            }
-            // the background music is big-ish (~1 MB): fetch it once the samples are in
-            setTimeout(() => this.load('bgm', 'sfx/music-prelude.mp3').then(() => this.syncBgm()), 1500);
 
             // Browsers start audio suspended until a gesture; iOS also interrupts it on calls/notifications.
             const kick = () => this.unlock();
@@ -238,10 +231,8 @@
             try { old.onstatechange = null; old.close(); } catch (e) { /* already closed */ }
             this.build();
             this.buffers = {};
-            this.bgmVoice = null;
             await Promise.all(Object.keys(this.bytes).map(name => this.decode(name)));
             this.unlock();
-            this.syncBgm();
         },
 
         unlock() {
@@ -475,12 +466,8 @@
             const v = this.startVoice(this.buffers[name], { name: `music:${name}`, volume, bus: 'music', poly: 1, priority: 3 });
             if (v) {
                 this.music = v;
-                this.syncBgm(); // the background loop makes way
                 v.src.addEventListener('ended', () => {
-                    if (this.music === v) {
-                        this.music = null;
-                        this.syncBgm();
-                    }
+                    if (this.music === v) this.music = null;
                 });
             }
         },
@@ -493,40 +480,6 @@
                 v.gain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.15);
                 v.src.stop(this.ctx.currentTime + 0.6);
             } catch (e) { /* already stopped */ }
-            this.syncBgm();
-        },
-
-        // ---- background music (quiet harpsichord Bach loop; its own toggle)
-
-        setBgmLevel(level) {
-            this.bgmLevel = level;
-            this.syncBgm();
-        },
-
-        syncBgm() {
-            const want = this.ctx && this.musicOn && !this.muted && this.buffers.bgm && (this.bgmLevel ?? 0.2) > 0 && !this.music;
-            if (want && !this.bgmVoice) {
-                const v = this.startVoice(this.buffers.bgm, { name: 'bgm', volume: 0.0001, bus: 'music', poly: 1, priority: 3, loop: true });
-                if (v) {
-                    this.bgmVoice = v;
-                    v.gain.gain.setTargetAtTime(this.bgmLevel ?? 0.2, this.ctx.currentTime, 0.6);
-                }
-            } else if (!want && this.bgmVoice) {
-                this.fadeOut(this.bgmVoice, 0.8);
-                this.bgmVoice = null;
-            } else if (want && this.bgmVoice) {
-                this.bgmVoice.gain.gain.setTargetAtTime(this.bgmLevel ?? 0.2, this.ctx.currentTime, 0.4);
-            }
-        },
-
-        toggleMusic() {
-            this.musicOn = !this.musicOn;
-            try {
-                localStorage.setItem('hunter.music', this.musicOn ? '1' : '0');
-            } catch (e) { /* storage unavailable */ }
-            this.unlock();
-            this.syncBgm();
-            return this.musicOn;
         },
 
         /** Spoken lines: voice bus, ducks the sfx bus by 6 dB while talking. */
@@ -764,9 +717,7 @@
             if (this.muted) {
                 this.stopMusic();
                 this.voices.slice().forEach(v => this.stopVoice(v));
-                this.bgmVoice = null;
             }
-            this.syncBgm();
             try {
                 localStorage.setItem('hunter.muted', this.muted ? '1' : '0');
             } catch (e) { /* storage unavailable */ }

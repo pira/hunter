@@ -237,12 +237,12 @@ extendGame({
         if (!(this.timers.poison > 0) || this.lootFrozen) return;
         const p = this.player;
         this.poisonT = (this.poisonT || 0) + 1;
-        if (this.poisonT % 3 === 0) {
+        if (this.poisonT % 2 === 0) {
             const a = Math.random() * TAU;
             const r = Math.random() * POISON_RADIUS;
-            this.particle({ x: p.x + Math.cos(a) * r, y: p.y + Math.sin(a) * r * 0.7, vx: (Math.random() - 0.5) * 0.4, vy: -0.25, life: 40, size: 6 + Math.random() * 8, grow: 0.25, color: 'rgba(132,204,22,0.16)', kind: 'smoke' });
+            this.particle({ x: p.x + Math.cos(a) * r, y: p.y + Math.sin(a) * r * 0.7, vx: (Math.random() - 0.5) * 0.4, vy: -0.25, life: 40, size: 8 + Math.random() * 12, grow: 0.3, color: 'rgba(132,204,22,0.16)', kind: 'smoke' });
         }
-        if (this.poisonT % 27 !== 0) return;
+        if (this.poisonT % 54 !== 0) return; // 1 HP per second
         for (const m of this.monsters) {
             if (m.dead || m.dying) continue;
             if (U.distanceSquared(m.x, m.y, p.x, p.y) < (POISON_RADIUS + m.size * 0.5) ** 2) {

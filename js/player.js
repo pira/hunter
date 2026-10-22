@@ -43,7 +43,7 @@ extendGame({
 
     get rateMult() {
         const fury = this.buffs.fury2 ? 2 : this.buffs.fury1 ? 1.5 : 1;
-        return (1 + 0.15 * this.stack('haste')) * (this.timers.rapidFire > 0 ? 3 : 1) * fury * this.artefactMult('rate');
+        return (1 + 0.1 * this.stack('haste')) * (this.timers.rapidFire > 0 ? 3 : 1) * fury * this.artefactMult('rate');
     },
 
     get moveMult() {

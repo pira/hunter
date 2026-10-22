@@ -42,6 +42,7 @@ extendGame({
     async syncProfile() {
         await Leaderboard.refreshOwn();
         if (this.state === 'menu') this.pickClass(this.cls, true);
+        this.refreshWho();
         this.loadArtefacts();
     },
 
@@ -273,9 +274,9 @@ extendGame({
                 const mergeTier = [1, 2, 3].find(t => owned[t - 1] >= 3);
                 if (mergeTier) {
                     const cost = MERGE_GEMS[mergeTier + 1];
-                    actions += `<button class="buy merge" data-merge="${id}" data-tier="${mergeTier + 1}" ${gems < cost || !online ? 'disabled' : ''}>3→1 ${TIERS[mergeTier + 1].label} · 💎${cost}</button>`;
+                    actions += `<button class="buy merge" data-merge="${id}" data-tier="${mergeTier + 1}" ${gems < cost || !online ? 'disabled' : ''}>3→1 ${TIERS[mergeTier + 1].label} · ${GEM}${cost}</button>`;
                 }
-                actions += `<button class="buy" data-buy="artefact" data-id="${id}" ${gold < ARTEFACT_PRICE || !online ? 'disabled' : ''}>+1 · 🪙${ARTEFACT_PRICE.toLocaleString()}</button>`;
+                actions += `<button class="buy" data-buy="artefact" data-id="${id}" ${gold < ARTEFACT_PRICE || !online ? 'disabled' : ''}>+1 · ${COIN}${ARTEFACT_PRICE.toLocaleString()}</button>`;
             }
             return `<li><span class="ai">${a.icon}</span><span class="an"><b>${a.name}</b><small>${a.what}</small><span class="chips">${chips}</span></span><span class="acts">${actions}</span></li>`;
         }).join('');
@@ -293,8 +294,8 @@ extendGame({
                 if (mine) {
                     btn = on ? `<button class="buy on" data-equip="${cls}" data-skin="">Wearing ✓</button>`
                         : owned ? `<button class="buy" data-equip="${cls}" data-skin="${id}" ${off}>Wear</button>`
-                            : price.gold ? `<button class="buy" data-buy="skin" data-id="${id}" ${gold < price.gold || !online ? 'disabled' : ''}>🪙${price.gold.toLocaleString()}</button>`
-                                : `<button class="buy gem" data-buy="skin" data-id="${id}" ${gems < price.gems || !online ? 'disabled' : ''}>💎${price.gems}</button>`;
+                            : price.gold ? `<button class="buy" data-buy="skin" data-id="${id}" ${gold < price.gold || !online ? 'disabled' : ''}>${COIN}${price.gold.toLocaleString()}</button>`
+                                : `<button class="buy gem" data-buy="skin" data-id="${id}" ${gems < price.gems || !online ? 'disabled' : ''}>${GEM}${price.gems}</button>`;
                     if (owned) btn += `<button class="icon-pick ${isIcon ? 'on' : ''}" data-icon="${cls}" data-skin="${id}" ${off} title="Use as profile icon">${isIcon ? '⭐ icon' : '☆ icon'}</button>`;
                 }
                 return `<div class="skin ${s.rarity} ${on ? 'on' : ''}"><canvas data-cls="${cls}" data-skin="${id}" width="96" height="96"></canvas>` +
@@ -305,7 +306,7 @@ extendGame({
         }).join('');
 
         el.innerHTML =
-            `<div class="gold-line">💰 <b>${gold.toLocaleString()}</b> gold <span class="gem-count">💎 <b>${gems.toLocaleString()}</b> gems</span>` +
+            `<div class="gold-line">${POUCH} <b>${gold.toLocaleString()}</b> gold <span class="gem-count">${GEM} <b>${gems.toLocaleString()}</b> gems</span>` +
             (mine ? '<small>Unspent coins are banked when a hunt ends. Gems drop rarely — bosses always drop some.</small>' : '') + '</div>' +
             `<h3>🎒 Equipped artefacts <small>${slots.length}/${MAX_SLOTS} · active in every hunt</small></h3><div class="slots">${slotBoxes}</div>` +
             (artRows ? `<h3>✨ Collection${mine ? ' <small>merge 3 of a kind into the next tier</small>' : ''}</h3><ul class="arts">${artRows}</ul>` : '') +
@@ -340,6 +341,7 @@ extendGame({
             }
             this.loadArtefacts();
             this.renderShop(res.player, true);
+            this.refreshWho();
             if (btn.dataset.equip === this.cls) this.pickClass(this.cls, true);
             this.drawAvatar(this.el.profileAvatar, ...this.profileLook(res.player, true));
             if (btn.dataset.merge) this.el.profileShop.querySelector('.arts')?.classList.add('flash');

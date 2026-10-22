@@ -156,16 +156,38 @@ extendGame({
         ctx.fill();
     },
 
+    /** A flat gold coin icon (HUD floaters, the Coins ×2/×3 pickups). */
+    drawCoinAt(ctx, x, y, r) {
+        ctx.fillStyle = '#ffd60a';
+        ctx.strokeStyle = '#a66a00';
+        ctx.lineWidth = Math.max(1, r * 0.18);
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, TAU);
+        ctx.fill();
+        ctx.stroke();
+        ctx.strokeStyle = '#e0a800';
+        ctx.lineWidth = Math.max(0.8, r * 0.13);
+        ctx.beginPath();
+        ctx.arc(x, y, r * 0.65, 0, TAU);
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(255,247,194,0.85)';
+        ctx.beginPath();
+        ctx.ellipse(x - r * 0.35, y - r * 0.4, r * 0.26, r * 0.17, 0, 0, TAU);
+        ctx.fill();
+    },
+
     /** A little coin pouch: brown sack, gold tie, its value on the front. */
     drawPouch(ctx, c) {
         const s = c.value >= 5 ? 1.25 : c.value >= 3 ? 1.1 : 1;
-        const x = c.x;
-        const y = c.y - c.z;
-        const wob = Math.sin(c.spin) * 0.12;
         ctx.fillStyle = 'rgba(0,0,0,0.22)';
         ctx.beginPath();
-        ctx.ellipse(x, c.y + 6 * s, 7 * s, 2.6 * s, 0, 0, TAU);
+        ctx.ellipse(c.x, c.y + 6 * s, 7 * s, 2.6 * s, 0, 0, TAU);
         ctx.fill();
+        this.drawPouchAt(ctx, c.x, c.y - c.z, s, String(c.value), Math.sin(c.spin) * 0.12);
+    },
+
+    /** The pouch itself; `label` is its value, or null for the plain icon (a gold coin on the front). */
+    drawPouchAt(ctx, x, y, s, label, wob = 0) {
         ctx.save();
         ctx.translate(x, y);
         ctx.rotate(wob);
@@ -201,24 +223,35 @@ extendGame({
         ctx.moveTo(-3.8, -4);
         ctx.lineTo(3.8, -4);
         ctx.stroke();
-        // value
-        ctx.font = `bold 9px ${DISPLAY_FONT}`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.lineWidth = 2.5;
-        ctx.strokeStyle = '#5b3410';
-        ctx.strokeText(String(c.value), 0, 2);
-        ctx.fillStyle = '#ffe066';
-        ctx.fillText(String(c.value), 0, 2);
+        if (label) {
+            ctx.font = `bold 9px ${DISPLAY_FONT}`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.lineWidth = 2.5;
+            ctx.strokeStyle = '#5b3410';
+            ctx.strokeText(label, 0, 2);
+            ctx.fillStyle = '#ffe066';
+            ctx.fillText(label, 0, 2);
+        } else {
+            ctx.fillStyle = '#ffd60a';
+            ctx.strokeStyle = '#a66a00';
+            ctx.lineWidth = 0.8;
+            ctx.beginPath();
+            ctx.arc(0, 2, 2.5, 0, TAU);
+            ctx.fill();
+            ctx.stroke();
+        }
         ctx.restore();
     },
 
     /** A faceted blue diamond with a soft glow and a twinkle. */
-    drawGem(ctx, x, y, r, t = 0, groundY = y) {
-        ctx.fillStyle = 'rgba(0,0,0,0.2)';
-        ctx.beginPath();
-        ctx.ellipse(x, groundY + r * 0.9, r * 0.8, r * 0.3, 0, 0, TAU);
-        ctx.fill();
+    drawGem(ctx, x, y, r, t = 0, groundY = y, shadow = true) {
+        if (shadow) {
+            ctx.fillStyle = 'rgba(0,0,0,0.2)';
+            ctx.beginPath();
+            ctx.ellipse(x, groundY + r * 0.9, r * 0.8, r * 0.3, 0, 0, TAU);
+            ctx.fill();
+        }
         const glow = ctx.createRadialGradient(x, y, 1, x, y, r * 2.6);
         glow.addColorStop(0, 'rgba(125,211,252,0.55)');
         glow.addColorStop(1, 'rgba(125,211,252,0)');
@@ -284,11 +317,15 @@ extendGame({
         ctx.strokeStyle = 'rgba(255,255,255,0.8)';
         ctx.lineWidth = 2;
         ctx.stroke();
-        ctx.font = `22px ${EMOJI_FONT}`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillStyle = '#000';
-        ctx.fillText(def.emoji, pu.x, pu.y + bob + 1);
+        if (def.pouch) {
+            this.drawCoinAt(ctx, pu.x, pu.y + bob, 9);
+        } else {
+            ctx.font = `22px ${EMOJI_FONT}`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = '#000';
+            ctx.fillText(def.emoji, pu.x, pu.y + bob + 1);
+        }
         if (def.tag) {
             ctx.font = `15px ${DISPLAY_FONT}`;
             ctx.lineWidth = 3;
@@ -607,8 +644,10 @@ extendGame({
 
     drawPlayer(ctx) {
         const p = this.player;
-        if (p.iframes > 0 && Math.floor(p.iframes / 5) % 2 === 0) return;
+        // blinking = can't be hurt (after a hit, and for the whole Invincible powerup)
         const giant = this.timers.invincible > 0;
+        if (p.iframes > 0 && Math.floor(p.iframes / 5) % 2 === 0) return;
+        if (giant && p.iframes <= 0 && Math.floor(this.frameNo / 5) % 2 === 0) return;
         const scale = giant ? 1.6 : 1;
         const moving = p.moveT > 0;
         const frame = moving ? 1 + (Math.floor(p.moveT / 6) % 4) : 0;
@@ -639,14 +678,6 @@ extendGame({
             ctx.fillStyle = g;
             ctx.beginPath();
             ctx.arc(p.x, p.y, 34 * scale, 0, TAU);
-            ctx.fill();
-            ctx.globalAlpha = 1;
-        }
-        if (giant) {
-            ctx.globalAlpha = 0.3 + 0.15 * Math.sin(this.frameNo * 0.3);
-            ctx.fillStyle = '#7CFC00';
-            ctx.beginPath();
-            ctx.arc(p.x, p.y, 30 * scale, 0, TAU);
             ctx.fill();
             ctx.globalAlpha = 1;
         }
@@ -712,7 +743,7 @@ extendGame({
             if (sweep < 1 || t < 0.8) {
                 const hx = p.x + Math.cos(a1) * 10;
                 const hy = p.y - 4 + Math.sin(a1) * 10;
-                Game.drawAxe(ctx, pal, hx, hy, a1 + Math.PI / 2, Math.min(1.25, this.impactMult * 1.1), 1 + 0.1 * this.stack('reach'));
+                Game.drawAxe(ctx, pal, hx, hy, a1 + Math.PI / 2, Math.min(1.25, this.impactMult * 1.1));
             }
         }
     },
@@ -741,7 +772,7 @@ extendGame({
         this.blitSprite(ctx, 'barbarian', this.skin, 0, p.x, p.y + 14, 1, face * Math.max(0.35, Math.abs(Math.cos(spin))), 'noweapon');
         for (const off of [0, Math.PI]) {
             const a = spin + off;
-            Game.drawAxe(ctx, pal, p.x + Math.cos(a) * 12, p.y - 6 + Math.sin(a) * 12, a + Math.PI / 2, Math.min(1.25, this.impactMult * 1.1), 1 + 0.1 * this.stack('reach'));
+            Game.drawAxe(ctx, pal, p.x + Math.cos(a) * 12, p.y - 6 + Math.sin(a) * 12, a + Math.PI / 2, Math.min(1.25, this.impactMult * 1.1));
         }
     },
 
@@ -912,6 +943,29 @@ extendGame({
             ctx.font = `${Math.round(f.size * pop)}px ${DISPLAY_FONT}`;
             ctx.strokeStyle = 'rgba(0,0,0,0.75)';
             ctx.lineWidth = 4;
+            const icon = f.text.includes('🪙') ? 'coin' : f.text.includes('💎') ? 'gem' : null;
+            if (icon) {
+                // coins and gems read as the drawn icons, placed right after the text
+                const txt = f.text.replace(/\s*(🪙|💎)\s*/g, ' ').trim();
+                const fs = Math.round(f.size * pop);
+                const w = txt ? ctx.measureText(txt).width : 0;
+                const x0 = f.x - (fs * 0.9) / 2;
+                if (txt) {
+                    ctx.strokeText(txt, x0, f.y);
+                    ctx.fillStyle = f.color;
+                    ctx.fillText(txt, x0, f.y);
+                }
+                const ix = txt ? x0 + w / 2 + fs * 0.55 : f.x;
+                if (icon === 'coin') this.drawCoinAt(ctx, ix, f.y, fs * 0.36);
+                else this.drawGem(ctx, ix, f.y, fs * 0.36, this.frameNo, f.y, false);
+                ctx.font = `${fs}px ${DISPLAY_FONT}`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.lineJoin = 'round';
+                ctx.strokeStyle = 'rgba(0,0,0,0.75)';
+                ctx.lineWidth = 4;
+                continue;
+            }
             ctx.strokeText(f.text, f.x, f.y);
             ctx.fillStyle = f.color;
             ctx.fillText(f.text, f.x, f.y);

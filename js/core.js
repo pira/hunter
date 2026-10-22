@@ -3,7 +3,7 @@
 class Game {
     constructor() {
         // Version system (bumped by the pre-commit hook, see VERSION-README.md)
-        this.version = "3.2.1";
+        this.version = "3.2.2";
         this.buildDate = "2026-10-22";
 
         this.canvas = document.getElementById('gameCanvas');
@@ -119,14 +119,6 @@ class Game {
             this.loadBoard(this.el.menuBoard, this.el.menuBoardTitle, this.boardSel.board, this.boardSel.cls);
         });
         this.el.muteBtn.textContent = Sfx.muted ? '🔇' : '🔊';
-        const musicBtns = [$('musicBtn'), $('menuMusicBtn')];
-        const showMusic = () => musicBtns.forEach(b => b.classList.toggle('off', !Sfx.musicOn));
-        musicBtns.forEach(b => b.addEventListener('click', e => {
-            e.currentTarget.blur();
-            Sfx.toggleMusic();
-            showMusic();
-        }));
-        showMusic();
     }
 
     // Class picker on the menu: remembered between visits, changeable before every run.
@@ -139,8 +131,8 @@ class Game {
             const speed = U.clamp(Math.round((c.speed - 2) / 0.65), 1, 5);
             return `<button class="cls" data-cls="${id}" style="--c:${c.color}" aria-label="${c.name}">` +
                 `<canvas width="120" height="120"></canvas><b>${c.name}</b><small>${'❤️'.repeat(c.hearts)}</small>` +
-                `<span class="cdmg" title="Damage per basic hit">⚔️ <b>${Game.fmtDmg(PRIMARY[c.primary].damage)}</b>${c.primary === 'grenade' ? ' <i>area</i>' : c.primary === 'cleave' ? ' <i>sweep</i>' : ''}</span>` +
-                `<span class="cstat" title="Power">💪<span>${pips(c.power)}</span></span><span class="cstat" title="Speed">👟<span>${pips(speed)}</span></span></button>`;
+                `<span class="cdmg" title="Damage per basic hit">💪 <b>${Game.fmtDmg(PRIMARY[c.primary].damage)}</b></span>` +
+                `<span class="cstat" title="Speed">👟<span>${pips(speed)}</span></span></button>`;
         }).join('');
         this.el.classInfo = document.getElementById('classInfo');
         this.el.classPicker.querySelectorAll('.cls').forEach(btn => {
@@ -192,10 +184,6 @@ class Game {
                 return;
             }
             if (key === 'm') this.toggleMute();
-            if (key === 'b') {
-                Sfx.toggleMusic();
-                document.querySelectorAll('.music-btn').forEach(b => b.classList.toggle('off', !Sfx.musicOn));
-            }
             if (key === 'p' || key === 'escape') {
                 if (this.state === 'playing') this.pause();
                 else if (this.state === 'paused') this.resume();
@@ -578,7 +566,6 @@ class Game {
 
     showMenu() {
         Sfx.stopMusic();
-        Sfx.setBgmLevel(0.22);
         this.leaveGameMode();
         this.state = 'menu';
         this.resetRun();
@@ -589,6 +576,7 @@ class Game {
         for (let i = 0; i < 9; i++) this.attract.push(this.makeMonster(this.pickType(['small', 'medium', 'large'][i % 3]), Math.random() * this.W, Math.random() * this.H, 'random'));
         this.showBoardTabs();
         this.loadBoard(this.el.menuBoard, this.el.menuBoardTitle, this.boardSel.board, this.boardSel.cls);
+        this.refreshWho();
     }
 
     startRun() {
@@ -614,7 +602,6 @@ class Game {
         this.chargeMult = this.artefactMult('charge');
         this.statsLog = /[?&]stats\b/.test(window.location.search) ? this.makeStatsLog() : null;
         this.startLevel();
-        Sfx.setBgmLevel(0.15);
         this.enterGameMode(true);
         this.banner('HUNT!', `${this.biome.name} · fill the bar to clear the level`);
         Sfx.arpeggio([392, 523, 659], 0.08, { type: 'triangle', volume: 0.12 });
@@ -629,7 +616,6 @@ class Game {
         this.keys = {};
         this.state = 'paused';
         this.setOverlay('pause');
-        Sfx.setBgmLevel(0.09);
         const owned = UPGRADES.filter(u => this.stack(u.id) > 0);
         document.getElementById('pauseUps').innerHTML = owned.length
             ? owned.map(u => `<span class="up">${u.icon} ${u.name}<sup>${this.stack(u.id)}/${u.max}</sup></span>`).join('')
@@ -642,7 +628,6 @@ class Game {
         this.state = 'playing';
         this.setOverlay(null);
         this.lastTime = performance.now();
-        Sfx.setBgmLevel(0.15);
         this.enterGameMode();
     }
 

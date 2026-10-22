@@ -77,6 +77,9 @@ extendGame({
         this.el.whoForm.hidden = Boolean(id);
         this.el.whoHello.hidden = !id;
         if (id) this.el.whoNameText.textContent = id.name;
+        const cache = id && Leaderboard.cachedProfile();
+        document.getElementById('whoPurse').innerHTML = cache && cache.id === id.id
+            ? `${POUCH} ${(cache.gold || 0).toLocaleString()}<span class="g">${GEM} ${(cache.gems || 0).toLocaleString()}</span>` : '';
     },
 
     askName(rename = false) {

@@ -10,7 +10,7 @@ extendGame({
         if (b && !b.dying && b.mode !== 'enter' && target && (target === b || Math.hypot(target.x - p.x, target.y - p.y) > 80)) {
             return { x: b.x, y: b.y };
         }
-        return target ? { x: target.x, y: target.y } : null;
+        return target ? { x: target.x, y: target.y, m: target } : null;
     },
 
     nearestMonster(x, y, exclude, maxDist = Infinity, bossBias = 0.2) {
@@ -34,7 +34,7 @@ extendGame({
     },
 
     get cleaveReach() {
-        return PRIMARY.cleave.reach * (1 + 0.1 * this.stack('reach')) * this.impactMult;
+        return PRIMARY.cleave.reach * this.impactMult;
     },
 
     get blastRadius() {
@@ -92,13 +92,13 @@ extendGame({
         const target = this.nearestMonster(p.x, p.y, null, Infinity, 1);
         if (!target || Math.hypot(target.x - p.x, target.y - p.y) - target.size > reach) return;
         const angle = Math.atan2(target.y - p.y, target.x - p.x);
-        this.cooldown = PRIMARY.cleave.cooldown / (1 + 0.25 * this.stack('quick'));
+        this.cooldown = PRIMARY.cleave.cooldown / (1 + 0.1 * this.stack('quick'));
         this.startCleave(angle, reach, PRIMARY.cleave.damage * this.powerMult, PRIMARY.cleave.arc);
         Sfx.play('swoosh', { volume: 0.32, rate: 1.5 + Math.random() * 0.2, duration: 0.3 });
     },
 
     startCleave(angle, reach, damage, arc, opts = {}) {
-        const speed = (1 + 0.25 * this.stack('quick')) * (this.timers.rapidFire > 0 ? 1.5 : 1);
+        const speed = (1 + 0.1 * this.stack('quick')) * (this.timers.rapidFire > 0 ? 1.5 : 1);
         const dur = Math.max(6, Math.round(PRIMARY.cleave.swing / speed));
         const dir = this.player.facing >= 0 ? 1 : -1;
         this.cleaves.push({ angle, reach, damage, arc, t: 0, dur, dir, hits: new Set(), full: Boolean(opts.full) });
@@ -147,18 +147,27 @@ extendGame({
         this.cooldown = def.cooldown * Math.pow(0.9, this.stack('fuse'));
         const count = Math.min(5, 2 + this.stack('cluster')); // goblins always throw a pair
         const dirs = all ? 4 : 1;
+        if (aim && aim.m && !all && aim.m.behavior === 'chase' && !aim.m.anchored && !aim.m.boss) {
+            // lead a chaser: it walks towards you while the bomb is in the air
+            const d = Math.hypot(aim.x - p.x, aim.y - p.y);
+            const lead = Math.min(d * 0.5, (aim.m.speed * d) / def.speed);
+            aim = { x: aim.x + ((p.x - aim.x) / Math.max(1, d)) * lead, y: aim.y + ((p.y - aim.y) / Math.max(1, d)) * lead };
+        }
         const base = aim ? Math.atan2(aim.y - p.y, aim.x - p.x) : -Math.PI / 2;
         const range = all ? def.range : Math.min(def.range, Math.hypot(aim.x - p.x, aim.y - p.y));
+        // aimed throws land ~26 px apart around the target; the super fans out wide
+        const spread = all ? 0.32 : Math.min(0.32, 26 / Math.max(30, range));
         const fuse = Math.round(def.fuse * Math.pow(0.8, this.stack('fuse')));
         for (let d = 0; d < dirs; d++) {
             for (let i = 0; i < count; i++) {
-                const a = base + (d * TAU) / 4 + (i - (count - 1) / 2) * 0.32;
+                const a = base + (d * TAU) / 4 + (i - (count - 1) / 2) * spread;
                 // lob so the first bounce lands on the target, then hop up to `bounces` times
-                const dist = Math.max(30, range * (all ? 0.7 + 0.3 * Math.random() : 1));
+                // Bombardment: each bomb lands at its own distance and hops 2–4 times
+                const dist = Math.max(30, range * (all ? 0.45 + 0.55 * Math.random() : 1));
                 const flight = dist / def.speed;
                 this.grenades.push({
                     x: p.x, y: p.y, sx: p.x, sy: p.y, z: 6, vx: Math.cos(a) * def.speed, vy: Math.sin(a) * def.speed,
-                    vz: GRENADE_G * flight / 2, bounces: 0, timer: fuse, fuse, spin: 0,
+                    vz: GRENADE_G * flight / 2, bounces: 0, maxBounces: all ? 2 + Math.floor(Math.random() * 3) : def.bounces, timer: fuse, fuse, spin: 0,
                     radius: this.blastRadius * blastMult, damage: def.damage * (all ? 1 : this.powerMult)
                 });
             }
@@ -186,11 +195,11 @@ extendGame({
                 const hit = this.monsters.some(m => !m.dead && !m.dying && !m.hidden && U.distanceSquared(g.x, g.y, m.x, m.y) < (6 + m.size) ** 2);
                 if (hit) {
                     g.timer = 0;
-                } else if (g.bounces < PRIMARY.grenade.bounces) {
+                } else if (g.bounces < (g.maxBounces ?? PRIMARY.grenade.bounces)) {
                     g.bounces++;
                     g.vz = Math.abs(g.vz) * 0.55;
-                    g.vx *= 0.6;
-                    g.vy *= 0.6;
+                    g.vx *= 0.3; // short hops: half the old bounce length
+                    g.vy *= 0.3;
                     if (g.bounces === 1) Sfx.hit(8, { volume: 0.08, flavor: 'thwack' });
                 } else {
                     g.vx = g.vy = g.vz = 0; // resting; goes off on its fuse
@@ -308,7 +317,7 @@ extendGame({
                 this.novaQueue.shift();
                 for (let i = 0; i < 12; i++) {
                     const a = (i / 12) * TAU + ring * (TAU / 36);
-                    this.spawnBolt(p.x, p.y - 6, a, 7, 9 * this.impactMult, 2, this.stack('pierce') + 2, true);
+                    this.spawnBolt(p.x, p.y - 6, a, 7, 9 * this.impactMult, 3, this.stack('pierce') + 2, true);
                 }
                 this.ring(p.x, p.y, 70, '#e9d5ff', 16);
                 Sfx.tone(523 * (1 + ring * 0.26), { duration: 0.18, type: 'triangle', volume: 0.12, slide: 400, bus: 'sfx' });
