@@ -1,0 +1,13 @@
+{
+  "_comment": "Spoken boss lines. Each clip -> sfx/voice/<boss>-<event>-<n>.mp3. 'fx' picks the ffmpeg voice chain in make-voices.sh.",
+  "bosses": {
+    "bonecrusher": { "fx": "brute", "intro": ["I'll grind your bones to gravel!"], "taunt": ["Stand still, snack!", "Crunch time!", "Ha! Too slow!"], "enrage": ["ENOUGH!"], "death": ["Impossible..."] },
+    "hexweaver": { "fx": "witch", "intro": ["Welcome to my web of curses, little hunter."], "taunt": ["Hee hee hee! Dance for me!", "Feel the hex!", "Is that all you have got?"], "enrage": ["Now you've made me angry!"], "death": ["My spells... unraveling..."] },
+    "broodmother": { "fx": "swarm", "intro": ["My children are hungry. So hungry."], "taunt": ["Eat, my babies, eat!", "So many of us. Only one of you.", "You are surrounded!"], "enrage": ["You hurt my children!"], "death": ["My brood... will avenge me..."] },
+    "voidmaw": { "fx": "void", "intro": ["I am the hunger between the stars."], "taunt": ["Your light is fading.", "Come closer, little hunter.", "I will swallow you whole!"], "enrage": ["THE VOID AWAKENS!"], "death": ["The dark... recedes..."] },
+    "gravelord": { "fx": "giant", "intro": ["The mountain wakes. And it is ANGRY."], "taunt": ["Rocks fall! You lose!", "I will crush you like a pebble!", "Ha ha! Flat as a pancake!"], "enrage": ["FEEL THE EARTH SHAKE!"], "death": ["I crumble... to dust..."] },
+    "stormcaller": { "fx": "storm", "intro": ["Kneel before the storm!"], "taunt": ["You just got zapped!", "The sky obeys ME!", "Lightning never misses!"], "enrage": ["UNLEASH THE TEMPEST!"], "death": ["The storm... passes..."] },
+    "hydra": { "fx": "hydra", "intro": ["Three heads. Three times the trouble!"], "taunt": ["Snap snap snap!", "We see you!", "Cut one off, two more appear!"], "enrage": ["NOW WE'RE MAD!"], "death": ["All our heads... spinning..."] },
+    "lich": { "fx": "lich", "intro": ["Death is only the beginning, mortal."], "taunt": ["Your soul will make a fine lantern.", "Join my army!", "You cannot kill what is already dead!"], "enrage": ["Rise, my servants! RISE!"], "death": ["I... will... return..."] }
+  }
+}

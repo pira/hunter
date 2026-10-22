@@ -11,7 +11,8 @@
 //   POST /player/{id}/name           rename { secret, name }
 //
 // Items (single table):
-//   pk="board#v2"      sk="<inverted score>#<ts>#<id>"   score rows, best first
+//   pk="board#v2"      sk="<inverted score>#<ts>#<id>"   Classic score rows, best first
+//   pk="board#v3"      sk=…                               v3 score rows (classes, the road)
 //   pk="nonce"         sk=<token nonce>                   consumed run tokens (TTL)
 //   pk="rate"          sk=<ip>#<minute>                   per-IP submit counter (TTL)
 //   pk="player#<pid>"  sk="meta"                          profile (secretHash never leaves the server)
@@ -19,6 +20,9 @@
 import { createHmac, createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 
 export const BOARD = 'board#v2';
+export const BOARD_V3 = 'board#v3';
+export const CLASSES = ['wizard', 'barbarian', 'goblin'];
+export const MIN_LEVEL_SECONDS = 12; // no level (fight + encounter + travel) is faster than this
 export const MAX_SCORE = 50_000_000;
 export const MAX_RUN_MS = 6 * 3600 * 1000;
 export const SUBMITS_PER_MINUTE = 6;
@@ -51,6 +55,12 @@ export function levelForXp(xp) {
         total += xpToNextLevel(level);
     }
     return level;
+}
+
+// Upper bound on unspent gold a run can plausibly end with (coins scale with monster HP, +30%/6 levels).
+export function coinCap(kills, bosses, level) {
+    const hpScale = 1 + Math.floor((Math.max(1, level) - 1) / 6) * 0.3;
+    return Math.round(200 + kills * 12 * hpScale + bosses * 600 + level * 120);
 }
 
 export function sanitizeName(name) {
@@ -149,7 +159,28 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
             !isInt(combo, 0, 10_000_000) || !isInt(bosses, 0, 10_000) || !isInt(duration, 1, MAX_RUN_MS / 1000)) {
             throw new HttpError(400, 'invalid fields');
         }
-        return { name, score, level, kills, combo, bosses, duration };
+        const out = { name, score, level, kills, combo, bosses, duration };
+        if (body.board === 'v3') {
+            if (!CLASSES.includes(body.cls)) throw new HttpError(400, 'invalid class');
+            out.cls = body.cls;
+            if (body.skin !== undefined) {
+                if (typeof body.skin !== 'string' || !/^[a-z0-9_-]{1,32}$/.test(body.skin)) throw new HttpError(400, 'invalid skin');
+                out.skin = body.skin;
+            }
+            if (body.coins !== undefined) {
+                if (!isInt(body.coins, 0, 100_000_000)) throw new HttpError(400, 'invalid coins');
+                out.coins = body.coins;
+            }
+        }
+        return out;
+    }
+
+    /** v3: levels are earned by damage over time, so the level is bounded by the run length. */
+    function checkPlausibleV3(run) {
+        const { score, level, kills, combo, duration, bosses, coins } = run;
+        if (level > 2 + Math.floor(duration / MIN_LEVEL_SECONDS)) throw new HttpError(422, 'implausible level');
+        if (score > 1000 + duration * 4000 || kills > 60 + duration * 25 || combo > kills) throw new HttpError(422, 'implausible score');
+        if (coins !== undefined && coins > coinCap(kills, bosses, level)) throw new HttpError(422, 'implausible coins');
     }
 
     function checkPlausible(run) {
@@ -168,7 +199,9 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
         const elapsed = now() - token.issuedAt;
         // The claimed run length must fit in the real time since the run started (pause time only adds slack).
         if (elapsed > MAX_RUN_MS || run.duration * 1000 > elapsed + 15000) throw new HttpError(403, 'run timing mismatch');
-        checkPlausible(run);
+        const v3 = body.board === 'v3';
+        if (v3) checkPlausibleV3(run);
+        else checkPlausible(run);
 
         const pid = body.playerId;
         let meta = null;
@@ -178,10 +211,11 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
 
         const ts = now();
         const id = random(6).toString('base64url');
-        const board = BOARD;
+        const board = v3 ? BOARD_V3 : BOARD;
         const sk = `${pad(MAX_SCORE - run.score, 9)}#${pad(ts, 14)}#${id}`;
         const nonceItem = { pk: 'nonce', sk: token.nonce, ttl: Math.floor(ts / 1000) + 8 * 3600 };
-        const boardItem = { pk: board, sk, id, ...run, ts };
+        const { coins: unspent, ...shown } = run;
+        const boardItem = { pk: board, sk, id, ...shown, ts };
         if (pid) boardItem.playerId = pid;
 
         if (!pid) {
@@ -207,7 +241,8 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
     async function writeWithProfile({ pid, meta, secret, run, ts, id, nonceItem, boardItem }) {
         const runItem = {
             pk: `player#${pid}`, sk: `run#${pad(ts, 14)}#${id}`,
-            score: run.score, level: run.level, kills: run.kills, combo: run.combo, bosses: run.bosses, duration: run.duration, ts
+            score: run.score, level: run.level, kills: run.kills, combo: run.combo, bosses: run.bosses, duration: run.duration, ts,
+            ...(run.cls ? { cls: run.cls, board: 'v3' } : {})
         };
         for (let attempt = 0; attempt < 3; attempt++) {
             const next = {
@@ -306,7 +341,7 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
         try {
             if (method === 'GET' && path === '/scores') {
                 const limit = Math.min(50, Math.max(1, Number(query.limit) || 10));
-                return json(200, { scores: await topScores(BOARD, limit) });
+                return json(200, { scores: await topScores(query.board === 'v3' ? BOARD_V3 : BOARD, limit) });
             }
             if (method === 'POST' && path === '/run') return json(200, { token: makeToken() });
             if (method === 'POST' && path === '/scores') return json(200, await submit(parseBody(event), ip));

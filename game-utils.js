@@ -152,7 +152,82 @@
         return delta;
     }
 
+    /** Monster HP multiplier at a level (+30% every 6 levels). */
+    function hpScale(level) {
+        return 1 + Math.floor((Math.max(1, level) - 1) / 6) * 0.3;
+    }
+
+    /** Super meter gain for a kill: table value × multiplier, never above what is left to 100. */
+    function superCharge(meter, tierCharge, mult = 1) {
+        return Math.min(100, meter + Math.max(0, tierCharge) * mult);
+    }
+
+    /** Storm chain-lightning damage at a jump index (0 = first target). */
+    function stormDamage(level, jump, base = 6, falloff = 0.65, damageMult = 1) {
+        return base * hpScale(level) * damageMult * Math.pow(falloff, jump);
+    }
+
+    /** Effective damage that fills the level bar (~60 s of fighting at par skill). */
+    function levelDamage(level) {
+        const L = Math.max(1, level);
+        return Math.round(70 * (1 + 0.3 * (L - 1)) * hpScale(L));
+    }
+
+    /** Encounter at the end of a level: big boss every 10, small boss at 5/15/25…, else gatekeeper/wave. */
+    function encounterKind(level) {
+        if (level % 10 === 0) return 'bigBoss';
+        if (level % 10 === 5) return 'smallBoss';
+        return 'regular';
+    }
+
+    /** Coins dropped by a kill: tier base × monster HP scale × random factor (0.8–1.2), at least 1. */
+    function coinDrop(tierBase, level, rand = 1) {
+        return Math.max(1, Math.round(tierBase * hpScale(level) * rand));
+    }
+
+    /** Price of a shop card: permanent = static base × (1 + 0.75 × rank); one-level = share of income. */
+    function cardPrice(card, rank, expected, incomeEMA) {
+        if (card.share) return Math.max(card.cost, Math.round(card.share * Math.max(expected, incomeEMA || 0)));
+        return Math.round(card.cost * (1 + 0.75 * rank));
+    }
+
+    /** Coins a player can expect to earn during a level (kills + level bonus + encounter loot). */
+    function expectedIncome(level) {
+        return Math.round(0.7 * levelDamage(level) + 10 + 2 * level);
+    }
+
+    /**
+     * Deals `count` shop cards: at least one permanent and one one-level card when both exist,
+     * never two cards of the same `group` (e.g. Freeze I and II), the rest weighted at random.
+     */
+    function dealCards(permanent, oneLevel, count = 3, rng = Math.random) {
+        const hand = [];
+        const take = item => {
+            if (!item) return;
+            hand.push(item);
+        };
+        const fits = item => !hand.includes(item) && !(item.group && hand.some(h => h.group === item.group));
+        if (permanent.length) take(pickWeighted(permanent, rng));
+        if (oneLevel.length) take(pickWeighted(oneLevel, rng));
+        const rest = permanent.concat(oneLevel);
+        while (hand.length < count) {
+            const pool = rest.filter(fits);
+            if (!pool.length) break;
+            take(pickWeighted(pool, rng));
+        }
+        return hand.slice(0, count);
+    }
+
     return {
+        dealCards,
+        coinDrop,
+        cardPrice,
+        expectedIncome,
+        levelDamage,
+        encounterKind,
+        hpScale,
+        superCharge,
+        stormDamage,
         distanceSquared,
         isWithinRadius,
         vectorMagnitude,

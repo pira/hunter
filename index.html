@@ -79,17 +79,29 @@
         .combobar { height: 4px; background: rgba(0,0,0,.4); border-radius: 3px; overflow: hidden; margin-top: 2px; }
         #comboFill { height: 100%; background: #fff; }
         @keyframes throb { to { transform: scale(1.12); } }
-        #weapons { bottom: calc(12px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); display: flex; gap: 8px; }
-        .slot { pointer-events: auto; position: relative; width: 3.1em; height: 3.1em; border-radius: 12px; background: rgba(0,0,0,.45); border: 2px solid rgba(255,255,255,.2); display: grid; place-items: center; font-size: 1em; transition: transform .1s, border-color .1s; }
-        .slot .icon { font-size: 1.5em; }
-        .slot .key { position: absolute; top: 1px; left: 5px; font-size: .62em; color: var(--muted); }
-        .slot .lock { display: none; position: absolute; bottom: -1.35em; font-size: .62em; color: var(--muted); white-space: nowrap; }
-        .slot.active { border-color: var(--gold); transform: translateY(-4px); box-shadow: 0 0 14px rgba(255,214,10,.45); background: rgba(40,30,0,.55); }
-        .slot.locked .icon { filter: grayscale(1); opacity: .3; }
-        .slot.locked .lock { display: block; }
-        body.touch .slot .key { display: none; }
-        #weaponBtn { pointer-events: auto; right: 14px; bottom: calc(14px + env(safe-area-inset-bottom)); width: 4.2em; height: 4.2em; border-radius: 50%; border: 2px solid rgba(255,255,255,.35); background: rgba(0,0,0,.4); font-size: 1.2em; }
-
+        #superBar { position: relative; width: 7.5em; height: 10px; border-radius: 6px; background: rgba(0,0,0,.5); border: 1px solid rgba(255,255,255,.25); overflow: hidden; }
+        #superFill { height: 100%; width: 0; background: linear-gradient(90deg, #6366f1, #a855f7, #ec4899); transition: width .12s; }
+        #superBar::after { content: '⚡'; position: absolute; right: 2px; top: 50%; transform: translateY(-50%); font-size: 8px; opacity: .7; }
+        #superBar.ready { border-color: #facc15; box-shadow: 0 0 10px rgba(250,204,21,.8); animation: blink .5s infinite alternate; }
+        #superBar.ready #superFill { background: linear-gradient(90deg, #facc15, #fde047, #facc15); }
+        #superBar.active #superFill { background: linear-gradient(90deg, #f97316, #fde047); transition: none; }
+        @keyframes blink { to { filter: brightness(1.6); } }
+        /* SUPER button: pops up under the score when the meter is full */
+        #superBtn { pointer-events: auto; top: calc(48px * var(--ui) + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%) scale(.4); opacity: 0; visibility: hidden; display: flex; align-items: center; gap: .35em; padding: .35em 1.1em .35em .55em; border-radius: 999px; border: 3px solid #fff7c2; background: linear-gradient(180deg, #fde047, #f59e0b); color: #3b1d00; box-shadow: 0 4px 0 #92400e, 0 0 26px rgba(250,204,21,.85); transition: transform .25s cubic-bezier(.3,1.6,.6,1), opacity .2s, visibility .2s; }
+        #superBtn span { font-size: 1.5em; line-height: 1; }
+        #superBtn b { font-family: var(--display); font-weight: normal; font-size: 1.25em; letter-spacing: 1px; }
+        #superBtn small { font-size: .65em; opacity: .7; margin-left: .2em; }
+        #superBtn.ready { opacity: 1; visibility: visible; transform: translateX(-50%) scale(1); animation: superPulse .8s ease-in-out infinite; }
+        @keyframes superPulse { 50% { transform: translateX(-50%) scale(1.08); box-shadow: 0 4px 0 #92400e, 0 0 40px rgba(250,204,21,1); } }
+        #hud.super-ready #combo { top: calc(100px * var(--ui) + env(safe-area-inset-top)); }
+        #hud.super-ready ~ #bossBar { top: calc(140px * var(--ui) + env(safe-area-inset-top)); }
+        /* owned upgrades strip (after timed effects and one-level cards) */
+        .up { position: relative; display: grid; place-items: center; width: 1.7em; height: 1.7em; font-size: 1em; border-radius: 8px; background: rgba(0,0,0,.35); }
+        .up sup { position: absolute; right: -3px; top: -5px; font-family: var(--display); font-size: .6em; color: var(--gold); text-shadow: 0 1px 2px #000; }
+        .up.more { pointer-events: auto; cursor: pointer; font-family: var(--display); font-size: .8em; color: #e2e8f0; width: auto; padding: 0 .4em; }
+        .pause-ups { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin: .8em 0 .2em; }
+        .pause-ups .up { width: auto; height: auto; padding: .3em .5em; gap: .3em; display: flex; font-size: .85em; }
+        .pause-ups .up sup { position: static; font-size: .9em; }
         #bossBar { position: absolute; top: calc(92px * var(--ui) + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); width: min(70%, 520px); text-align: center; pointer-events: none; }
         #bossName { font-family: var(--display); font-size: 1.2em; color: #ffb4a8; text-shadow: 0 2px 0 #000; }
         #bossName small { font-family: system-ui, sans-serif; font-size: .6em; color: #e2e8f0; opacity: .85; margin-left: 6px; }
@@ -119,10 +131,10 @@
         .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 1.4em 1.6em; width: min(100%, 26em); max-height: 100%; overflow-y: auto; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,.5); touch-action: pan-y; position: relative; }
         h1, h2, h3 { font-family: var(--display); font-weight: normal; margin: 0; letter-spacing: 1px; }
         .logo { display: flex; align-items: center; justify-content: center; gap: .3em; }
-        .logo .wiz { font-size: 3.6em; animation: bob 1.6s ease-in-out infinite; display: inline-block; transform: scaleX(-1); }
+        .logo .wiz { width: 4.6em; height: 4.6em; animation: bob 1.6s ease-in-out infinite; display: inline-block; margin: -.4em -.3em -.2em 0; }
         .logo h1 { font-size: 2.6em; line-height: .95; text-align: left; color: #fff; text-shadow: 0 4px 0 #7c2d12, 0 0 24px rgba(255,214,10,.35); }
         .logo h1 span { color: var(--gold); }
-        @keyframes bob { 50% { transform: scaleX(-1) translateY(-8px); } }
+        @keyframes bob { 50% { transform: translateY(-8px); } }
         .tagline { color: #cbd5e1; margin: .6em 0 1em; font-size: .95em; }
         .btn { display: inline-flex; align-items: center; justify-content: center; gap: .4em; border: 0; border-radius: 14px; padding: .75em 1.4em; font-family: var(--display); font-size: 1.15em; letter-spacing: 1px; background: #334155; color: #fff; box-shadow: 0 4px 0 rgba(0,0,0,.35); transition: transform .08s, filter .1s; }
         .btn:hover { filter: brightness(1.12); }
@@ -200,7 +212,7 @@
         .pu { position: relative; }
         .pu i { position: absolute; right: 1px; top: 0; font-style: normal; font-family: var(--display); font-size: .45em; color: #fff; text-shadow: 0 1px 2px #000; }
         .pu.buff { border-style: dashed; --c: #4ade80; }
-        .slot[data-w="sword"]::after { content: attr(data-dmg); position: absolute; bottom: -1.3em; font-family: var(--display); font-size: .7em; color: var(--heat, #fff); text-shadow: 0 1px 2px #000, 0 0 6px rgba(0,0,0,.6); }
+        #banner.super .title { color: #fde047; text-shadow: 0 4px 0 #7c2d12, 0 0 34px rgba(250,204,21,.9); }
 
         /* Pause + game over */
         .stack { display: flex; flex-direction: column; gap: .7em; margin-top: 1em; }
@@ -225,6 +237,16 @@
         .who-avatar { width: 2.2em; height: 2.2em; display: grid; place-items: center; font-size: 1.3em; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #6d54e8, #2a1f6b); }
         .who-avatar canvas, .avatar canvas { width: 100%; height: 100%; }
         .shake { animation: nope .3s; }
+        .class-picker { display: flex; gap: .55em; justify-content: center; margin: .2em 0 .5em; }
+        .cls { flex: 1 1 0; max-width: 7.2em; display: flex; flex-direction: column; align-items: center; gap: .1em; padding: .35em .3em .45em; border-radius: 16px; border: 2px solid rgba(255,255,255,.12); background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02)); transition: transform .12s, border-color .12s, background .12s; }
+        .cls canvas { width: 4.2em; height: 4.2em; }
+        .cls b { font-family: var(--display); font-weight: normal; font-size: 1em; letter-spacing: .5px; }
+        .cls small { font-size: .6em; letter-spacing: 1px; }
+        .cls:hover { transform: translateY(-3px); }
+        .cls.on { border-color: var(--c); background: radial-gradient(circle at 50% 35%, color-mix(in srgb, var(--c) 45%, transparent), rgba(255,255,255,.03) 70%); box-shadow: 0 0 18px color-mix(in srgb, var(--c) 55%, transparent); transform: translateY(-3px); }
+        .cls.on b { color: #fff; }
+        .class-info { min-height: 2.6em; margin: 0 0 .9em; font-size: .82em; line-height: 1.45; color: #cbd5e1; }
+        .class-info .sup { color: #fde047; }
         /* profile */
         #profile { z-index: 4; background: rgba(5, 8, 16, .7); }
         .profile-panel { width: min(100%, 28em); text-align: left; }
@@ -248,6 +270,10 @@
         .profile-own { display: flex; flex-wrap: wrap; gap: .5em; justify-content: center; margin-top: 1em; }
         .code-box { flex-basis: 100%; text-align: center; font-size: .82em; color: #cbd5e1; }
         .code-box code { display: block; margin: .4em 0; padding: .6em; border-radius: 10px; background: #0b1220; border: 1px dashed #475569; word-break: break-all; font-size: .9em; color: #fde68a; -webkit-user-select: all; user-select: all; }
+        .board-tabs { display: flex; justify-content: center; gap: 4px; margin: .35em 0 0; }
+        .board-tabs button { border: 1px solid var(--line); background: transparent; color: var(--muted); border-radius: 999px; padding: .2em .8em; font-size: .75em; }
+        .board-tabs button.on { background: rgba(250,204,21,.15); color: var(--gold); border-color: rgba(250,204,21,.5); }
+        .board .cls-i { font-size: .85em; margin-right: .25em; }
         .board li[data-pid] { cursor: pointer; }
         .board li[data-pid]:hover { background: rgba(255,255,255,.1); }
         .board li[data-pid] .name::after { content: ' ›'; color: var(--muted); }
@@ -261,6 +287,8 @@
         @media (max-width: 560px) {
             #powerups { position: absolute; top: 2.7em; right: 0; flex-wrap: wrap; justify-content: flex-end; width: 11em; }
             #combo { min-width: 6em; }
+            #superBtn { font-size: .78em; padding: .3em .8em .3em .45em; }
+            #superBtn small { display: none; }
             #comboCount { display: none; }
             .pu { font-size: 1.05em; padding: 1px 4px; }
             #cards { flex-direction: column; align-items: stretch; gap: 10px; }
@@ -287,6 +315,7 @@
         <div id="hud" class="hidden">
             <div class="hud-left">
                 <div id="hearts"></div>
+                <div id="superBar" title="Super meter"><div id="superFill"></div></div>
                 <div class="lvl"><span id="levelLabel">LV 1</span><div class="xpbar"><div id="xpFill"></div></div></div>
                 <div id="coins">🪙 0</div>
             </div>
@@ -298,8 +327,7 @@
                 <button id="pauseBtn" class="icon-btn" aria-label="Pause">⏸</button>
             </div>
             <div id="combo"><div class="row"><span id="comboMult">×1</span><span id="comboCount"></span></div><div class="combobar"><div id="comboFill"></div></div></div>
-            <div id="weapons"></div>
-            <button id="weaponBtn" class="touch-only" aria-label="Switch weapon">🔫</button>
+            <button id="superBtn" aria-label="Super"><span>⚡</span><b>SUPER!</b></button>
         </div>
 
         <div id="bossBar" hidden>
@@ -312,7 +340,7 @@
         <div id="menu" class="overlay">
             <div class="panel">
                 <button id="menuFsBtn" class="icon-btn fs-btn panel-corner" aria-label="Fullscreen">⛶</button>
-                <div class="logo"><span class="wiz">🧙‍♂️</span><h1>MONSTER<br><span>HUNTER</span></h1></div>
+                <div class="logo"><canvas id="logoHero" class="wiz" width="160" height="160"></canvas><h1>MONSTER<br><span>HUNTER</span></h1></div>
                 <p class="tagline">Survive the horde. Chain kills. Slay the bosses.</p>
                 <div id="who">
                     <form id="whoForm" autocomplete="off" hidden>
@@ -332,14 +360,17 @@
                         <button id="whoEdit" class="icon-btn" aria-label="Rename">✏️</button>
                     </div>
                 </div>
+                <div id="classPicker" class="class-picker"></div>
+                <p id="classInfo" class="class-info"></p>
                 <button id="playBtn" class="btn primary">▶ PLAY</button>
                 <div class="howto desktop-only">
-                    <kbd>WASD</kbd> move · weapons fire on their own · hold <kbd>click</kbd> to aim<br>
-                    <kbd>Space</kbd> / <kbd>1</kbd>–<kbd>4</kbd> switch weapon · <kbd>P</kbd> pause · <kbd>M</kbd> mute
+                    <kbd>WASD</kbd> move · you attack on your own · hold <kbd>click</kbd> to aim<br>
+                    <kbd>Space</kbd> SUPER when the bar is full · <kbd>P</kbd> pause · <kbd>M</kbd> mute
                 </div>
-                <div class="howto touch-only">Drag anywhere to move · weapons fire on their own<br>Tap a weapon slot (or the big button) to switch</div>
+                <div class="howto touch-only">Drag anywhere to move · you attack on your own<br>Tap ⚡ SUPER when the bar is full</div>
                 <div id="iosHint" class="hint" hidden>📲 Tap <b>Share</b> → <b>Add to Home Screen</b> to play fullscreen <button id="iosHintClose" aria-label="Dismiss">✕</button></div>
                 <h3 id="menuBoardTitle">🏆 Top Hunters</h3>
+                <div class="board-tabs" id="boardTabs"><button data-board="v3" class="on">Monster Road</button><button data-board="v2">Classic</button></div>
                 <ol id="menuBoard" class="board"></ol>
                 <div id="version"></div>
             </div>
@@ -384,6 +415,7 @@
         <div id="pause" class="overlay">
             <div class="panel">
                 <h2>PAUSED</h2>
+                <div id="pauseUps" class="pause-ups"></div>
                 <div class="stack">
                     <button id="resumeBtn" class="btn primary">▶ RESUME</button>
                     <button id="restartBtn" class="btn">↻ Restart</button>
@@ -413,6 +445,19 @@
     <script src="game-utils.js"></script>
     <script src="audio.js"></script>
     <script src="leaderboard.js"></script>
-    <script src="game.js"></script>
+    <script src="js/config-data.js"></script>
+    <script src="js/core.js"></script>
+    <script src="js/player.js"></script>
+    <script src="js/combat.js"></script>
+    <script src="js/monsters.js"></script>
+    <script src="js/road.js"></script>
+    <script src="js/encounters.js"></script>
+    <script src="js/bosses.js"></script>
+    <script src="js/loot.js"></script>
+    <script src="js/shop.js"></script>
+    <script src="js/hud.js"></script>
+    <script src="js/render.js"></script>
+    <script src="js/sprites.js"></script>
+    <script src="js/profile.js"></script>
 </body>
 </html>

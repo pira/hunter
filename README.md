@@ -2,43 +2,58 @@
 
 Fast arcade survival game in plain JavaScript + canvas. Play it at **https://oleg.manida.com**.
 
-Kite waves of monsters, chain kills into a combo multiplier, pick an upgrade card every level, beat a boss every five levels, and put your name on the global leaderboard.
+Pick a hero, run down the monster road through eleven biomes, chain kills into a combo, unleash your super, beat a gatekeeper, a wave or a boss at the end of every level, and put your name on the global leaderboard.
 
 ## How to play
 
 | | Desktop | Touch |
 |---|---|---|
 | Move | WASD / arrow keys | drag anywhere (floating stick) |
-| Shoot | automatic (nearest monster, bosses first); hold click to aim | automatic |
-| Switch weapon | Space / E / Q, 1–4, mouse wheel | tap a weapon slot or the big button |
+| Attack | automatic (nearest monster, bosses first); hold click to aim | automatic |
+| Super | Space (when the bar is full) | tap the SUPER button under the score |
 | Shop | 1–3 buy, Enter continue | tap a card, tap Continue |
 | Pause / mute | P or Esc / M | ⏸ / 🔊 buttons |
 | Fullscreen | automatic on Play (⛶ toggles; turning it off is remembered) | same; on iPhone use Share → Add to Home Screen |
 
-- **Weapons:** 🔫 Blaster and 🗡️ Blade from the start; 💣 Grenades and 🚀 Missiles are unlocked in the shop.
-  - *Blaster* auto-aims (bosses first). Split Shot adds bullets; Multi-Shot fires the whole volley in 4 directions.
-  - *Blade* stabs the nearest monster in reach. Each consecutive hit doubles the damage (10 → 20 → 40 → …); the chain resets after ~1.5 s without a hit or when you get hurt. The steel glows from black to red to white-hot with the chain.
-  - *Grenades* max 4 per throw (×4 with Multi-Shot), *Missiles* max 3 per salvo (×4 with Multi-Shot).
+- **Heroes** (picked on the menu, remembered):
+  - 🧙 *Wizard* — auto-aiming magic bolts; super **Arcane Nova**: three rings of giant piercing bolts.
+  - 🪓 *Barbarian* — 4 hearts, a cleave that hits everything in front; super **Whirlwind**: 5 s of invincible spinning.
+  - 💣 *Goblin* — fastest runner, throws grenades in pairs; super **Bombardment**: bombs in all four directions.
+- **The road** scrolls down. Monsters come from the top and burst out of the bushes; loot drifts with the road and is gone once it leaves the bottom (it blinks first). Hiding at the very bottom works for three seconds only.
+- **Levels** fill with the damage you deal. When the bar is full: **CLEAR!** → finish the stragglers → the level's encounter → loot → through the gate into the next biome → shop.
+  - Encounters: a **gatekeeper** (Shieldbearer, Splitter, Bomber, Charger, Totem, Archers) or a **coordinated wave** (V-formation, Pincer, Closing Ring, Stampede, Conga Snake, Monster Rain); a **small boss** at levels 5, 15, 25… (Bonecrusher, Hexweaver, Broodmother, Voidmaw) and a **big boss** at 10, 20, 30… (Gravelord, Stormcaller, Hydra, Lich). Bosses talk.
+- **Super meter** fills with kills (bigger monsters charge more; 🔋 Overcharge fills it at once).
 - **Combo:** kills within ~2.8 s of each other build a combo; 5/15/30/50 kills give ×2/×3/×4/×5 score. Getting hit resets it.
-- **Coins & shop:** monsters drop 🪙 coins (bigger monsters drop more). Every level-up opens a shop with 3 cards and a level bonus; buy as many as you can afford (gold price = affordable, red = not), then continue.
-  - Permanent upgrades have fixed prices that rise with each rank you own (the set is finite, so it converges).
-  - One-level buffs — Double XP, Double Gold, Double Damage, Slow Mobs — are always on sale (even when everything else is maxed) and cost a share of what you have been earning per level, so they stay a real choice late in a run.
-- **Bosses:** levels 5, 10, 15, … bring Bonecrusher (telegraphed charges), Hexweaver (bullet rings), Broodmother (summons) and Voidmaw (all of it). Boss bullets are magenta. A beaten boss slowly cracks and falls apart, spilling gold coins, a heart and two powerups.
-- **Powerups:** 🏹 Multi-Shot, ⚡ Rapid Fire, 🛡️ Invincible (giant mode — you trample monsters), ❄️ Freeze, 🪙×2 / 🪙×3 coin multipliers, ❤️ Extra Life, 💣 Bomb. Drops are throttled (one every few seconds, at most 3 on the floor) and a timer never stacks past 30 s. Hearts drop more often while you're hurt.
-- **Leaderboard:** after you die, enter a name to submit. Scores go to the global board (AWS) and are also kept on your device; if the API is unreachable the device board is shown instead.
+- **Coins & shop:** coins scale with monster HP. Every level opens a shop with 3 cards (always at least one permanent upgrade and one one-level card) plus a level bonus.
+  - Permanent upgrades: fixed prices that rise per rank owned (a finite set). Class cards only show for your hero.
+  - One-level cards — Freeze, Fleet Foot, Fury, Coin Magnet, Road Brake, Double Progress/Gold/Damage, Feast — cost a share of what you have been earning per level.
+- **Pickups:** 🌩️ Storm (chain lightning every 3 s), 🔋 Overcharge, 🧪 Poison (spreads by touch), 💫 Stun, ⚡ Rapid Fire, 🛡️ Invincible, ❄️ Freeze, 🐢 Road Brake, 🧲 Magnet, 🪙×2/×3, ❤️ Extra Life, 🌋 Earthquake. Timers never stack past 30 s.
+- **Your hunter:** the first launch asks for a name; every run is saved to your profile (best score, hunts, kills, bosses, play time, recent runs). Tap any name on the leaderboard to see that hunter's profile. A recovery code moves your hunter to another device.
+- **Leaderboard:** runs are submitted automatically. The *Classic* tab keeps the v2 board.
 
 ## Project layout
 
 ```
 index.html          markup, HUD, menus, styles
 config.js           runtime config (leaderboard API URL)
-game.js             the game (fixed 60 Hz simulation, canvas rendering)
+js/                 the game, as classic scripts mixed into one Game class (no build step):
+  config-data.js    constants and data tables     core.js     Game class: loop, states, input, platform
+  player.js         movement, damage, stats       combat.js   weapons, projectiles, damage pipeline
+  monsters.js       spawning, movement, kills     bosses.js   boss patterns and death sequence
+  loot.js           coins, drops, powerups        shop.js     levels, pricing, burn transition, shop
+  hud.js            DOM HUD, game over, board     render.js   canvas drawing and particles
+  profile.js        identity and profile overlay  road.js     scrolling, biomes, background tiles
+  encounters.js     level flow, gatekeepers, waves, hazards
+  sprites.js        vector player characters (cached per class × skin × frame)
 game-utils.js       pure helpers shared with tests (level curve, combo tiers, …)
 audio.js            Web Audio engine: buses + limiter, voice manager, health watchdog,
                     procedural creature voices and hit sounds (samples in sfx/)
 manifest.webmanifest, icons/   PWA install (fullscreen on iPhone via Add to Home Screen)
 tools/audio/        prepare.sh rebuilds sfx/ from the originals in tools/audio/src/
 tools/icons/        make-icons.py renders icons/ with headless Chromium
+tools/voices/       make-voices.sh: boss lines (lines.json) → Piper TTS → ffmpeg → sfx/voice/
+tools/sim/          balance.py: headless bot run per class, prints per-level pacing/economy
+tools/dev-api.mjs   the Lambda app on an in-memory table, for local QA
 leaderboard.js      leaderboard client with local fallback
 leaderboard/        AWS backend: Lambda source + deploy script (see leaderboard/README.md)
 test/               node:test unit tests
@@ -48,7 +63,9 @@ No build step and no runtime dependencies. Run locally with any static server:
 
 ```bash
 python3 -m http.server 8000   # then open http://localhost:8000
-npm test                      # unit tests (node --test)
+npm test                      # unit tests (node --test): game-utils + the Lambda against a fake DynamoDB
+open http://localhost:8000/?stats        # per-level calibration log overlay
+open http://localhost:8000/?audiodebug   # audio engine state, voices, steals
 ```
 
 ## Deploy
