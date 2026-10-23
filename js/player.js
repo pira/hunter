@@ -31,7 +31,7 @@ extendGame({
 
     /** Coins (and gems): the Magnet powerup and the Coin Magnet card pull them from the whole map. */
     get magnetRadius() {
-        if (this.timers.magnet > 0 || this.buffs.magnetAll || this.phase === 'travel') return 2000;
+        if (this.timers.magnet > 0 || this.buffs.magnetAll || this.phase === 'travel' || this.bossLootPhase) return 2000;
         return this.pickupRadius;
     },
 
@@ -149,11 +149,13 @@ extendGame({
         if (this.turtleBlocks()) {
             // the turtle's green heart takes it: a short blink, no red heart lost
             p.iframes = 70;
+            this.greenLost++;
             this.shake(6);
             Sfx.tone(260, { duration: 0.12, type: 'triangle', volume: 0.1, bus: 'sfx' });
             return;
         }
         p.hp--;
+        this.heartsLost++;
         p.iframes = 90;
         this.shake(14);
         this.hitStop = 5;

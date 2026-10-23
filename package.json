@@ -1,6 +1,6 @@
 {
   "name": "hunter",
-  "version": "3.3.5",
+  "version": "3.3.6",
   "description": "Monster Hunter \u2014 arcade survival game (GitHub Pages: oleg.manida.com)",
   "main": "js/core.js",
   "scripts": {

@@ -235,6 +235,17 @@
         #gameover h2 { font-size: 2.6em; color: #ff6b6b; text-shadow: 0 4px 0 #3b0000; }
         .killer { display: flex; align-items: center; justify-content: center; gap: .4em; color: #cbd5e1; margin: .2em 0 .6em; }
         #newBest { display: inline-block; background: linear-gradient(90deg, #facc15, #f97316); color: #3b1d00; font-family: var(--display); padding: .15em .7em; border-radius: 999px; margin-bottom: .6em; animation: throb .5s infinite alternate; }
+        /* boss summary: shown when a boss's loot is in */
+        .bs-panel { max-width: 30em; width: 100%; text-align: center; }
+        #bsTitle { font-size: 2.1em; color: var(--gold); text-shadow: 0 4px 0 #3b1d00; }
+        .bs-sub { margin: .2em 0 .7em; color: var(--muted); }
+        .bs-trophies { margin: 0 auto .8em; padding: .55em .8em; border-radius: 14px; background: linear-gradient(90deg, rgba(250,204,21,.2), rgba(250,204,21,.05)); font-size: .95em; }
+        .bs-trophies b { font-family: var(--display); font-weight: normal; font-size: 1.25em; color: var(--gold); }
+        .bs-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: .8em; }
+        .bs-grid div { background: rgba(255,255,255,.05); border-radius: 10px; padding: .45em .3em; display: flex; flex-direction: column; }
+        .bs-grid span { font-size: .68em; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+        .bs-grid b { font-family: var(--display); font-weight: normal; font-size: 1.2em; }
+        .bs-run { font-size: .82em; color: var(--muted); margin: 0 0 .9em; }
         #finalStats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 1em; }
         #finalStats div { background: rgba(255,255,255,.05); border-radius: 10px; padding: .45em .3em; display: flex; flex-direction: column; }
         #finalStats span { font-size: .7em; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
@@ -538,6 +549,18 @@
                         <button id="profileCopy" class="btn small">Copy</button>
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <div id="bossStats" class="overlay">
+            <div class="panel bs-panel">
+                <h2 id="bsTitle">BOSS DEFEATED!</h2>
+                <p id="bsSub" class="bs-sub"></p>
+                <div id="bsTrophies" class="bs-trophies"></div>
+                <div id="bsGrid" class="bs-grid"></div>
+                <p id="bsRun" class="bs-run"></p>
+                <button id="bsContinue" class="btn primary">CONTINUE ▶</button>
+                <p class="shop-hint desktop-only"><kbd>Enter</kbd> continue</p>
             </div>
         </div>
 

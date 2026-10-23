@@ -18,6 +18,7 @@
       g.closeShop();
       continue;
     }
+    if (g.state === 'bossStats') { g.bossStatsAt = 0; g.closeBossStats(); continue; }
     if (g.state === 'dying') { g.step(); steps++; continue; }
     // kite: flee nearby monsters, drift to coins, stay mid-screen
     const p = g.player;

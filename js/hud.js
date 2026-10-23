@@ -200,6 +200,59 @@ extendGame({
     },
 
     // Runs are submitted automatically under the player's stored identity.
+    /** Snapshot of the run's counters: a boss summary shows the difference since the last one. */
+    stageSnapshot() {
+        return {
+            level: this.level, time: this.time, coins: this.coinsEarned || 0, kills: this.kills || 0, hits: this.hits || 0,
+            hearts: this.heartsLost || 0, green: this.greenLost || 0, gems: this.gems || 0, eggs: (this.eggCards || 0) + (this.bossEggs || 0), score: this.score
+        };
+    },
+
+    showBossStats() {
+        const now = this.stageSnapshot();
+        const was = this.stageStart || { level: 1, time: 0, coins: 0, kills: 0, hits: 0, hearts: 0, green: 0, gems: 0, eggs: 0, score: 0 };
+        const k = this.bossKill || { name: 'The boss', secs: 0 };
+        const d = key => now[key] - was[key];
+        this.state = 'bossStats';
+        this.releaseStick();
+        this.keys = {};
+        const $ = id => document.getElementById(id);
+        $('bsTitle').textContent = `👑 ${k.name.toUpperCase()} DEFEATED!`;
+        $('bsSub').textContent = `Level ${this.level} · levels ${was.level}–${this.level} · fight ${U.formatTime(k.secs)}`;
+        const r = this.lastSackReturn;
+        $('bsTrophies').innerHTML = r && (r.coins || r.gems || r.eggs)
+            ? `👑 Road trophies back: <b>${COIN} ${r.coins}</b>${r.gems ? ` · <b>${GEM} ${r.gems}</b>` : ''}${r.eggs ? ` · <b>🥚 ${r.eggs}</b>` : ''}`
+            : '✨ The road kept nothing — perfect collecting!';
+        const hearts = d('hearts');
+        const green = d('green');
+        const stats = [
+            ['Coins earned', `${COIN} ${d('coins').toLocaleString()}`],
+            ['Gems found', `${GEM} ${d('gems')}`],
+            ['Kills', d('kills').toLocaleString()],
+            ['Hearts lost', hearts || green ? `${hearts ? `❤️ ${hearts}` : ''}${green ? ` 💚 ${green}` : ''}` : 'none! 🏅'],
+            ['Score', `+${d('score').toLocaleString()}`],
+            ['Time', U.formatTime(d('time'))]
+        ];
+        if (d('eggs')) stats.splice(2, 0, ['Eggs', `🥚 ${d('eggs')}`]);
+        $('bsGrid').innerHTML = stats.map(([a, b]) => `<div><span>${a}</span><b>${b}</b></div>`).join('');
+        $('bsRun').innerHTML = `Whole run: ${COIN} ${now.coins.toLocaleString()} earned · ${now.kills.toLocaleString()} kills · ` +
+            `${now.hearts + now.green ? `${now.hearts + now.green} ${now.hearts + now.green === 1 ? 'heart' : 'hearts'} lost` : 'no hearts lost'} · ${this.bossesSlain} ${this.bossesSlain === 1 ? 'boss' : 'bosses'}`;
+        this.setOverlay('bossStats');
+        Sfx.arpeggio([523, 659, 784, 1046, 1318], 0.07, { type: 'triangle', volume: 0.12 });
+        this.bossStatsAt = performance.now();
+        setTimeout(() => { if (this.state === 'bossStats') document.getElementById('bsContinue').focus(); }, 420);
+    },
+
+    closeBossStats() {
+        if (this.state !== 'bossStats' || performance.now() - (this.bossStatsAt || 0) < 400) return;
+        this.stageStart = this.stageSnapshot();
+        this.stageStart.level = this.level + 1; // the next stage starts with the next level
+        this.state = 'playing';
+        this.setOverlay(null);
+        this.lastTime = performance.now();
+        this.startTravel();
+    },
+
     async submitScore() {
         const id = Leaderboard.identity();
         const name = (id && id.name) || 'Hunter';

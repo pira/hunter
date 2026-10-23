@@ -3,7 +3,7 @@
 class Game {
     constructor() {
         // Version system (bumped by the pre-commit hook, see VERSION-README.md)
-        this.version = "3.3.5";
+        this.version = "3.3.6";
         this.buildDate = "2026-10-23";
 
         this.canvas = document.getElementById('gameCanvas');
@@ -70,6 +70,8 @@ class Game {
             spinBtn: $('spinBtn'), keepBtn: $('keepBtn'), profileShop: $('profileShop')
         };
         this.el.continueBtn.addEventListener('click', () => this.closeShop());
+        this.el.bossStats = $('bossStats');
+        $('bsContinue').addEventListener('click', () => this.closeBossStats());
         this.el.spinBtn.addEventListener('click', () => this.spinWheel());
         this.el.keepBtn.addEventListener('click', () => this.keepPot());
 
@@ -177,6 +179,10 @@ class Game {
                 return;
             }
             if (this.state === 'transition') return;
+            if (this.state === 'bossStats') {
+                if (key === 'enter' || key === ' ' || key === 'c') this.closeBossStats();
+                return;
+            }
             if (this.state === 'levelup') {
                 const idx = ['1', '2', '3', '4'].indexOf(key);
                 if (idx >= 0) this.buyCard(idx);
@@ -510,6 +516,10 @@ class Game {
         this.gems = 0;
         this.roadSack = { coins: 0, gems: 0, eggs: 0 };
         this.sackFlights = [];
+        this.heartsLost = 0;
+        this.greenLost = 0;
+        this.lastSackReturn = null;
+        this.stageStart = null; // snapshot at run start / last boss (set once the run is ready)
         this.eggCards = 0;
         this.bossEggs = 0;
         this.petList = [];
@@ -643,7 +653,7 @@ class Game {
     }
 
     setOverlay(name) {
-        ['menu', 'levelup', 'pauseOverlay', 'gameover'].forEach(key => {
+        ['menu', 'levelup', 'pauseOverlay', 'gameover', 'bossStats'].forEach(key => {
             const id = key === 'pauseOverlay' ? 'pause' : key;
             this.el[key].classList.toggle('show', id === name);
         });

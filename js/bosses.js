@@ -55,6 +55,7 @@ extendGame({
     },
 
     spawnBoss(def) {
+        this.bossStartTime = this.time;
         const big = Boolean(def.big);
         const n = big ? this.bigCount : this.smallCount; // how many of this size we have met, incl. this one
         const cycle = Math.floor((n - 1) / 4);
@@ -801,6 +802,7 @@ extendGame({
         }
         this.boss = null;
         this.bossesSlain++;
+        this.bossKill = { name: b.boss.name, title: b.boss.title, secs: this.time - (this.bossStartTime || this.time) };
         this.el.bossBar.hidden = true;
         const bonus = 300 * this.bossCount * (b.boss.big ? 2 : 1);
         this.score += bonus;
@@ -818,6 +820,7 @@ extendGame({
     /** Everything the road took since the last boss bursts out of this one. */
     dropRoadSack(b) {
         const s = this.roadSack;
+        this.lastSackReturn = s ? { ...s } : null;
         if (!s || !(s.coins + s.gems + s.eggs)) return;
         if (s.coins) this.spawnCoins(b.x, b.y, s.coins, 5, 7);
         if (s.gems) this.spawnGems(b.x, b.y, s.gems);

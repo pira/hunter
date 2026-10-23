@@ -59,7 +59,11 @@ extendGame({
         } else if (this.phase === 'encounter') {
             this.updateEncounter();
         } else if (this.phase === 'loot') {
-            if (--this.lootT <= 0) this.startTravel();
+            if (--this.lootT <= 0) {
+                // after a boss: once its loot has flown to you, show the stage summary
+                if (this.bossLootPhase && this.state === 'playing') this.showBossStats();
+                else this.startTravel();
+            }
         } else if (this.phase === 'travel') {
             // the road rushes on; leftover loot glides to you (magnet covers the whole screen now)
             for (const c of this.coinDrops) c.t = Math.max(c.t, 19);
@@ -85,6 +89,7 @@ extendGame({
     },
 
     startTravel() {
+        this.bossLootPhase = false;
         this.phase = 'travel';
         this.seam = { y: -130, biome: this.biomeFor(this.level + 1) };
         this.biomeTile(this.seam.biome); // render the next tile now, before it scrolls in
@@ -173,6 +178,7 @@ extendGame({
         enc.done = true;
         this.phase = 'loot';
         this.lootT = Math.round(4.5 * 60 * GAME_SPEED);
+        this.bossLootPhase = enc.kind === 'bigBoss' || enc.kind === 'smallBoss'; // all its loot flies to you
         this.hazards = this.hazards.filter(h => h.type === 'scorch');
         if (enc.kind === 'gatekeeper' || enc.kind === 'wave') {
             // reward: a shower of coins on the road ahead and a pickup
