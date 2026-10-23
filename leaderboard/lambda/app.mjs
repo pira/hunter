@@ -34,7 +34,7 @@
 import { createHmac, createHash, randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
 import {
     PETS, MERGE_GEMS, MAX_SLOTS, SLOT_UNLOCK, petKey, EGG_PRICE, NESTS, MAX_NESTS, NEST_UNLOCK, HATCH_MS, HURRY_GEMS_PER_HOUR, EGG_ODDS,
-    ART_REFUND_GOLD, ART_REFUND_GEMS, SKINS, SKIN_PRICES, WHEEL_WIN, PET_LEVEL_MAX, FEED_COST, masteryTier
+    ART_REFUND_GOLD, ART_REFUND_GEMS, SKINS, SKIN_PRICES, WHEEL_WIN, PET_LEVEL_MAX, FEED_COST, masteryTier, reachedLevel
 } from './catalog.mjs';
 
 export const BOARD = 'board#v2';
@@ -243,10 +243,13 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
             const out = await send('Query', {
                 KeyConditionExpression: 'pk = :pk AND begins_with(sk, :run)',
                 ExpressionAttributeValues: { ':pk': `player#${pid}`, ':run': 'run#' },
-                ProjectionExpression: 'cls, #l', ExpressionAttributeNames: { '#l': 'level' },
+                ProjectionExpression: 'cls, #l, bosses', ExpressionAttributeNames: { '#l': 'level' },
                 Limit: 500, ExclusiveStartKey
             });
-            for (const r of out.Items || []) if (CLASSES.includes(r.cls) && r.level > (best[r.cls] || 0)) best[r.cls] = r.level;
+            for (const r of out.Items || []) {
+                const lvl = reachedLevel(r.level, r.bosses);
+                if (CLASSES.includes(r.cls) && lvl > (best[r.cls] || 0)) best[r.cls] = lvl;
+            }
             ExclusiveStartKey = out.LastEvaluatedKey;
         } while (ExclusiveStartKey && ++pages < 40);
         return best;
@@ -367,7 +370,7 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
         if (meta && meta.equipped && run.cls && meta.equipped[run.cls]) boardItem.skin = meta.equipped[run.cls];
         // the class mastery badge, including what this run just earned
         if (pid && run.cls) {
-            const tier = masteryTier(Math.max((meta && meta.classBest && meta.classBest[run.cls]) || 0, run.level));
+            const tier = masteryTier(Math.max((meta && meta.classBest && meta.classBest[run.cls]) || 0, reachedLevel(run.level, run.bosses)));
             if (tier > 0) boardItem.mastery = tier;
         }
 
@@ -413,7 +416,7 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
             next.bestScore = Math.max(next.bestScore || 0, run.score);
             next.bestLevel = Math.max(next.bestLevel || 0, run.level);
             next.classBest = { ...(next.classBest || {}) };
-            if (run.cls) next.classBest[run.cls] = Math.max(next.classBest[run.cls] || 0, run.level);
+            if (run.cls) next.classBest[run.cls] = Math.max(next.classBest[run.cls] || 0, reachedLevel(run.level, run.bosses));
             next.version = (meta ? meta.version || 0 : 0) + 1;
             // Unspent gold is banked 100% at death (D5); the pot lets it ride on the wheel.
             next.gold += unspent;

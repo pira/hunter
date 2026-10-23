@@ -807,6 +807,7 @@ extendGame({
         this.boss = null;
         this.bossesSlain++;
         this.bossKill = { name: b.boss.name, title: b.boss.title, secs: this.time - (this.bossStartTime || this.time) };
+        this.masteryCheck(b);
         this.el.bossBar.hidden = true;
         const bonus = 300 * this.bossCount * (b.boss.big ? 2 : 1);
         this.score += bonus;

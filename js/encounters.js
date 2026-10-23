@@ -117,12 +117,22 @@ extendGame({
         if (this.statsLog) this.statsLog.endLevel(this);
         this.pendingLevels = 1;
         this.phase = 'shop';
-        // the boss of a tenth level fell: a new mastery tier for this class
+    },
+
+    /** The level a run counts as reached: a beaten tenth-level boss counts as the next level. */
+    reachedLevel() {
+        return this.level % 10 === 0 && this.bossesSlain >= this.level / 5 ? this.level + 1 : this.level;
+    },
+
+    /** The boss of a tenth level fell: that counts as reaching the next level (a new mastery tier). */
+    masteryCheck(b) {
+        if (!b.boss.big || this.level % 10 !== 0) return;
         const before = U.masteryTier(this.classBest(this.cls));
-        this.noteClassBest(this.cls, this.level);
-        const tier = U.masteryTier(this.level);
+        this.noteClassBest(this.cls, this.level + 1);
+        const tier = U.masteryTier(this.level + 1);
         if (tier > before) {
-            this.banner(`${CLASSES[this.cls].name.toUpperCase()} MASTERY ${Game.roman(tier)}!`, `next hunt: ${this.masteryText(this.level)}`, 'super');
+            this.bossKill.mastery = tier;
+            this.banner(`${CLASSES[this.cls].name.toUpperCase()} MASTERY ${Game.roman(tier)}!`, `next hunt: ${this.masteryText(this.level + 1)}`, 'super');
             Sfx.arpeggio([523, 659, 784, 1046, 1318], 0.07, { type: 'triangle', volume: 0.13 });
         }
     },

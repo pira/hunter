@@ -149,7 +149,7 @@ extendGame({
     showGameOver() {
         this.state = 'gameover';
         this.clearSavedRun();
-        this.noteClassBest(this.cls, this.level);
+        this.noteClassBest(this.cls, this.reachedLevel());
         const tierNow = U.masteryTier(this.classBest(this.cls));
         if (tierNow > (this.runMasteryTier || 0)) this.masteryUp = { cls: this.cls, tier: tierNow };
         this.releaseWakeLock();
@@ -261,9 +261,10 @@ extendGame({
         $('bsTitle').textContent = `👑 ${k.name.toUpperCase()} DEFEATED!`;
         $('bsSub').textContent = `Level ${this.level} · levels ${was.level}–${this.level} · fight ${U.formatTime(k.secs)}`;
         const r = this.lastSackReturn;
-        $('bsTrophies').innerHTML = r && (r.coins || r.gems || r.eggs)
+        $('bsTrophies').innerHTML = (r && (r.coins || r.gems || r.eggs)
             ? `👑 Road trophies back: <b>${COIN} ${r.coins}</b>${r.gems ? ` · <b>${GEM} ${r.gems}</b>` : ''}${r.eggs ? ` · <b>🥚 ${r.eggs}</b>` : ''}`
-            : '✨ The road kept nothing — perfect collecting!';
+            : '✨ The road kept nothing — perfect collecting!') +
+            (k.mastery ? `<br>${this.masteryBadge(k.mastery)} <b>${CLASSES[this.cls].name} Mastery ${Game.roman(k.mastery)}</b> — next hunt: ${this.masteryText(this.level + 1)}` : '');
         const hearts = d('hearts');
         const green = d('green');
         const stats = [

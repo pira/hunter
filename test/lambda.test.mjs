@@ -381,8 +381,11 @@ describe('lambda: banking, wheel and meta shop', () => {
         await finishRun(api, 0, { level: 12, score: 5000 }); // wizard reached 12: the level-10 boss fell
         await finishRun(api, 0, { level: 7, cls: 'goblin' });
         await finishRun(api, 0, { level: 9 });
+        // died at level 10 right after its boss (2 bosses: L5 and L10): that counts as level 11
+        await finishRun(api, 0, { level: 10, bosses: 2, cls: 'barbarian' });
+        await finishRun(api, 0, { level: 10, bosses: 1, cls: 'goblin' }); // the boss won
         const prof = (await api.call('GET', `/player/${PID}`)).body.player;
-        assert.deepEqual(prof.classBest, { wizard: 12, goblin: 7 });
+        assert.deepEqual(prof.classBest, { wizard: 12, goblin: 10, barbarian: 11 });
         const board = (await t.call('GET', '/scores', undefined, '1.2.3.4', { board: 'v3' })).body.scores;
         assert.equal(board.find(s => s.cls === 'wizard' && s.level === 12).mastery, 1);
         assert.equal(board.find(s => s.cls === 'goblin').mastery, undefined);
