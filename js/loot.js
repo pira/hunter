@@ -144,7 +144,10 @@ extendGame({
     },
 
     spawnPowerup(x, y, type, { pop = false, loot = false, speed = 2.5 } = {}) {
-        if (!type) type = U.pickWeighted(Object.entries(POWERUPS).map(([k, d]) => ({ k, weight: d.weight }))).k;
+        if (!type) {
+            const pets = Boolean(this.petList && this.petList.length);
+            type = U.pickWeighted(Object.entries(POWERUPS).filter(([, d]) => !d.needsPets || pets).map(([k, d]) => ({ k, weight: d.weight }))).k;
+        }
         const a = Math.random() * TAU;
         this.powerups.push({
             x: U.clamp(x, 20, this.W - 20), y: U.clamp(y, 20, this.H - 20), type, life: POWERUP_LIFE, t: 0, loot,

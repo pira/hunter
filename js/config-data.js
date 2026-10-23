@@ -80,7 +80,7 @@ const WANDER_UP_BIAS = 0.01;  // wanderers turn up-screen this much more often t
 const TIMER_CAP = Math.round(30 * 60 * GAME_SPEED); // a powerup can never stack past 30 real seconds
 // Coins per kill: [chance, tierBase]; amount = tierBase × hpScale(L) × rand(0.8–1.2) × coin multipliers.
 const COIN_DROPS = {
-    small: [0.3, 1], medium: [0.45, 2], large: [0.8, 4], elite: [1, 6],
+    small: [0.35, 1], medium: [0.5, 2], large: [0.85, 4], elite: [1, 6],
     legendary: [1, 8], mythic: [1, 11], ancient: [1, 15], ultimate: [1, 25]
 };
 
@@ -98,6 +98,7 @@ const POWERUPS = {
     coins2: { emoji: '🪙', pouch: true, tag: '×2', name: 'Coins ×2', color: '#FFC300', timed: true, secs: 30, weight: 0.8 },
     coins3: { emoji: '🪙', pouch: true, tag: '×3', name: 'Coins ×3', color: '#FF8C00', timed: true, secs: 30, weight: 0.4 },
     heart: { emoji: '❤️', name: 'Extra Life', color: '#FF1493', weight: 1 },
+    petBoost: { emoji: '🦴', name: 'Pet Treat', color: '#f59e0b', timed: true, secs: 30, weight: 0.6, needsPets: true },
     quake: { emoji: '🌋', name: 'Earthquake', color: '#FF4500', weight: 0.3 }
 };
 const TIMED_POWERUPS = Object.keys(POWERUPS).filter(k => POWERUPS[k].timed);
@@ -125,6 +126,7 @@ const UPGRADES = [
     { id: 'impact', icon: '💥', name: 'Impact', max: 3, cost: 30, desc: '+15% bolt size, cleave reach and blast radius' },
     { id: 'split', icon: '🔱', name: 'Split Shot', max: 3, cost: 40, cls: 'wizard', desc: 'Bolts fire +1 projectile' },
     { id: 'pierce', icon: '🏹', name: 'Piercing Rounds', max: 3, cost: 30, cls: 'wizard', desc: 'Bolts pierce +1 monster' },
+    { id: 'packLeader', icon: '🦮', name: 'Pack Leader', max: 1, cost: 40, needsPets: true, desc: 'Whole run: your pets are twice as strong' },
     { id: 'quick', icon: '💨', name: 'Quick Swing', max: 3, cost: 30, cls: 'barbarian', desc: '+10% swing speed' },
     { id: 'cluster', icon: '🧨', name: 'Cluster Bombs', max: 3, cost: 30, cls: 'goblin', desc: '+1 grenade per throw' },
     { id: 'fuse', icon: '⏲️', name: 'Short Fuse', max: 3, cost: 30, cls: 'goblin', desc: 'Grenades burst 20% sooner and throw 10% faster' }
@@ -144,6 +146,7 @@ const LEVEL_BUFFS = [
     { id: 'swarm', icon: '👯', name: 'Double Trouble', buff: true, cost: 40, weight: 0.45, desc: 'This level: twice the monsters — they all come in pairs. More kills, more coins!' },
     { id: 'xp2', icon: '📘', name: 'Double Progress', buff: true, cost: 10, weight: 0.5, desc: 'This level: the level bar fills twice as fast' },
     { id: 'freeze2', group: 'freeze', icon: '❄️', name: 'Freeze II', buff: true, cost: 15, weight: 0.35, desc: 'This level: monsters move at 50%' },
+    { id: 'petParty', icon: '🐾', name: 'Pet Party', buff: true, cost: 15, weight: 0.5, needsPets: true, desc: 'This level: your pets are twice as strong' },
     { id: 'dmg2', icon: '🗡️', name: 'Double Damage', buff: true, cost: 12, weight: 0.5, desc: 'This level: ×2 damage' }
 ];
 LEVEL_BUFFS.forEach(b => { b.oneLevel = true; });
@@ -184,6 +187,7 @@ const NESTS = 1;
 const HATCH_MS = 6 * 3600 * 1000;
 const HURRY_GEMS_PER_HOUR = 1;
 const EGG_ODDS = [80, 16, 3.5, 0.5]; // one kind of egg, bought or dropped by a boss
+const BOSS_EGG_CHANCE = 0.1;         // any boss, small or big
 const PETS = {
     turtle: { icon: '🐢', name: 'Turtle', what: 'extra green hearts that take hits first', values: [0, 1, 2, 3, 4], label: v => `+${v} green ${v > 1 ? 'hearts' : 'heart'}` },
     bees: { icon: '🐝', name: 'Bees', what: 'each bee stings a monster near you every 2 s', values: [0, 1, 2, 4, 8], label: v => `${v} ${v > 1 ? 'bees' : 'bee'}` },

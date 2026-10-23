@@ -25,12 +25,14 @@ extendGame({
     },
 
     availableCards() {
+        const pets = Boolean(this.petList && this.petList.length);
         const permanent = UPGRADES.filter(u => this.stack(u.id) < u.max)
+            .filter(u => !u.needsPets || pets)
             .filter(u => !u.cls || u.cls === this.cls)
             .filter(u => !u.minLevel || this.level >= u.minLevel)
             .filter(u => u.id !== 'vitality' || this.player.maxHp < 6)
             .map(u => ({ ...u, weight: u.weight || (u.cls ? 1.6 : 1) }));
-        const buffs = LEVEL_BUFFS.filter(b => (b.id !== 'feast' || this.player.hp < this.player.maxHp) && !this.buffs[b.id]);
+        const buffs = LEVEL_BUFFS.filter(b => (b.id !== 'feast' || this.player.hp < this.player.maxHp) && !this.buffs[b.id] && (!b.needsPets || pets));
         return { permanent, buffs };
     },
 

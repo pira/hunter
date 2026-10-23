@@ -21,6 +21,22 @@ extendGame({
         this.petIcons = this.petIcons || {};
     },
 
+    /** Pet Treat powerup, Pet Party (this level) and Pack Leader (whole run) each double the pets. */
+    get petMult() {
+        return Math.min(4, (this.timers.petBoost > 0 ? 2 : 1) * (this.buffs.petParty ? 2 : 1) * (this.stack('packLeader') ? 2 : 1));
+    },
+
+    /** Turtle: green hearts follow the multiplier (extra ones come and go with a boost). */
+    syncTurtle() {
+        const t = this.pet('turtle');
+        if (!t) return;
+        const p = this.player;
+        const want = t.v * this.petMult;
+        if (want > p.greenMax) p.greenHp += want - p.greenMax;
+        p.greenMax = want;
+        p.greenHp = Math.min(p.greenHp, want);
+    },
+
     pet(id) {
         return (this.petList || []).find(q => q.id === id) || null;
     },
@@ -36,6 +52,7 @@ extendGame({
         if (!list || !list.length || this.state !== 'playing') return;
         const p = this.player;
         const busy = this.phase === 'shop' || this.phase === 'intro';
+        this.syncTurtle();
         for (const pet of list) {
             pet.t++;
             // follow the hero, a little behind
@@ -46,7 +63,7 @@ extendGame({
                 pet.y += (ty - pet.y) * 0.12;
             }
             if (busy) continue;
-            if (pet.cd > 0) pet.cd--;
+            if (pet.cd > 0) pet.cd -= pet.id === 'donkey' ? this.petMult : 1; // boosted donkeys kick more often
             if (pet.id === 'bees') this.updateBees(pet);
             else if (pet.id === 'eagle') this.updateEagle(pet);
             else if (pet.id === 'frog') this.updateFrog(pet);
@@ -68,7 +85,7 @@ extendGame({
                 if (f.t >= 24) b.fly = null;
                 continue;
             }
-            if (--b.cd > 0) continue;
+            if ((b.cd -= this.petMult) > 0) continue; // boosted bees sting more often
             const pool = this.petTargets(p.x, p.y, 230);
             if (!pool.length) {
                 b.cd = 10;
@@ -95,7 +112,7 @@ extendGame({
                 pet.x = a.sx + (tx - a.sx) * k;
                 pet.y = a.sy + (ty - a.sy) * k - Math.sin(k * Math.PI) * 60;
                 if (a.t === 20 && !m.dead) {
-                    this.damageMonster(m, pet.v, { sound: 'thwack', aoe: true, numColor: '#fde68a' });
+                    this.damageMonster(m, pet.v * this.petMult, { sound: 'thwack', aoe: true, numColor: '#fde68a' });
                     this.spark(m.x, m.y, '#fde68a', 6);
                 }
             } else {
@@ -131,7 +148,7 @@ extendGame({
             return;
         }
         if (pet.cd > 0) return;
-        const pool = this.petTargets(pet.x, pet.y, 170, m => !m.boss && !m.gk && m.hp <= pet.v);
+        const pool = this.petTargets(pet.x, pet.y, 170, m => !m.boss && !m.gk && m.hp <= pet.v * this.petMult);
         if (!pool.length) {
             pet.cd = 12;
             return;
@@ -168,13 +185,13 @@ extendGame({
     /** Squirrel: chance that a kill drops its loot twice. */
     get doubleDropChance() {
         const sq = this.pet('squirrel');
-        return sq ? sq.v / 100 : 0;
+        return sq ? (sq.v * this.petMult) / 100 : 0;
     },
 
     /** Bunny: chance to drop a heart when you get hit. */
     bunnyOnHit() {
         const b = this.pet('bunny');
-        if (!b || Math.random() >= b.v / 100) return;
+        if (!b || Math.random() >= (b.v * this.petMult) / 100) return;
         const p = this.player;
         this.spawnPowerup(b.x, b.y, 'heart', { pop: true });
         this.floater(b.x, b.y - 24, '❤️ hop!', '#fda4af', 16);
@@ -208,6 +225,16 @@ extendGame({
         ctx.textBaseline = 'middle';
         for (const pet of list) {
             const hop = pet.act ? 0 : Math.abs(Math.sin(pet.t * 0.12)) * (p.moveT > 0 ? 4 : 1.5);
+            if (this.petMult > 1) {
+                // boosted: a warm golden glow
+                const g = ctx.createRadialGradient(pet.x, pet.y - 6, 2, pet.x, pet.y - 6, 22);
+                g.addColorStop(0, `rgba(253,224,71,${0.35 + 0.15 * Math.sin(pet.t * 0.2)})`);
+                g.addColorStop(1, 'rgba(253,224,71,0)');
+                ctx.fillStyle = g;
+                ctx.beginPath();
+                ctx.arc(pet.x, pet.y - 6, 22, 0, TAU);
+                ctx.fill();
+            }
             const flying = pet.id === 'eagle' || pet.id === 'bees';
             this.drawShadow(ctx, pet.x, pet.y + 10 + (flying ? 10 : 0), flying ? 6 : 9);
             // frog tongue

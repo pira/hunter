@@ -808,8 +808,8 @@ extendGame({
         // gems: small bosses 1–2, big bosses 3–5
         this.spawnGems(b.x, b.y, b.boss.big ? 3 + Math.floor(Math.random() * 3) : 1 + (Math.random() < 0.5 ? 1 : 0));
         this.dropRoadSack(b);
-        // a pet egg: always from big bosses, sometimes from small ones (only kept with a profile)
-        if (Leaderboard.identity() && (b.boss.big || Math.random() < 0.35)) this.spawnEgg(b.x, b.y);
+        // a pet egg now and then (only kept with a profile)
+        if (Leaderboard.identity() && Math.random() < BOSS_EGG_CHANCE) this.spawnEgg(b.x, b.y);
         Sfx.arpeggio([523, 659, 784, 1046, 1318], 0.09, { type: 'triangle', volume: 0.12 });
         this.monsters.forEach(m => { if (m.minion || m.lichAdd || m.body === b) m.behavior = 'flee'; });
         this.encounterWon();
