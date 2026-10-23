@@ -83,16 +83,29 @@ const MONSTER_TYPES = {
         mob('bandits', 3, { size: 15, speed: 0.9, speedVariation: 0.2, health: 5, points: 100 }),
         mob('bugs', 3, { size: 17, speed: 0.8, speedVariation: 0.2, health: 5, points: 100 })
     ],
-    elite: MOB_FAMILY_ORDER.map(f => mob(f, 4, { size: 20, speed: 1.4, speedVariation: 0.5, health: 3, points: 50 })),
-    legendary: MOB_FAMILY_ORDER.map(f => mob(f, 5, { size: 24, speed: 1.5, speedVariation: 0.3, health: 10, points: 150, glow: '#FF1493' })),
-    mythic: MOB_FAMILY_ORDER.map(f => mob(f, 6, { size: 28, speed: 1.8, speedVariation: 0.4, health: 14, points: 250, glow: '#00FFFF' })),
-    ancient: MOB_FAMILY_ORDER.map(f => mob(f, 7, { size: 34, speed: 2.2, speedVariation: 0.5, health: 20, points: 400, glow: '#FF00FF' })),
-    ultimate: MOB_FAMILY_ORDER.map(f => mob(f, 8, { size: 40, speed: 2.4, speedVariation: 0.4, health: 50, points: 1000, glow: '#FFFFFF' }))
+    // v3.6: the leaders and champions are real heavyweights now (HP climbs by rank), and a bit slower
+    elite: MOB_FAMILY_ORDER.map(f => mob(f, 4, { size: 20, speed: 1.3, speedVariation: 0.4, health: 4, points: 60 })),
+    legendary: MOB_FAMILY_ORDER.map(f => mob(f, 5, { size: 24, speed: 1.3, speedVariation: 0.3, health: 12, points: 150, glow: '#FF1493' })),
+    mythic: MOB_FAMILY_ORDER.map(f => mob(f, 6, { size: 28, speed: 1.4, speedVariation: 0.3, health: 20, points: 250, glow: '#00FFFF' })),
+    ancient: MOB_FAMILY_ORDER.map(f => mob(f, 7, { size: 34, speed: 1.5, speedVariation: 0.3, health: 32, points: 400, glow: '#FF00FF' })),
+    ultimate: MOB_FAMILY_ORDER.map(f => mob(f, 8, { size: 40, speed: 1.6, speedVariation: 0.3, health: 60, points: 1000, glow: '#FFFFFF' }))
 };
 const TIER_UNLOCK = { elite: 6, legendary: 11, mythic: 16, ancient: 22, ultimate: 28 };
-const DROP_CHANCE = { small: 0.004, medium: 0.01, large: 0.03, elite: 0.06, legendary: 0.1, mythic: 0.14, ancient: 0.2, ultimate: 0.4 };
-const DROP_COOLDOWN = 480;         // frames between powerup drops from kills
-const MAX_FIELD_POWERUPS = 4;      // never more than this many lying around (boss loot excepted)
+// Tier mix (v3.6): % chance of each heavy tier once unlocked — `from` at the unlock level, rising
+// steadily to `to` over `over` levels; small/medium/large share the rest (small shrinks most).
+const TIER_RAMP = {
+    elite: { from: 3, to: 10, over: 20 },
+    legendary: { from: 2, to: 8, over: 20 },
+    mythic: { from: 1.5, to: 6, over: 16 },
+    ancient: { from: 1, to: 4, over: 18 },
+    ultimate: { from: 0.8, to: 3, over: 20 }
+};
+const DROP_CHANCE = { small: 0.004, medium: 0.01, large: 0.03, elite: 0.05, legendary: 0.08, mythic: 0.1, ancient: 0.12, ultimate: 0.15 };
+// Powerups from kills: at most one per cooldown — ~18 s on level 1, shortening by 0.15 s a level to
+// ~11 s (level 45): late levels drop a bit more often, never a flood. Field pickups: every 18–26 s.
+const DROP_COOLDOWN = 960;
+const DROP_COOLDOWN_MIN = 600;
+const MAX_FIELD_POWERUPS = 3;      // never more than this many lying around (boss loot excepted)
 // Loot vs the road (v3.3.1): drops from low kills pop up-screen, the bottom strip is sticky, and
 // coins/gems/eggs that still fall off are kept by the next boss and dropped when it dies.
 const LOOT_POP_ZONE = 0.66;   // kills below this share of the screen height launch their loot upwards
@@ -103,10 +116,12 @@ const CHASE_ROAD_GRIP = 0.2;  // chasers walk against the road: they cancel this
 const WANDER_UP_BIAS = 0.01;  // wanderers turn up-screen this much more often than down
 // Picking up a powerup that is already running refills its timer (no stacking, no cap: Overtime counts).
 const KICK = { every: Math.round(2 * 60 * GAME_SPEED), radius: 140, push: 70 }; // Kickback powerup
-// Coins per kill: [chance, tierBase]; amount = tierBase × hpScale(L) × rand(0.8–1.2) × coin multipliers.
+// Coins per kill: [chance, tierBase]; amount = tierBase × coinScale(L) × rand(0.8–1.2) × coin multiplier.
+// Grunts and soldiers pay about half a coin per HP, champions much less per HP (v3.6): income
+// grows with the level but stays roughly linear.
 const COIN_DROPS = {
-    small: [0.35, 1], medium: [0.5, 2], large: [0.85, 4], elite: [1, 6],
-    legendary: [1, 8], mythic: [1, 11], ancient: [1, 15], ultimate: [1, 25]
+    small: [0.5, 1], medium: [0.6, 2], large: [0.8, 3], elite: [0.9, 3],
+    legendary: [1, 3], mythic: [1, 4], ancient: [1, 5], ultimate: [1, 8]
 };
 
 // Pickups. `instant` ones hit monsters right away, so end-of-level loot (nobody left to hit) never has them.
@@ -116,14 +131,14 @@ const POWERUPS = {
     overcharge: { emoji: '🔋', name: 'Overcharge', color: '#facc15', weight: 0.5 },
     poison: { emoji: '🧪', name: 'Poison Cloud', color: '#84cc16', timed: true, secs: 20, weight: 0.7 },
     stun: { emoji: '💫', name: 'Stun', color: '#fde047', weight: 0.25, instant: true },
-    rapidFire: { emoji: '⚡', name: 'Rapid Fire', color: '#00CED1', timed: true, secs: 10, weight: 0.9 },
+    rapidFire: { emoji: '⚡', name: 'Rapid Fire', color: '#00CED1', timed: true, secs: 10, weight: 0.9 }, // ×2 attack rate
     invincible: { emoji: '🛡️', name: 'Invincible', color: '#7CFC00', timed: true, secs: 10, weight: 0.35 },
     freeze: { emoji: '❄️', name: 'Ice Cloud', color: '#87CEEB', timed: true, secs: 12, weight: 0.7 },
     kickback: { emoji: '💨', name: 'Kickback', color: '#e2e8f0', timed: true, secs: 30, weight: 0.6 },
     roadBrake: { emoji: '🐢', name: 'Road Brake', color: '#a3a3a3', timed: true, secs: 10, weight: 0.6 },
     magnet: { emoji: '🧲', name: 'Magnet', color: '#f43f5e', timed: true, secs: 30, weight: 0.7 },
-    coins2: { emoji: '🪙', pouch: true, tag: '×2', name: 'Coins ×2', color: '#FFC300', timed: true, secs: 30, weight: 0.8 },
-    coins3: { emoji: '🪙', pouch: true, tag: '×3', name: 'Coins ×3', color: '#FF8C00', timed: true, secs: 30, weight: 0.4 },
+    coins2: { emoji: '🪙', pouch: true, tag: '×2', name: 'Coins ×2', color: '#FFC300', timed: true, secs: 25, weight: 0.6 },
+    coins3: { emoji: '🪙', pouch: true, tag: '×3', name: 'Coins ×3', color: '#FF8C00', timed: true, secs: 25, weight: 0.25 },
     heart: { emoji: '❤️', name: 'Extra Life', color: '#FF1493', weight: 1 },
     petBoost: { emoji: '🦴', name: 'Pet Treat', color: '#f59e0b', timed: true, secs: 30, weight: 0.6, needsPets: true },
     quake: { emoji: '🌋', name: 'Earthquake', color: '#FF4500', weight: 0.3, instant: true }
@@ -143,11 +158,11 @@ const UPGRADES = [
     { id: 'vitality', icon: '❤️', name: 'Vitality', max: 3, cost: 50, desc: '+1 max heart and heal 1' },
     { id: 'crit', icon: '🎯', name: 'Keen Eye', max: 4, cost: 30, desc: '+8% chance to crit for 2.5× damage' },
     { id: 'streak', icon: '🔥', name: 'Hot Streak', max: 3, cost: 8, desc: 'Combo timer lasts 1s longer' },
-    { id: 'luck', icon: '🍀', name: 'Lucky Charm', max: 3, cost: 20, desc: '+30% powerup drops' },
+    { id: 'luck', icon: '🍀', name: 'Lucky Charm', max: 3, cost: 20, desc: '+20% powerup drops' },
     { id: 'goldrush', icon: '💰', name: 'Gold Rush', max: 4, cost: 20, desc: '+15% chance that monsters drop coins' },
-    { id: 'goldrun', icon: '🏦', name: 'Double Gold', max: 1, cost: 80, desc: '×2 coins (stacks with Triple Gold for ×6)' },
+    { id: 'goldrun', icon: '🏦', name: 'Double Gold', max: 1, cost: 80, desc: '+100% coins (adds to other gold boosts)' },
     { id: 'magnet', icon: '🧲', name: 'Magnet', max: 3, cost: 9, desc: 'Pull coins from further away' },
-    { id: 'overtime', icon: '⌛', name: 'Overtime', max: 3, cost: 15, desc: 'Powerups last 30% longer' },
+    { id: 'overtime', icon: '⌛', name: 'Overtime', max: 3, cost: 15, desc: 'Powerups last 20% longer (not gold boosts)' },
     { id: 'toxin', icon: '☠️', name: 'Toxic Cloud', max: 1, cost: 20, desc: 'Whole run: Poison Cloud does ×2 damage' },
     { id: 'frost', icon: '🧊', name: 'Deep Freeze', max: 3, cost: 15, desc: 'Whole run: Ice Cloud slows 10% more' },
     { id: 'thunder', icon: '⛈️', name: 'Thunder God', max: 1, cost: 20, desc: 'Whole run: Storm’s first strike hits ×2' },
@@ -155,11 +170,11 @@ const UPGRADES = [
     { id: 'regen', icon: '🌿', name: 'Regeneration', max: 2, cost: 60, desc: 'Regrow a heart every 40s (25s at rank 2)' },
     { id: 'nova', icon: '💫', name: 'Static Nova', max: 2, cost: 35, desc: 'Taking a hit blasts nearby monsters' },
     { id: 'impact', icon: '💥', name: 'Impact', max: 3, cost: 30, desc: '+15% bolt size, cleave reach and blast radius' },
-    { id: 'split', icon: '🔱', name: 'Split Shot', max: 3, cost: 40, cls: 'wizard', desc: 'Bolts fire +1 projectile' },
-    { id: 'pierce', icon: '🏹', name: 'Piercing Rounds', max: 3, cost: 30, cls: 'wizard', desc: 'Bolts pierce +1 monster' },
+    { id: 'split', icon: '🔱', name: 'Split Shot', max: 2, cost: 40, cls: 'wizard', desc: '+1 side bolt (half damage)' },
+    { id: 'pierce', icon: '🏹', name: 'Piercing Rounds', max: 2, cost: 30, cls: 'wizard', desc: 'Bolts pierce +1 monster' },
     { id: 'packLeader', icon: '🦮', name: 'Pack Leader', max: 1, cost: 40, needsPets: true, desc: 'Whole run: your pets are twice as strong' },
     { id: 'quick', icon: '💨', name: 'Quick Swing', max: 3, cost: 30, cls: 'barbarian', desc: '+10% swing speed' },
-    { id: 'cluster', icon: '🧨', name: 'Cluster Bombs', max: 3, cost: 30, cls: 'goblin', desc: '+1 grenade per throw' },
+    { id: 'cluster', icon: '🧨', name: 'Cluster Bombs', max: 2, cost: 30, cls: 'goblin', desc: '+1 grenade per throw' },
     { id: 'fuse', icon: '⏲️', name: 'Short Fuse', max: 3, cost: 30, cls: 'goblin', desc: 'Grenades burst 20% sooner and throw 10% faster' }
 ];
 // Core upgrades: always on offer in their own row above the three dealt cards —
@@ -174,7 +189,7 @@ const LEVEL_BUFFS = [
     { id: 'fleet2', group: 'fleet', icon: '🐆', name: 'Fleet Foot II', buff: true, cost: 13, weight: 0.35, desc: 'This level: you run 200% fast' },
     { id: 'feast', icon: '🍖', name: 'Feast', cost: 5, weight: 0.4, desc: 'Fully heal' },
     { id: 'freeze1', group: 'freeze', icon: '🧊', name: 'Freeze I', buff: true, cost: 10, weight: 0.5, desc: 'This level: monsters move at 75%' },
-    { id: 'gold3', icon: '💰', name: 'Triple Gold', buff: true, cost: 30, weight: 0.5, desc: 'This level: ×3 coins' },
+    { id: 'gold3', icon: '💰', name: 'Triple Gold', buff: true, cost: 30, weight: 0.5, desc: 'This level: +200% coins' },
     { id: 'fury1', group: 'fury', icon: '😤', name: 'Fury I', buff: true, cost: 15, weight: 0.5, desc: 'This level: attack 150% as often' },
     { id: 'fury2', group: 'fury', icon: '👹', name: 'Fury II', buff: true, cost: 20, weight: 0.35, desc: 'This level: attack twice as often' },
     { id: 'swarm', icon: '👯', name: 'Double Trouble', buff: true, cost: 40, weight: 0.45, desc: 'This level: twice the monsters — they all come in pairs. More kills, more coins!' },

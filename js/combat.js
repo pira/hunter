@@ -7,7 +7,8 @@ extendGame({
         const target = this.nearestMonster(p.x, p.y);
         // Boss fight: keep shooting the boss unless something is right on top of you.
         const b = this.boss;
-        if (b && !b.dying && b.mode !== 'enter' && target && (target === b || Math.hypot(target.x - p.x, target.y - p.y) > 80)) {
+        // (not while it hides behind a shield: then the things that hold the shield up come first)
+        if (b && !b.dying && !b.shielded && b.mode !== 'enter' && target && (target === b || Math.hypot(target.x - p.x, target.y - p.y) > 80)) {
             return { x: b.x, y: b.y };
         }
         return target ? { x: target.x, y: target.y, m: target } : null;
@@ -20,7 +21,7 @@ extendGame({
             if (m.dead || m.dying || (exclude && exclude.has(m))) continue;
             if (m.x < -m.size || m.x > this.W + m.size || m.y < -m.size || m.y > this.H + m.size) continue;
             // Bosses count as closer than they are, so auto-aim focuses them.
-            const d = U.distanceSquared(x, y, m.x, m.y) * (m.boss || m.gk ? bossBias : 1);
+            const d = U.distanceSquared(x, y, m.x, m.y) * (m.shielded ? 4 : m.boss || m.gk ? bossBias : 1);
             if (d < bestD) {
                 bestD = d;
                 best = m;
@@ -66,9 +67,12 @@ extendGame({
         this.cooldown = def.cooldown;
         const base = Math.atan2(aim.y - p.y, aim.x - p.x);
         const count = 1 + this.stack('split');
+        const main = Math.floor((count - 1) / 2);
         for (let i = 0; i < count; i++) {
             const a = base + (i - (count - 1) / 2) * 0.16;
-            this.spawnBolt(p.x + Math.cos(a) * 14, p.y - 6 + Math.sin(a) * 14, a, def.speed, def.radius * this.impactMult, def.damage * this.powerMult, this.stack('pierce'));
+            // Split Shot side bolts hit for half (v3.6)
+            const dmg = def.damage * this.powerMult * (i === main ? 1 : 0.5);
+            this.spawnBolt(p.x + Math.cos(a) * 14, p.y - 6 + Math.sin(a) * 14, a, def.speed, def.radius * this.impactMult, dmg, this.stack('pierce'));
         }
         this.particle({ x: p.x + Math.cos(base) * 18, y: p.y - 6 + Math.sin(base) * 18, vx: 0, vy: 0, life: 6, size: 10, color: '#d8b4fe', kind: 'flash' });
         Sfx.fx('zap', 0.16, (d, rate, len, k) => {
@@ -155,7 +159,7 @@ extendGame({
         const p = this.player;
         const def = PRIMARY.grenade;
         this.cooldown = def.cooldown * Math.pow(0.9, this.stack('fuse'));
-        const count = Math.min(5, 2 + this.stack('cluster')); // goblins always throw a pair
+        const count = Math.min(4, 2 + this.stack('cluster')); // goblins always throw a pair
         const dirs = all ? 4 : 1;
         // Short Fuse scales both ends of the random throw speed
         const fast = Math.pow(1.1, this.stack('fuse'));
@@ -357,7 +361,7 @@ extendGame({
             }, { volume: 0.4 });
         } else {
             // Bombardment: 10× a normal throw rains down at random spots over 5 s
-            const bombs = 10 * Math.min(5, 2 + this.stack('cluster'));
+            const bombs = 10 * Math.min(4, 2 + this.stack('cluster'));
             this.bombRain = this.bombRain && this.bombRain.left > 0
                 ? { ...this.bombRain, left: this.bombRain.left + bombs, every: this.bombRain.every }
                 : { left: bombs, t: 0, every: (5 * 60 * GAME_SPEED) / bombs };

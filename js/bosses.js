@@ -59,7 +59,9 @@ extendGame({
         const big = Boolean(def.big);
         const n = big ? this.bigCount : this.smallCount; // how many of this size we have met, incl. this one
         const cycle = Math.floor((n - 1) / 4);
-        const hp = Math.round(def.hp * (1 + (big ? 0.5 : 0.4) * (n - 1)) * (1 + 0.4 * cycle));
+        // v3.6: past level 12 bosses also get part of the monsters' steeper HP climb (×1.4 at L30, ×1.6 at L40)
+        const late = Math.pow(U.hpScale(this.level) / U.hpStep(this.level), 0.75);
+        const hp = Math.round(def.hp * (1 + (big ? 0.5 : 0.4) * (n - 1)) * (1 + 0.4 * cycle) * late);
         const b = this.makeBossBody(def, hp, cycle, this.W / 2, -def.size * 2);
         this.boss = b;
         this.bossParts = [b];
@@ -688,7 +690,7 @@ extendGame({
         for (let i = 0; i < n; i++) {
             const a = (i / n) * TAU;
             const m = this.makeMonster({ name: 'Skeleton', family: 'undead', rank: 1, shape: 'skull', color: '#e7e5e4', size: 12, speed: 1.1, speedVariation: 0.3, health: 3, points: 20, tier: 'medium' }, b.x + Math.cos(a) * 70, b.y + Math.sin(a) * 70, 'chase');
-            Object.assign(m, { lichAdd: b, minion: true, spawnT: 30, enc: b.enc, hp: Math.round(3 * U.hpScale(this.level)), maxHp: Math.round(3 * U.hpScale(this.level)) });
+            Object.assign(m, { lichAdd: b, minion: true, spawnT: 30, enc: b.enc, hp: Math.round(3 * U.hpStep(this.level)), maxHp: Math.round(3 * U.hpStep(this.level)) });
             this.monsters.push(m);
         }
         this.ring(b.x, b.y, 90, '#a78bfa', 22);

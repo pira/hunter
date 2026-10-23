@@ -200,7 +200,7 @@ extendGame({
     },
 
     gkHp(base) {
-        return Math.round(base * U.hpScale(this.level) * (1 + 0.12 * (this.level - 1)));
+        return Math.round(base * U.hpStep(this.level) * (1 + 0.12 * (this.level - 1)));
     },
 
     makeGatekeeper(id, x, y, extra = {}) {
@@ -352,7 +352,8 @@ extendGame({
                 if (m.t % 60 === 0) {
                     m.beams = [];
                     for (const o of this.monsters) {
-                        if (o === m || o.dead || o.enc !== m.enc || o.hp >= o.maxHp) continue;
+                        // heals its little helpers, not the other totem (twin totems were unkillable for slow hitters)
+                        if (o === m || o.dead || o.gk || o.enc !== m.enc || o.hp >= o.maxHp) continue;
                         if (U.distanceSquared(o.x, o.y, m.x, m.y) < 170 * 170) {
                             o.hp = Math.min(o.maxHp, o.hp + Math.max(1, o.maxHp * 0.06));
                             m.beams.push(o);

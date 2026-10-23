@@ -104,7 +104,7 @@ describe('GameUtils.spawnInterval', () => {
     it('shrinks with level but never below the floor', () => {
         assert.equal(GameUtils.spawnInterval(1), 1.4);
         assert.ok(GameUtils.spawnInterval(10) < GameUtils.spawnInterval(5));
-        assert.equal(GameUtils.spawnInterval(200), 0.22);
+        assert.equal(GameUtils.spawnInterval(200), 0.4);
     });
 });
 
@@ -158,6 +158,12 @@ describe('GameUtils v3 helpers', () => {
         assert.ok(Math.abs(GameUtils.hpScale(13) - 1.6) < 1e-9);
     });
 
+    it('climbs steadily after level 12 (v3.6) and keeps the old steps for gatekeepers', () => {
+        for (let L = 13; L < 80; L++) assert.ok(GameUtils.hpScale(L + 1) > GameUtils.hpScale(L));
+        assert.ok(GameUtils.hpScale(30) > 3 && GameUtils.hpScale(30) < 4);
+        assert.equal(GameUtils.hpStep(30), 2.2);
+    });
+
     it('charges the super meter and caps it at 100', () => {
         assert.equal(GameUtils.superCharge(0, 2), 2);
         assert.equal(GameUtils.superCharge(90, 25), 100);
@@ -188,9 +194,10 @@ describe('GameUtils level flow', () => {
 });
 
 describe('GameUtils economy', () => {
-    it('scales coin drops with monster HP and never drops nothing', () => {
+    it('keeps coin drops flat with the level (v3.6) and never drops nothing', () => {
         assert.equal(GameUtils.coinDrop(1, 1, 0.8), 1);
         assert.equal(GameUtils.coinDrop(3, 7, 1), 4);
+        assert.equal(GameUtils.coinDrop(3, 40, 1), 4);
         assert.equal(GameUtils.coinDrop(0.2, 1, 1), 1);
     });
 
@@ -208,6 +215,8 @@ describe('GameUtils economy', () => {
 
     it('expects more income on later levels', () => {
         assert.ok(GameUtils.expectedIncome(10) > GameUtils.expectedIncome(1));
+        // about linear: level 40 pays a few times level 10, not tens of times
+        assert.ok(GameUtils.expectedIncome(40) < 5 * GameUtils.expectedIncome(10));
     });
 });
 

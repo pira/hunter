@@ -19,14 +19,15 @@ extendGame({
         return 1 + 0.2 * this.stack('power');
     },
 
-    /** Gold boost from the ×2/×3 pickups and the Triple Gold card (the screen edges glow while ≥ 2). */
+    /** Gold boost from the ×2/×3 pickups and the Triple Gold card (the screen edges glow while ≥ 2).
+     *  v3.6: boosts add up instead of multiplying (×3 pickup + Triple Gold = ×5, not ×9). */
     get goldBoost() {
-        return (this.timers.coins3 > 0 ? 3 : this.timers.coins2 > 0 ? 2 : 1) * (this.buffs.gold3 ? 3 : 1);
+        return 1 + (this.timers.coins3 > 0 ? 2 : this.timers.coins2 > 0 ? 1 : 0) + (this.buffs.gold3 ? 2 : 0);
     },
 
+    /** Everything that multiplies coins, added up: pickups, Triple Gold, Double Gold (+100%). Max ×6. */
     get coinMult() {
-        const timed = this.timers.coins3 > 0 ? 3 : this.timers.coins2 > 0 ? 2 : 1;
-        return timed * (this.buffs.gold3 ? 3 : 1) * (this.stack('goldrun') ? 2 : 1) * this.artefactMult('gold');
+        return (this.goldBoost + (this.stack('goldrun') ? 1 : 0)) * this.artefactMult('gold');
     },
 
     /** Freeze cards slow every monster for the level. */
@@ -56,7 +57,7 @@ extendGame({
 
     get rateMult() {
         const fury = this.buffs.fury2 ? 2 : this.buffs.fury1 ? 1.5 : 1;
-        return (1 + 0.1 * this.stack('haste')) * (this.timers.rapidFire > 0 ? 3 : 1) * fury * this.artefactMult('rate');
+        return (1 + 0.1 * this.stack('haste')) * (this.timers.rapidFire > 0 ? 2 : 1) * fury * this.artefactMult('rate');
     },
 
     get moveMult() {
@@ -65,7 +66,7 @@ extendGame({
     },
 
     get luckMult() {
-        return (1 + 0.3 * this.stack('luck')) * this.artefactMult('luck');
+        return (1 + 0.2 * this.stack('luck')) * this.artefactMult('luck');
     },
 
     get comboWindow() {
@@ -74,8 +75,11 @@ extendGame({
 
     /** Steps a timed pickup lasts. */
     powerupDuration(type) {
-        const secs = (POWERUPS[type] && POWERUPS[type].secs) || 10;
-        return Math.round(secs * 60 * GAME_SPEED * (1 + 0.3 * this.stack('overtime')) * this.artefactMult('timed'));
+        const def = POWERUPS[type];
+        const secs = (def && def.secs) || 10;
+        // Overtime stretches the fighting powerups, not the gold boosts (v3.6)
+        const over = def && def.pouch ? 1 : 1 + 0.2 * this.stack('overtime');
+        return Math.round(secs * 60 * GAME_SPEED * over * this.artefactMult('timed'));
     },
 
     /** True while nothing can hurt the player (Invincible powerup or the barbarian's Whirlwind). */

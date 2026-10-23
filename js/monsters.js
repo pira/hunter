@@ -1,16 +1,24 @@
 /* Monster Hunter — monsters: spawning, movement, road interaction, damage, kills. Extends Game (js/core.js). */
 
 extendGame({
+    /** Tier of the next regular spawn: the heavy tiers ramp up after they unlock (TIER_RAMP). */
     pickTier() {
-        const r = Math.random();
         const L = this.level;
-        if (L >= TIER_UNLOCK.ultimate && r < 0.04) return 'ultimate';
-        if (L >= TIER_UNLOCK.ancient && r < 0.07) return 'ancient';
-        if (L >= TIER_UNLOCK.mythic && r < 0.1) return 'mythic';
-        if (L >= TIER_UNLOCK.legendary && r < 0.12) return 'legendary';
-        if (L >= TIER_UNLOCK.elite && r < 0.15) return 'elite';
-        if (r < 0.65) return 'small';
-        if (r < 0.9) return 'medium';
+        let r = Math.random() * 100;
+        for (const tier of ['ultimate', 'ancient', 'mythic', 'legendary', 'elite']) {
+            const u = TIER_UNLOCK[tier];
+            if (L < u) continue;
+            const ramp = TIER_RAMP[tier];
+            const pct = ramp.from + (ramp.to - ramp.from) * Math.min(1, (L - u) / ramp.over);
+            if ((r -= pct) < 0) return tier;
+        }
+        // the rest: small 65% of it early, 45% by level 40 (medium 25%; large 10% → 15%)
+        const late = U.clamp((L - 10) / 30, 0, 1);
+        const small = 65 - 20 * late;
+        const large = 10 + 5 * late;
+        const x = Math.random() * 100;
+        if (x < small) return 'small';
+        if (x < 100 - large) return 'medium';
         return 'large';
     },
 
@@ -80,7 +88,7 @@ extendGame({
     },
 
     spawnPack() {
-        const count = 5 + Math.min(14, Math.floor(this.level / 2));
+        const count = 5 + Math.min(9, Math.floor(this.level / 3)); // v3.6: smaller late packs
         const type = this.pickType('small');
         const fromSide = Math.random() < 0.4;
         const left = Math.random() < 0.5;
@@ -107,7 +115,7 @@ extendGame({
         if (this.edgeWarn && --this.edgeWarn.t <= 0) this.edgeWarn = null;
         if (this.phase !== 'fight') return;
         const alive = this.monsters.length;
-        const cap = Math.min(110, 40 + this.level * 2);
+        const cap = Math.min(70, 40 + this.level);
         const interval = U.spawnInterval(this.level);
         this.spawnClock += STEP;
         if (alive < 3 || (this.spawnClock >= interval && alive < cap)) {
@@ -129,7 +137,7 @@ extendGame({
             if (this.powerups.filter(pu => !pu.loot).length < MAX_FIELD_POWERUPS) {
                 this.spawnPowerup(this.roadLeft + 30 + Math.random() * (this.roadRight - this.roadLeft - 60), 30 + Math.random() * this.H * 0.35);
             }
-            this.powerupClock = 12 + Math.random() * 8;
+            this.powerupClock = 18 + Math.random() * 8;
         }
     },
 
@@ -183,6 +191,11 @@ extendGame({
                 }
             }
             if (!m.boss && !m.anchored) this.keepOnField(m);
+            // gatekeepers stand their ground: a kick or a blast can't shove them off screen (a soft-lock)
+            else if (m.anchored && m.gk && !m.hidden && (m.entered || (m.entered = m.y > m.size && m.y < this.H - m.size))) {
+                m.x = U.clamp(m.x, 0, this.W); // its centre stays on screen, so it can always be targeted
+                m.y = U.clamp(m.y, 0, this.H);
+            }
         }
     },
 

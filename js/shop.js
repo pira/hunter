@@ -14,7 +14,7 @@ extendGame({
     },
 
     levelBonus(level) {
-        return 5 + level;
+        return 10 + 2 * level;
     },
 
     // Permanent upgrades: static base price, ×(1 + 0.75 per rank owned) — a finite sink.

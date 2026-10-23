@@ -88,9 +88,10 @@
         return null;
     }
 
-    /** Seconds between regular monster spawns at a given level. */
+    /** Seconds between regular monster spawns at a given level (v3.6: never denser than one per 0.4 s,
+     *  reached around level 20 — late levels bring tougher monsters instead of more of them). */
     function spawnInterval(level) {
-        return Math.max(0.22, 1.4 * Math.pow(0.935, level - 1));
+        return Math.max(0.4, 1.4 * Math.pow(0.935, level - 1));
     }
 
     /** Bosses arrive every 5 levels. */
@@ -152,9 +153,24 @@
         return delta;
     }
 
-    /** Monster HP multiplier at a level (+30% every 6 levels). */
-    function hpScale(level) {
+    /** The old step curve: +30% every 6 levels (gatekeepers and boss adds still use it). */
+    function hpStep(level) {
         return 1 + Math.floor((Math.max(1, level) - 1) / 6) * 0.3;
+    }
+
+    /** Monster HP multiplier at a level: the step curve up to level 12, then a steady climb
+     *  (v3.6: L20 ×2.2, L30 ×3.5, L40 ×5.4, L50 ×7.9) so a fully upgraded hero still meets a wall. */
+    function hpScale(level) {
+        const L = Math.max(1, level);
+        if (L <= 12) return hpStep(L);
+        const n = L - 13;
+        return 1.6 + 0.06 * n + 0.003 * n * n;
+    }
+
+    /** Coin value per kill no longer follows monster HP (v3.6: ×1, ×1.2 from level 7): bigger monsters pay more and more of
+     *  them show up later, so income grows about linearly with the level instead of exploding. */
+    function coinScale(level) {
+        return Math.max(1, level) >= 7 ? 1.2 : 1;
     }
 
     /** Super meter gain for a kill: table value × multiplier, never above what is left to 100. */
@@ -180,9 +196,9 @@
         return 'regular';
     }
 
-    /** Coins dropped by a kill: tier base × monster HP scale × random factor (0.8–1.2), at least 1. */
+    /** Coins dropped by a kill: tier base × coin scale × random factor (0.8–1.2), at least 1. */
     function coinDrop(tierBase, level, rand = 1) {
-        return Math.max(1, Math.round(tierBase * hpScale(level) * rand));
+        return Math.max(1, Math.round(tierBase * coinScale(level) * rand));
     }
 
     /**
@@ -202,7 +218,8 @@
 
     /** Coins a player can expect to earn during a level (kills + level bonus + encounter loot). */
     function expectedIncome(level) {
-        return Math.round(0.7 * levelDamage(level) + 10 + 2 * level);
+        const L = Math.max(1, level);
+        return Math.round(0.7 * levelDamage(L) * coinScale(L) / hpScale(L) + 10 + 2 * L);
     }
 
     /**
@@ -235,6 +252,8 @@
         levelDamage,
         encounterKind,
         hpScale,
+        hpStep,
+        coinScale,
         superCharge,
         stormDamage,
         distanceSquared,

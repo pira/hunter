@@ -43,7 +43,7 @@ extendGame({
         const pus = this.dropRolls((DROP_CHANCE[m.tier] || (m.gk ? 0.5 : 0)) * luck * this.dropsMult);
         if (this.dropCd <= 0 && onField < MAX_FIELD_POWERUPS && pus > 0) {
             for (let i = 0; i < Math.min(pus, MAX_FIELD_POWERUPS - onField); i++) this.spawnPowerup(m.x, m.y, null, { pop: true });
-            this.dropCd = DROP_COOLDOWN;
+            this.dropCd = Math.max(DROP_COOLDOWN_MIN, DROP_COOLDOWN - 8 * this.level);
             return;
         }
         if (m.gk && (m.gen || 0) === 0) this.spawnCoins(m.x, m.y, 6 + this.level, 3.5, 5);
