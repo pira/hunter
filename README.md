@@ -10,26 +10,28 @@ Pick a hero, run down the monster road through eleven biomes, chain kills into a
 |---|---|---|
 | Move | WASD / arrow keys | drag anywhere (floating stick) |
 | Attack | automatic (nearest monster, bosses first); hold click to aim | automatic |
-| Super | Space (when the bar is full) | tap the SUPER button under the score |
+| Super | Space (when the ring is full) | tap the round SUPER button in the lower right |
 | Shop | 1–3 buy, Enter continue | tap a card, tap Continue |
 | Pause / mute | P or Esc / M | ⏸ / 🔊 buttons |
 | Fullscreen | automatic on Play (⛶ toggles; turning it off is remembered) | same; on iPhone use Share → Add to Home Screen |
 
 - **Heroes** (picked on the menu, remembered):
-  - 🧙 *Wizard* — auto-aiming magic bolts; super **Arcane Nova**: three rings of giant piercing bolts.
+  - 🧙 *Wizard* — auto-aiming magic bolts; super **Arcane Barrage**: a stream of fireballs (10× your bolts, two a second, double damage), each at the nearest monster.
   - 🪓 *Barbarian* — 4 hearts, a cleave that hits everything in front; super **Whirlwind**: 5 s of invincible spinning.
-  - 💣 *Goblin* — fastest runner, throws grenades in pairs; super **Bombardment**: bombs in all four directions.
+  - 💣 *Goblin* — fastest runner, throws grenades in pairs; super **Bombardment**: 10× a normal throw rains down at random spots over 5 s.
 - **The road** scrolls down. Monsters come from the top and burst out of the bushes; loot drifts with the road and is gone once it leaves the bottom (it blinks first). Hiding at the very bottom works for three seconds only.
 - **Levels** fill with the damage you deal. When the bar is full: **CLEAR!** → finish the stragglers → the level's encounter → loot → through the gate into the next biome → shop.
   - Encounters: a **gatekeeper** (Shieldbearer, Splitter, Bomber, Charger, Totem, Archers) or a **coordinated wave** (V-formation, Pincer, Closing Ring, Stampede, Conga Snake, Monster Rain); a **small boss** at levels 5, 15, 25… (Bonecrusher, Hexweaver, Broodmother, Voidmaw) and a **big boss** at 10, 20, 30… (Gravelord, Stormcaller, Hydra, Lich). Bosses talk.
-- **Super meter** fills with kills (bigger monsters charge more; 🔋 Overcharge fills it at once).
+- **Super ring** (lower right) fills with kills (bigger monsters charge more; 🔋 Overcharge fills it at once — and on a full ring it fires a super for free and stays full).
 - **Combo:** kills within ~2.8 s of each other build a combo; 5/15/30/50 kills give ×2/×3/×4/×5 score. Getting hit resets it.
 - **Coins & shop:** coins scale with monster HP. Every level opens a shop with 3 cards (always at least one permanent upgrade and one one-level card) plus a level bonus.
   - Whole-run upgrades (purple cards): fixed prices that rise per rank owned (a finite set). Class cards only show for your hero.
   - One-level cards — Freeze, Fleet Foot, Fury, Coin Magnet, Road Brake, Double Progress/Gold/Damage, Feast — cost a share of what you have been earning per level.
 - **Pickups:** 🌩️ Storm (chain lightning every 3 s), 🔋 Overcharge, 🧪 Poison (spreads by touch), 💫 Stun, ⚡ Rapid Fire, 🛡️ Invincible, ❄️ Freeze, 🐢 Road Brake, 🧲 Magnet, 🪙×2/×3, ❤️ Extra Life, 🌋 Earthquake. Timers never stack past 30 s.
 - **Your hunter:** the first launch asks for a name; every run is saved to your profile (best score, hunts, kills, bosses, play time, recent runs). Tap any name on the leaderboard to see that hunter's profile. A recovery code moves your hunter to another device.
-- **Gold, the wheel and the profile shop:** coins you haven't spent when a hunt ends are banked into your profile. Feeling lucky? Spin **Double or nothing** as often as you dare (the server spins, 50/50), or keep it. Spend gold in your profile on **artefacts** (small permanent bonuses: Greed Ring, Whetstone, Quickening Rune, Storm Shard, Wind Boots, Luck Idol, Road Charm, Hourglass, Guardian Amulet — basic → rare → legendary → mythic, higher tiers unlock at best level 10/20/30) and **skins** for each hero (mythic ones glow, leave a trail and light up your name on the board).
+- **Gold, the wheel and the profile shop:** coins you haven't spent when a hunt ends are banked into your profile. Feeling lucky? Spin **Double or nothing** as often as you dare (the server spins, 50/50), or keep it. Spend gold in your profile on **pet eggs** and **skins** for each hero (mythic ones glow, leave a trail and light up your name on the board).
+- **Pets:** eggs (1000 gold, from the rare egg card in the level shop, or dropped by bosses) hatch in a nest in your profile after 6 hours — two nests, gems hurry them. Pets come in basic → rare → legendary → mythic; three of a kind merge into the next tier. One pet slot to start (2nd: 1000 gold, 3rd: 100 gems, 4th: 1000 gems); the pets in your slots follow you on hunts:
+  🐢 Turtle (green hearts 1/2/3/4 that take hits first) · 🐝 Bees (1/2/4/8 bees, each stings a nearby monster for 1 every 2 s) · 🦅 Eagle (dives on the most wounded monster, 2/4/8/16 damage every 3 s) · 🐸 Frog (swallows a monster with up to 2/4/8/16 HP every 4 s) · 🫏 Donkey (kicks away the monster about to reach you, every 2.5/1.6/1/0.5 s) · 🐿️ Squirrel (1/2/4/8% double loot) · 🐇 Bunny (5/10/15/20% chance a hit drops a heart).
 - **Leaderboard:** runs are submitted automatically. The *Classic* tab keeps the v2 board.
 
 ## Project layout
@@ -46,7 +48,8 @@ js/                 the game, as classic scripts mixed into one Game class (no b
   profile.js        identity and profile overlay  road.js     scrolling, biomes, background tiles
   encounters.js     level flow, gatekeepers, waves, hazards
   sprites.js        vector player characters (cached per class × skin × frame)
-  meta.js           banked gold, the wheel, artefacts and skins (profile shop)
+  meta.js           banked gold, the wheel, the profile shop (pets, eggs, skins)
+  pets.js           pets on the hunt
 game-utils.js       pure helpers shared with tests (level curve, combo tiers, …)
 audio.js            Web Audio engine: buses + limiter, voice manager, health watchdog,
                     procedural creature voices and hit sounds (samples in sfx/)

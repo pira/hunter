@@ -191,16 +191,13 @@ extendGame({
         this.headerShown = false;
     },
 
-    /** Once the run has earned 1000 coins, the shop rarely (~6%) also offers a basic artefact for the profile collection. */
+    /** Once the run has earned 1000 coins, the shop rarely (~6%) also offers a pet egg for the profile. */
     artefactCard() {
         const cap = 1 + Math.floor(this.level / 5); // the server accepts this many per run
-        if (this.coinsEarned < ARTEFACT_PRICE) return null;
-        if (!Leaderboard.enabled || !Leaderboard.identity() || this.artCards.length >= cap || Math.random() > 0.06) return null;
-        const ids = Object.keys(ARTEFACTS);
-        const id = ids[Math.floor(Math.random() * ids.length)];
-        const a = ARTEFACTS[id];
+        if (this.coinsEarned < EGG_PRICE) return null;
+        if (!Leaderboard.enabled || !Leaderboard.identity() || this.eggCards >= cap || Math.random() > 0.06) return null;
         return {
-            id: `art:${id}`, artefact: id, icon: a.icon, name: a.name, desc: `Keep forever: +${Math.abs(a.values[1])}% ${a.what}. Slot it in your profile; merge 3 to upgrade.`,
+            id: 'egg', egg: true, artefact: true, icon: '🥚', name: 'Pet Egg', desc: 'Keep forever: hatches into a pet in your profile overnight.',
             price: Math.max(60, Math.round(1.5 * this.expectedIncome(this.level) / 5) * 5)
         };
     },
@@ -261,8 +258,8 @@ extendGame({
         this.coinsSpent = (this.coinsSpent || 0) + card.price;
         card.sold = true;
         if (card.artefact) {
-            this.artCards.push(card.artefact);
-            this.floater(this.player.x, this.player.y - 50, `${card.icon} added to your collection!`, '#f0abfc', 18);
+            this.eggCards++;
+            this.floater(this.player.x, this.player.y - 50, '🥚 egg saved to your profile!', '#f0abfc', 18);
             Sfx.arpeggio([784, 988, 1318, 1568, 2093], 0.06, { type: 'triangle', volume: 0.12 });
         } else {
             this.applyCard(card);

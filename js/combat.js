@@ -203,7 +203,9 @@ extendGame({
             g.z += g.vz;
             g.vz -= GRENADE_G;
             g.spin += 0.05 * Math.hypot(g.vx, g.vy);
-            if (g.z <= 0) {
+            if (g.rain && g.z <= 0) {
+                g.timer = 0; // rained-down bombs burst on impact
+            } else if (g.z <= 0) {
                 // touching the ground (or resting): right on a monster → boom now; otherwise bounce on
                 g.z = 0;
                 const hit = this.monsters.some(m => !m.dead && !m.dying && !m.hidden && U.distanceSquared(g.x, g.y, m.x, m.y) < (6 + m.size) ** 2);
@@ -266,6 +268,16 @@ extendGame({
 
     updateBullets() {
         for (const b of this.bullets) {
+            const t = b.target;
+            if (t && !t.dead && !t.dying) {
+                // barrage fireballs curve gently after their target
+                const want = Math.atan2(t.y - b.y, t.x - b.x);
+                const cur = Math.atan2(b.vy, b.vx);
+                const a = cur + U.clamp(U.angleDelta(cur, want), -0.07, 0.07);
+                const sp = Math.hypot(b.vx, b.vy);
+                b.vx = Math.cos(a) * sp;
+                b.vy = Math.sin(a) * sp;
+            }
             b.x += b.vx;
             b.y += b.vy;
             b.life--;
@@ -280,6 +292,7 @@ extendGame({
                 if (m.dead || b.hits.has(m)) continue;
                 if (U.distanceSquared(b.x, b.y, m.x, m.y) < (b.r + m.size) ** 2) {
                     b.hits.add(m);
+                    if (m === b.target) this.releaseTarget(b);
                     const { dmg, crit } = this.rollDamage(b.damage);
                     this.damageMonster(m, dmg, { kx: b.vx * 0.25, ky: b.vy * 0.25, crit, sound: 'zap', src: { x: b.x - b.vx * 4, y: b.y - b.vy * 4 } });
                     this.spark(b.x, b.y, b.big ? '#f0abfc' : '#c4b5fd', b.big ? 6 : 3);
@@ -290,13 +303,25 @@ extendGame({
                 }
             }
         }
+        for (const b of this.bullets) if (b.life <= 0) this.releaseTarget(b);
         this.bullets = this.bullets.filter(b => b.life > 0);
+    },
+
+    releaseTarget(b) {
+        if (!b.target) return;
+        b.target.incoming = Math.max(0, (b.target.incoming || 0) - b.damage);
+        b.target = null;
     },
 
     // ---- super meter + supers
 
+    /** A super is still running (whirlwind spinning, fireballs or bombs still coming). */
+    get superRunning() {
+        return this.whirl > 0 || (this.barrage && this.barrage.left > 0) || (this.bombRain && this.bombRain.left > 0);
+    },
+
     addCharge(amount) {
-        if (this.whirl > 0 || amount <= 0) return;
+        if (this.superRunning || amount <= 0) return;
         const before = this.superMeter;
         this.superMeter = U.superCharge(this.superMeter, amount, this.chargeMult || 1);
         if (before < 100 && this.superMeter >= 100) {
@@ -305,9 +330,10 @@ extendGame({
         }
     },
 
-    activateSuper() {
+    /** keep = fired by an Overcharge pickup on a full meter: the meter stays full. */
+    activateSuper(keep = false) {
         if (this.state !== 'playing' || this.superMeter < 100) return;
-        this.superMeter = 0;
+        if (!keep) this.superMeter = 0;
         const p = this.player;
         const cls = CLASSES[this.cls];
         this.banner(cls.superName.toUpperCase() + '!', '', 'super');
@@ -317,8 +343,9 @@ extendGame({
         this.burst(p.x, p.y, cls.color, 24, 6);
         this.superSting(this.cls);
         if (this.cls === 'wizard') {
-            this.novaQueue = [0, 11, 22]; // three rings, 0.2 s apart
-            this.novaT = 0;
+            // Arcane Barrage: 10× the bolts of a normal cast, two per second, each at the nearest enemy
+            const shots = 10 * (1 + this.stack('split'));
+            this.barrage = this.barrage && this.barrage.left > 0 ? { ...this.barrage, left: this.barrage.left + shots } : { left: shots, t: 0 };
         } else if (this.cls === 'barbarian') {
             this.whirl = WHIRLWIND_STEPS;
             this.whirlT = 0;
@@ -329,24 +356,86 @@ extendGame({
                 k.normalize(d, 0.7);
             }, { volume: 0.4 });
         } else {
-            this.throwGrenades(this.aimPoint(), { all: true, blastMult: 1.5 });
-            this.cooldown = 30;
+            // Bombardment: 10× a normal throw rains down at random spots over 5 s
+            const bombs = 10 * Math.min(5, 2 + this.stack('cluster'));
+            this.bombRain = this.bombRain && this.bombRain.left > 0
+                ? { ...this.bombRain, left: this.bombRain.left + bombs, every: this.bombRain.every }
+                : { left: bombs, t: 0, every: (5 * 60 * GAME_SPEED) / bombs };
+            this.bombRainSting();
         }
+    },
+
+    /** Original "here they come" jingle for the bomb rain: a falling whistle and a bright choir-ish chord. */
+    bombRainSting() {
+        Sfx.fx('rainSting', 1.4, (d, rate, len, k) => {
+            const chord = [523.25, 659.25, 783.99, 1046.5];
+            for (let i = 0; i < len; i++) {
+                const t = i / rate;
+                const env = Math.min(1, t / 0.08) * Math.pow(Math.max(0, 1 - t / 1.4), 1.6);
+                let v = 0;
+                for (const f of chord) v += Math.sin(TAU * f * t + 0.6 * Math.sin(TAU * 5.5 * t)) + 0.35 * Math.sin(TAU * f * 2 * t);
+                d[i] = v * env * 0.22;
+            }
+            k.biquad(d, rate, 'bandpass', 1100, 0.7); // a soft "aah" vowel
+            k.normalize(d, 0.7);
+        }, { volume: 0.32 });
+        Sfx.tone(2200, { duration: 0.9, type: 'sine', volume: 0.07, slide: -1700, bus: 'sfx' });
+    },
+
+    /** Nearest monster that still needs damage (fireballs already on the way are counted). */
+    barrageTarget(dmg) {
+        const p = this.player;
+        let best = null;
+        let bd = Infinity;
+        for (const m of this.monsters) {
+            if (m.dead || m.dying || m.hidden || m.spawnT > 40) continue;
+            if ((m.incoming || 0) >= m.hp) continue;
+            const d = U.distanceSquared(p.x, p.y, m.x, m.y);
+            if (d < bd) {
+                bd = d;
+                best = m;
+            }
+        }
+        if (best) best.incoming = (best.incoming || 0) + dmg;
+        return best;
     },
 
     updateSuper() {
         const p = this.player;
-        if (this.novaQueue && this.novaQueue.length) {
-            this.novaT++;
-            while (this.novaQueue.length && this.novaT >= this.novaQueue[0]) {
-                const ring = 3 - this.novaQueue.length;
-                this.novaQueue.shift();
-                for (let i = 0; i < 12; i++) {
-                    const a = (i / 12) * TAU + ring * (TAU / 36);
-                    this.spawnBolt(p.x, p.y - 6, a, 7, 9 * this.impactMult, 3, this.stack('pierce') + 2, true);
+        const br = this.barrage;
+        if (br && br.left > 0) {
+            br.t += this.rateMult; // Rapid Fire, Haste and Fury speed the barrage up too
+            const every = 0.5 * 60 * GAME_SPEED;
+            while (br.t >= every && br.left > 0) {
+                const dmg = 2 * PRIMARY.bolt.damage * this.powerMult;
+                const m = this.barrageTarget(dmg);
+                if (!m) {
+                    br.t = every; // nothing to shoot: wait for the next monster
+                    break;
                 }
-                this.ring(p.x, p.y, 70, '#e9d5ff', 16);
-                Sfx.tone(523 * (1 + ring * 0.26), { duration: 0.18, type: 'triangle', volume: 0.12, slide: 400, bus: 'sfx' });
+                br.t -= every;
+                br.left--;
+                const a = Math.atan2(m.y - (p.y - 6), m.x - p.x);
+                this.spawnBolt(p.x, p.y - 6, a, 9, 9 * this.impactMult, dmg, this.stack('pierce') + 2, true);
+                this.bullets[this.bullets.length - 1].target = m;
+                this.ring(p.x, p.y - 6, 26, '#e9d5ff', 8);
+                Sfx.tone(660 + Math.random() * 260, { duration: 0.14, type: 'triangle', volume: 0.1, slide: 500, bus: 'sfx' });
+            }
+            if (br.left <= 0) this.monsters.forEach(m => { m.incoming = 0; });
+        }
+        const rain = this.bombRain;
+        if (rain && rain.left > 0) {
+            rain.t++;
+            while (rain.t >= rain.every && rain.left > 0) {
+                rain.t -= rain.every;
+                rain.left--;
+                const x = 30 + Math.random() * (this.W - 60);
+                const y = this.topSafe + 30 + Math.random() * (this.H - this.topSafe - 60);
+                this.grenades.push({
+                    x, y, sx: x, sy: y, z: 420, vx: 0, vy: 0, vz: -7, rain: true, bounces: 0, maxBounces: 0, timer: 9999, fuse: 9999, spin: Math.random() * TAU,
+                    radius: this.blastRadius * 1.3, damage: PRIMARY.grenade.damage * this.powerMult
+                });
+                if (rain.left % 3 === 0) Sfx.tone(1900 + Math.random() * 500, { duration: 0.55, type: 'sine', volume: 0.035, slide: -1300, bus: 'sfx' });
             }
         }
         if (this.whirl > 0) {

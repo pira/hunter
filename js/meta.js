@@ -3,29 +3,24 @@
    (hunter.profileCache) so artefacts and skins also apply offline. Extends Game (js/core.js). */
 
 extendGame({
-    /** Bonuses for this run: the (up to 4) slotted artefacts plus the worn skin's perk. */
+    /** Bonuses for this run: the worn skin's perk (rare and better skins). */
     loadArtefacts() {
-        const cache = Leaderboard.cachedProfile() || {};
         const bonus = {};
-        const slots = this.activeSlots(cache);
-        for (const key of slots) {
-            const a = this.parseArt(key);
-            if (a) bonus[a.def.stat] = (bonus[a.def.stat] || 0) + a.def.values[a.tier] / 100;
-        }
         const perk = this.skin && SKIN_PERKS[this.skin];
         if (perk) bonus[perk.stat] = (bonus[perk.stat] || 0) + perk.pct / 100;
-        this.artefacts = { slots, mult: key => 1 + (bonus[key] || 0) };
+        this.artefacts = { mult: key => 1 + (bonus[key] || 0) };
+        if (this.loadPets) this.loadPets();
     },
 
-    parseArt(key) {
+    parsePet(key) {
         const m = /^([a-z]+)_([1-4])$/.exec(key || '');
-        return m && ARTEFACTS[m[1]] ? { id: m[1], tier: Number(m[2]), def: ARTEFACTS[m[1]] } : null;
+        return m && PETS[m[1]] ? { id: m[1], tier: Number(m[2]), def: PETS[m[1]] } : null;
     },
 
-    /** Slotted artefacts; profiles cached before v3.2 still have the old one-tier-per-id map. */
-    activeSlots(cache) {
-        if (Array.isArray(cache.slots)) return cache.slots.filter(k => (cache.arts || {})[k] > 0).slice(0, MAX_SLOTS);
-        return Object.entries(cache.artefacts || {}).filter(([id, t]) => ARTEFACTS[id] && t > 0).slice(0, MAX_SLOTS).map(([id, t]) => `${id}_${Math.min(4, t)}`);
+    /** The pets out with you: slotted and still owned, never more than the unlocked slots. */
+    activePets(cache) {
+        const slots = Array.isArray(cache.petSlots) ? cache.petSlots : [];
+        return slots.filter(k => (cache.pets || {})[k] > 0 && this.parsePet(k)).slice(0, cache.petSlotCount || 1);
     },
 
     equippedSkin(cls) {
@@ -239,47 +234,84 @@ extendGame({
         }
         const gold = player.gold || 0;
         const gems = player.gems || 0;
-        const arts = player.arts || {};
-        const slots = this.activeSlots(player);
+        const pets = player.pets || {};
+        const slotCount = player.petSlotCount || 1;
+        const slots = this.activePets(player);
+        const eggs = player.eggs || {};
+        const nests = player.nests || [];
         const skins = player.skins || {};
         const equipped = player.equipped || {};
         const icon = player.icon || null;
         const online = Leaderboard.enabled;
         const off = online ? '' : 'disabled';
         const pct = v => `${v > 0 ? '+' : ''}${v}%`;
-        const chip = (id, tier, n) => `<span class="tier" style="--t:${TIERS[tier].color}">${TIERS[tier].label}${n > 1 ? ` ×${n}` : ''} <i>${pct(ARTEFACTS[id].values[tier])}</i></span>`;
+        const price = pr => (pr.gold ? `${COIN}${pr.gold.toLocaleString()}` : `${GEM}${pr.gems.toLocaleString()}`);
+        const afford = pr => (pr.gold ? gold >= pr.gold : gems >= pr.gems);
 
-        // the four slots: what's active in runs
+        // pets out on the hunt: unlocked slots, then locked ones with their price
         const slotBoxes = Array.from({ length: MAX_SLOTS }, (_, i) => {
-            const a = this.parseArt(slots[i]);
-            if (!a) return `<div class="slot empty">${mine ? 'empty<small>equip below</small>' : '—'}</div>`;
-            return `<div class="slot" style="--t:${TIERS[a.tier].color}"><span class="si">${a.def.icon}</span><b>${pct(a.def.values[a.tier])}</b><small>${a.def.what}</small>` +
-                (mine ? `<button class="x" data-unslot="${a.id}" ${off} aria-label="Unequip">✕</button>` : '') + '</div>';
+            if (i >= slotCount) {
+                if (!mine) return '';
+                const pr = SLOT_UNLOCK[i + 1];
+                const next = i === slotCount;
+                return `<div class="slot locked">🔒${next ? `<button class="buy ${pr.gems ? 'gem' : ''}" data-unlock="1" ${afford(pr) && online ? '' : 'disabled'}>Unlock · ${price(pr)}</button>` : `<small>${price(pr)}</small>`}</div>`;
+            }
+            const a = this.parsePet(slots[i]);
+            if (!a) return `<div class="slot empty">${mine ? 'empty<small>pick a pet below</small>' : '—'}</div>`;
+            return `<div class="slot pet" style="--t:${TIERS[a.tier].color}"><span class="si">${this.petEmoji(a.def)}</span><b>${a.def.name}</b><small>${a.def.label(a.def.values[a.tier])}</small>` +
+                (mine ? `<button class="x" data-unslot="${a.id}" ${off} aria-label="Leave at home">✕</button>` : '') + '</div>';
         }).join('');
 
-        const artRows = Object.entries(ARTEFACTS).map(([id, a]) => {
-            const owned = [1, 2, 3, 4].map(t => arts[`${id}_${t}`] || 0);
+        // nests: warming eggs with a countdown; empty nests take an egg
+        const nestBoxes = !mine ? '' : Array.from({ length: NESTS }, (_, i) => {
+            const n = nests[i];
+            if (!n) {
+                const opts = Object.keys(EGGS).filter(t => eggs[t] > 0)
+                    .map(t => `<button class="buy" data-warm="${t}" ${off}>${EGGS[t].name}</button>`).join('');
+                return `<div class="nest empty"><span class="ni">🪹</span>${opts || '<small>no eggs yet</small>'}</div>`;
+            }
+            const left = n.start + HATCH_MS - Date.now();
+            if (left <= 0) return `<div class="nest ready" style="--e:${EGGS[n.type].color}"><span class="ni wobble">🥚</span><button class="buy hatch" data-hatch="${n.id}" ${off}>Hatch!</button></div>`;
+            const cost = Math.max(1, Math.ceil(left / 3600000) * HURRY_GEMS_PER_HOUR);
+            return `<div class="nest warming" style="--e:${EGGS[n.type].color}"><span class="ni">🥚</span><small>${EGGS[n.type].name}</small>` +
+                `<b data-left="${n.start + HATCH_MS}">${Game.fmtLeft(left)}</b><button class="buy gem" data-hurry="${n.id}" ${gems >= cost && online ? '' : 'disabled'}>Now · ${GEM}${cost}</button></div>`;
+        }).join('');
+        const eggLine = !mine ? '' : `<div class="egg-line">${Object.keys(EGGS).map(t => `<span>🥚 ${EGGS[t].name} <b>×${eggs[t] || 0}</b></span>`).join('')}` +
+            `<button class="buy" data-buy="egg" ${gold >= EGG_PRICE && online ? '' : 'disabled'}>Buy egg · ${COIN}${EGG_PRICE.toLocaleString()}</button></div>`;
+
+        const chip = (def, tier, n) => `<span class="tier" style="--t:${TIERS[tier].color}">${TIERS[tier].label}${n > 1 ? ` ×${n}` : ''} <i>${def.label(def.values[tier])}</i></span>`;
+        const petRows = Object.entries(PETS).map(([id, def]) => {
+            const owned = [1, 2, 3, 4].map(t => pets[`${id}_${t}`] || 0);
             const best = owned.reduce((b, n, i) => (n > 0 ? i + 1 : b), 0);
             if (!mine && !best) return '';
-            const chips = best ? owned.map((n, i) => (n ? chip(id, i + 1, n) : '')).join('') : '<span class="tier none">not owned</span>';
+            const chips = best ? owned.map((n, i) => (n ? chip(def, i + 1, n) : '')).join('') : '<span class="tier none">not hatched yet</span>';
             let actions = '';
-            if (mine) {
-                const slotted = this.parseArt(slots.find(k => k.startsWith(`${id}_`)));
-                if (best && (!slotted || slotted.tier < best)) {
-                    const full = !slotted && slots.length >= MAX_SLOTS;
-                    actions += `<button class="buy equip" data-slot="${id}_${best}" ${full || !online ? 'disabled' : ''}>${full ? 'Slots full' : slotted ? `Use ${TIERS[best].label}` : 'Equip'}</button>`;
-                } else if (slotted) {
-                    actions += '<span class="maxed">EQUIPPED</span>';
+            if (mine && best) {
+                const slotted = this.parsePet(slots.find(k => k.startsWith(`${id}_`)));
+                if (!slotted || slotted.tier < best) {
+                    const full = !slotted && slots.length >= slotCount;
+                    actions += `<button class="buy equip" data-slot="${id}_${best}" ${full || !online ? 'disabled' : ''}>${full ? 'Slots full' : slotted ? `Take ${TIERS[best].label}` : 'Take along'}</button>`;
+                } else {
+                    actions += '<span class="maxed">ON THE HUNT</span>';
                 }
                 const mergeTier = [1, 2, 3].find(t => owned[t - 1] >= 3);
                 if (mergeTier) {
                     const cost = MERGE_GEMS[mergeTier + 1];
                     actions += `<button class="buy merge" data-merge="${id}" data-tier="${mergeTier + 1}" ${gems < cost || !online ? 'disabled' : ''}>3→1 ${TIERS[mergeTier + 1].label} · ${GEM}${cost}</button>`;
                 }
-                actions += `<button class="buy" data-buy="artefact" data-id="${id}" ${gold < ARTEFACT_PRICE || !online ? 'disabled' : ''}>+1 · ${COIN}${ARTEFACT_PRICE.toLocaleString()}</button>`;
             }
-            return `<li><span class="ai">${a.icon}</span><span class="an"><b>${a.name}</b><small>${a.what}</small><span class="chips">${chips}</span></span><span class="acts">${actions}</span></li>`;
+            return `<li><span class="ai">${this.petEmoji(def)}</span><span class="an"><b>${def.name}</b><small>${def.what}</small><span class="chips">${chips}</span></span><span class="acts">${actions}</span></li>`;
         }).join('');
+
+        let refund = '';
+        if (mine && player.artRefund) {
+            let seen = false;
+            try {
+                seen = localStorage.getItem('hunter.refundSeen') === '1';
+                localStorage.setItem('hunter.refundSeen', '1');
+            } catch (e) { /* storage unavailable */ }
+            if (!seen) refund = `<p class="refund">✨ Artefacts became pets! Yours were turned back into <b>${COIN}${player.artRefund.gold.toLocaleString()}</b>${player.artRefund.gems ? ` and <b>${GEM}${player.artRefund.gems}</b>` : ''}.</p>`;
+        }
 
         const skinCards = CLASS_ORDER.map(cls => {
             const list = Object.entries(SKINS).filter(([, s]) => s.cls === cls);
@@ -307,9 +339,10 @@ extendGame({
 
         el.innerHTML =
             `<div class="gold-line">${POUCH} <b>${gold.toLocaleString()}</b> gold <span class="gem-count">${GEM} <b>${gems.toLocaleString()}</b> gems</span>` +
-            (mine ? '<small>Unspent coins are banked when a hunt ends. Gems drop rarely — bosses always drop some.</small>' : '') + '</div>' +
-            `<h3>🎒 Equipped artefacts <small>${slots.length}/${MAX_SLOTS} · active in every hunt</small></h3><div class="slots">${slotBoxes}</div>` +
-            (artRows ? `<h3>✨ Collection${mine ? ' <small>merge 3 of a kind into the next tier</small>' : ''}</h3><ul class="arts">${artRows}</ul>` : '') +
+            (mine ? '<small>Unspent coins are banked when a hunt ends. Gems drop rarely — bosses always drop some.</small>' : '') + '</div>' + refund +
+            `<h3>🐾 Pets on the hunt <small>${slots.length}/${slotCount}${mine ? ' · they follow you and help' : ''}</small></h3><div class="slots">${slotBoxes}</div>` +
+            (mine ? `<h3>🥚 Eggs <small>a nest hatches an egg in ${HATCH_MS / 3600000} hours — leave it overnight</small></h3><div class="nests">${nestBoxes}</div>${eggLine}` : '') +
+            (petRows ? `<h3>📖 Pet collection${mine ? ' <small>merge 3 of a kind into the next tier</small>' : ''}</h3><ul class="arts">${petRows}</ul>` : '') +
             (skinCards ? `<h3>🎨 Skins${mine ? ' <small>rare and better skins give a small bonus</small>' : ''}</h3>${skinCards}` : '') +
             (mine && !online ? '<p class="since">The shop needs the online leaderboard.</p>' : '');
         el.querySelectorAll('canvas[data-skin]').forEach(cv => this.drawPortrait(cv, cv.dataset.cls, cv.dataset.skin));
@@ -318,21 +351,66 @@ extendGame({
         act('button[data-equip]', b => Leaderboard.equip(b.dataset.equip, b.dataset.skin));
         act('button[data-icon]', b => Leaderboard.meta('icon', { cls: b.dataset.icon, skin: b.dataset.skin }));
         act('button[data-merge]', b => Leaderboard.meta('merge', { id: b.dataset.merge, tier: Number(b.dataset.tier) }));
+        act('button[data-unlock]', () => Leaderboard.meta('unlock', {}));
+        act('button[data-warm]', b => Leaderboard.meta('warm', { type: b.dataset.warm }));
+        act('button[data-hatch]', b => Leaderboard.meta('hatch', { nest: b.dataset.hatch }));
+        act('button[data-hurry]', b => Leaderboard.meta('hurry', { nest: b.dataset.hurry }));
         act('button[data-slot]', b => {
             const id = b.dataset.slot.split('_')[0];
             const next = slots.filter(k => !k.startsWith(`${id}_`));
             const i = slots.findIndex(k => k.startsWith(`${id}_`));
             next.splice(i < 0 ? next.length : i, 0, b.dataset.slot);
-            return Leaderboard.meta('slots', { slots: next.slice(0, MAX_SLOTS) });
+            return Leaderboard.meta('slots', { slots: next.slice(0, slotCount) });
         });
         act('button[data-unslot]', b => Leaderboard.meta('slots', { slots: slots.filter(k => !k.startsWith(`${b.dataset.unslot}_`)) }));
+        // nest countdowns tick while the profile is open; a finished one re-renders into "Hatch!"
+        clearInterval(this.nestClock);
+        if (mine && nests.length) {
+            this.nestClock = setInterval(() => {
+                if (!el.isConnected || !this.el.profile.classList.contains('show')) return clearInterval(this.nestClock);
+                let done = false;
+                el.querySelectorAll('[data-left]').forEach(span => {
+                    const left = Number(span.dataset.left) - Date.now();
+                    if (left <= 0) done = true;
+                    else span.textContent = Game.fmtLeft(left);
+                });
+                if (done) this.renderShop(Leaderboard.cachedProfile() || player, true);
+            }, 1000);
+        }
+    },
+
+    /** The big "you hatched…" moment. */
+    showHatch(h) {
+        const def = PETS[h.id];
+        if (!def) return;
+        const t = TIERS[h.tier];
+        const box = document.createElement('div');
+        box.className = 'hatch-reveal';
+        box.style.setProperty('--t', t.color);
+        box.innerHTML = `<div class="hr-card"><span class="hr-pet">${this.petEmoji(def)}</span><small style="color:${t.color}">${t.label.toUpperCase()}</small>` +
+            `<b>${def.name}!</b><p>${def.what}<br><i>${def.label(def.values[h.tier])}</i></p><button class="btn primary">Yay!</button></div>`;
+        this.el.profile.appendChild(box);
+        const close = () => box.remove();
+        box.addEventListener('click', close);
+        Sfx.arpeggio(h.tier >= 3 ? [523, 659, 784, 1046, 1318, 1568, 2093] : [523, 659, 784, 1046], 0.08, { type: 'triangle', volume: 0.14 });
+        for (let i = 0; i < 26; i++) {
+            const c = document.createElement('i');
+            c.className = 'confetti';
+            c.style.setProperty('--x', `${(Math.random() - 0.5) * 320}px`);
+            c.style.setProperty('--y', `${-60 - Math.random() * 200}px`);
+            c.style.setProperty('--c', [t.color, '#facc15', '#f472b6', '#38bdf8'][i % 4]);
+            box.querySelector('.hr-card').appendChild(c);
+            setTimeout(() => c.remove(), 1100);
+        }
     },
 
     async shopAction(btn, fn) {
         btn.disabled = true;
         try {
             const res = await fn(btn);
-            if (btn.dataset.merge) {
+            if (btn.dataset.hatch || btn.dataset.hurry) {
+                Sfx.tone(700, { duration: 0.12, type: 'square', volume: 0.06, slide: 300 }); // crack!
+            } else if (btn.dataset.merge) {
                 Sfx.arpeggio([523, 784, 1046, 1568, 2093], 0.07, { type: 'triangle', volume: 0.13 });
             } else if (btn.dataset.buy) {
                 Sfx.arpeggio([659, 880, 1175, 1568], 0.06, { type: 'triangle', volume: 0.12 });
@@ -345,6 +423,7 @@ extendGame({
             if (btn.dataset.equip === this.cls) this.pickClass(this.cls, true);
             this.drawAvatar(this.el.profileAvatar, ...this.profileLook(res.player, true));
             if (btn.dataset.merge) this.el.profileShop.querySelector('.arts')?.classList.add('flash');
+            if (res.hatched) this.showHatch(res.hatched);
         } catch (e) {
             btn.textContent = e.message || 'Error';
             Sfx.tone(160, { duration: 0.15, type: 'square', volume: 0.08 });

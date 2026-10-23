@@ -11,9 +11,13 @@
 //   POST /player/{id}/name           rename { secret, name }
 //   POST /player/{id}/spin           double-or-nothing on the run's pot { secret, pot, spins }
 //   POST /player/{id}/bank           close the pot { secret, pot }
-//   POST /player/{id}/buy            basic artefact (gold) or skin (gold/gems) { secret, item: 'artefact'|'skin', id }
-//   POST /player/{id}/merge          3 × tier-1 → 1 × tier (gems) { secret, id, tier }
-//   POST /player/{id}/slots          artefacts active in runs { secret, slots: ['greed_2', …] } (≤4, distinct ids)
+//   POST /player/{id}/buy            pet egg (gold) or skin (gold/gems) { secret, item: 'egg'|'skin', id? }
+//   POST /player/{id}/warm           put an egg in a free nest { secret, type: 'gold'|'boss' }
+//   POST /player/{id}/hatch          hatch a ready egg { secret, nest } → { hatched: { id, tier } }
+//   POST /player/{id}/hurry          hatch a warming egg now for gems { secret, nest }
+//   POST /player/{id}/merge          3 pets × tier-1 → 1 × tier (gems) { secret, id, tier }
+//   POST /player/{id}/slots          pets taken on hunts { secret, slots: ['bees_2', …] } (≤ unlocked, distinct)
+//   POST /player/{id}/unlock         unlock the next pet slot { secret }
 //   POST /player/{id}/icon           public profile icon { secret, cls, skin ('' = class default) }
 //   POST /player/{id}/equip          wear an owned skin { secret, cls, skin ('' = none) }
 //
@@ -26,7 +30,10 @@
 //   pk="player#<pid>"  sk="run#<ts>#<id>"                 run history
 //   pk="pot#<nonce>"   sk="pot"                           the run's banked gold on the wheel (TTL 24 h)
 import { createHmac, createHash, randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
-import { ARTEFACTS, ARTEFACT_PRICE, MERGE_GEMS, MAX_SLOTS, artKey, SKINS, SKIN_PRICES, WHEEL_WIN } from './catalog.mjs';
+import {
+    PETS, MERGE_GEMS, MAX_SLOTS, SLOT_UNLOCK, petKey, EGG_PRICE, NESTS, HATCH_MS, HURRY_GEMS_PER_HOUR, EGG_ODDS,
+    ART_REFUND_GOLD, ART_REFUND_GEMS, SKINS, SKIN_PRICES, WHEEL_WIN
+} from './catalog.mjs';
 
 export const BOARD = 'board#v2';
 export const BOARD_V3 = 'board#v3';
@@ -37,7 +44,7 @@ export const MAX_RUN_MS = 6 * 3600 * 1000;
 export const SUBMITS_PER_MINUTE = 6;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const SECRET_RE = /^[A-Za-z0-9_-]{32,128}$/;
-const PUBLIC_META = ['name', 'bestScore', 'bestLevel', 'runs', 'kills', 'bosses', 'playSeconds', 'createdAt', 'updatedAt', 'gold', 'gems', 'arts', 'slots', 'icon', 'skins', 'equipped'];
+const PUBLIC_META = ['name', 'bestScore', 'bestLevel', 'runs', 'kills', 'bosses', 'playSeconds', 'createdAt', 'updatedAt', 'gold', 'gems', 'pets', 'petSlots', 'petSlotCount', 'eggs', 'nests', 'artRefund', 'icon', 'skins', 'equipped'];
 const POT_RE = /^[A-Za-z0-9_-]{6,40}$/;
 const POT_TTL = 24 * 3600;
 
@@ -79,42 +86,63 @@ export function gemCap(kills, bosses, level) {
     return 2 + bosses * 6 + Math.floor(kills / 100) + level;
 }
 
-/** Brings any stored profile to the current shape: gems, arts {id_tier: n}, slots, icon.
- *  P7 profiles kept one artefact tier per id in `artefacts`; those become owned + slotted items. */
+/** Brings any stored profile to the current shape: gems, pets, pet slots, eggs, nests, icon.
+ *  Artefacts (P7 `artefacts` tier map, v3.2 `arts` collection) are turned back into gold and gems. */
 export function upgradeMeta(meta) {
     const m = { ...meta };
     m.gold = m.gold || 0;
     m.gems = m.gems || 0;
     m.skins = { ...(m.skins || {}) };
     m.equipped = { ...(m.equipped || {}) };
-    if (!m.arts) {
-        m.arts = {};
-        m.slots = [];
-        for (const [id, tier] of Object.entries(m.artefacts || {})) {
-            if (!ARTEFACTS.includes(id) || !(tier >= 1 && tier <= 4)) continue;
-            m.arts[artKey(id, tier)] = 1;
-            if (m.slots.length < MAX_SLOTS) m.slots.push(artKey(id, tier));
-        }
-    } else {
-        m.arts = { ...m.arts };
+    if (m.arts || m.artefacts) {
+        let gold = 0;
+        let gems = 0;
+        const add = (tier, n) => {
+            if (!(tier >= 1 && tier <= 4) || !(n > 0)) return;
+            gold += ART_REFUND_GOLD[tier] * n;
+            gems += ART_REFUND_GEMS[tier] * n;
+        };
+        if (m.arts) for (const [k, n] of Object.entries(m.arts)) add(Number(k.split('_')[1]), n);
+        else for (const tier of Object.values(m.artefacts)) add(tier, 1);
+        m.gold += gold;
+        m.gems += gems;
+        if (gold || gems) m.artRefund = { gold, gems };
+        delete m.arts;
+        delete m.artefacts;
+        delete m.slots;
     }
-    delete m.artefacts;
-    m.slots = Array.isArray(m.slots) ? [...m.slots] : [];
+    m.pets = { ...(m.pets || {}) };
+    m.petSlots = Array.isArray(m.petSlots) ? [...m.petSlots] : [];
+    m.petSlotCount = m.petSlotCount || 1;
+    m.eggs = { gold: 0, boss: 0, ...(m.eggs || {}) };
+    m.nests = Array.isArray(m.nests) ? m.nests.map(n => ({ ...n })) : [];
     if (m.icon === undefined) m.icon = null;
     m.version = m.version || 0;
     return m;
 }
 
-const parseArt = key => {
+export const parsePet = key => {
     const m = /^([a-z]+)_([1-4])$/.exec(typeof key === 'string' ? key : '');
-    return m && ARTEFACTS.includes(m[1]) ? { id: m[1], tier: Number(m[2]) } : null;
+    return m && PETS.includes(m[1]) ? { id: m[1], tier: Number(m[2]) } : null;
 };
 
-/** Adds a basic artefact; it takes a free slot if that artefact isn't slotted yet. */
-function grantBasic(m, id) {
-    const k = artKey(id, 1);
-    m.arts[k] = (m.arts[k] || 0) + 1;
-    if (m.slots.length < MAX_SLOTS && !m.slots.some(s => s.startsWith(`${id}_`))) m.slots.push(k);
+/** Adds a pet; it takes a free slot if that kind isn't out with you yet. */
+function grantPet(m, id, tier) {
+    const k = petKey(id, tier);
+    m.pets[k] = (m.pets[k] || 0) + 1;
+    const i = m.petSlots.findIndex(s => parsePet(s)?.id === id);
+    if (i >= 0 && parsePet(m.petSlots[i]).tier < tier) m.petSlots[i] = k;
+    else if (i < 0 && m.petSlots.length < m.petSlotCount) m.petSlots.push(k);
+}
+
+/** Pick a tier (1..4) from percentage odds with r in [0, 1). */
+export function rollTier(odds, r) {
+    let acc = 0;
+    for (let t = 0; t < odds.length; t++) {
+        acc += odds[t] / 100;
+        if (r < acc) return t + 1;
+    }
+    return 1;
 }
 
 export function sanitizeName(name) {
@@ -126,7 +154,7 @@ export const sha256 = s => createHash('sha256').update(String(s)).digest('base64
 const isInt = (v, min, max) => Number.isInteger(v) && v >= min && v <= max;
 const pad = (n, w) => String(n).padStart(w, '0');
 
-export function createApp({ send, tokenSecret, now = () => Date.now(), random = randomBytes, wheel = () => randomInt(0, 1_000_000) < WHEEL_WIN * 1_000_000 }) {
+export function createApp({ send, tokenSecret, now = () => Date.now(), random = randomBytes, wheel = () => randomInt(0, 1_000_000) < WHEEL_WIN * 1_000_000, rng = () => randomInt(0, 1_000_000) / 1_000_000 }) {
     const sign = payload => createHmac('sha256', tokenSecret).update(payload).digest('base64url');
 
     function makeToken() {
@@ -243,9 +271,16 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
                 if (!isInt(body.gems, 0, 100_000)) throw new HttpError(400, 'invalid gems');
                 out.gems = body.gems;
             }
-            if (body.artCards !== undefined) {
-                if (!Array.isArray(body.artCards) || body.artCards.length > 200 || !body.artCards.every(a => ARTEFACTS.includes(a))) throw new HttpError(400, 'invalid artefacts');
-                out.artCards = body.artCards;
+            // eggs bought from the in-run egg card, and eggs dropped by bosses
+            // (3.2 clients still send artCards: each counts as an egg card)
+            const cards = body.eggs !== undefined ? body.eggs : Array.isArray(body.artCards) ? body.artCards.length : undefined;
+            if (cards !== undefined) {
+                if (!isInt(cards, 0, 200)) throw new HttpError(400, 'invalid eggs');
+                out.eggCards = cards;
+            }
+            if (body.bossEggs !== undefined) {
+                if (!isInt(body.bossEggs, 0, 10_000)) throw new HttpError(400, 'invalid eggs');
+                out.bossEggs = body.bossEggs;
             }
         }
         return out;
@@ -253,12 +288,13 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
 
     /** v3: levels are earned by damage over time, so the level is bounded by the run length. */
     function checkPlausibleV3(run) {
-        const { score, level, kills, combo, duration, bosses, coins, gems, artCards } = run;
+        const { score, level, kills, combo, duration, bosses, coins, gems, eggCards, bossEggs } = run;
         if (level > 2 + Math.floor(duration / MIN_LEVEL_SECONDS)) throw new HttpError(422, 'implausible level');
         if (score > 1000 + duration * 4000 || kills > 60 + duration * 25 || combo > kills) throw new HttpError(422, 'implausible score');
         if (coins !== undefined && coins > coinCap(kills, bosses, level)) throw new HttpError(422, 'implausible coins');
         if (gems !== undefined && gems > gemCap(kills, bosses, level)) throw new HttpError(422, 'implausible gems');
-        if (artCards && artCards.length > 1 + Math.floor(level / 5)) throw new HttpError(422, 'implausible artefacts');
+        if (eggCards && eggCards > 1 + Math.floor(level / 5)) throw new HttpError(422, 'implausible eggs');
+        if (bossEggs && bossEggs > bosses) throw new HttpError(422, 'implausible eggs');
     }
 
     function checkPlausible(run) {
@@ -292,7 +328,7 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
         const board = v3 ? BOARD_V3 : BOARD;
         const sk = `${pad(MAX_SCORE - run.score, 9)}#${pad(ts, 14)}#${id}`;
         const nonceItem = { pk: 'nonce', sk: token.nonce, ttl: Math.floor(ts / 1000) + 8 * 3600 };
-        const { coins: unspent, gems: _gems, artCards: _cards, ...shown } = run;
+        const { coins: unspent, gems: _gems, eggCards: _cards, bossEggs: _boss, ...shown } = run;
         const boardItem = { pk: board, sk, id, ...shown, ts };
         if (pid) boardItem.playerId = pid;
         // The skin shown on the board is whatever the profile has equipped — never the client's word.
@@ -344,7 +380,8 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
             // Unspent gold is banked 100% at death (D5); the pot lets it ride on the wheel.
             next.gold += unspent;
             next.gems += run.gems || 0;
-            for (const a of run.artCards || []) grantBasic(next, a);
+            next.eggs.gold += run.eggCards || 0;
+            next.eggs.boss += run.bossEggs || 0;
             const metaPut = meta
                 ? { Put: { Item: next, ConditionExpression: '#v = :v', ExpressionAttributeNames: { '#v': 'version' }, ExpressionAttributeValues: { ':v': meta.version || 0 } } }
                 : { Put: { Item: next, ConditionExpression: 'attribute_not_exists(pk)' } };
@@ -374,7 +411,7 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
     function newMeta(pid, secret, ts) {
         return {
             pk: `player#${pid}`, sk: 'meta', secretHash: sha256(secret), createdAt: ts, runs: 0, kills: 0, bosses: 0, playSeconds: 0,
-            bestScore: 0, bestLevel: 0, gold: 0, gems: 0, arts: {}, slots: [], icon: null, skins: {}, equipped: {}, version: 0
+            bestScore: 0, bestLevel: 0, gold: 0, gems: 0, pets: {}, petSlots: [], petSlotCount: 1, eggs: { gold: 0, boss: 0 }, nests: [], icon: null, skins: {}, equipped: {}, version: 0
         };
     }
 
@@ -396,7 +433,7 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
         const h = sha256(body.secret);
         for (let attempt = 0; attempt < 4; attempt++) {
             const next = upgradeMeta(meta);
-            change(next); // throws HttpError when the action isn't allowed
+            const extra = change(next); // throws HttpError when the action isn't allowed
             next.version = (meta.version || 0) + 1;
             next.updatedAt = now();
             try {
@@ -406,7 +443,7 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
                     ExpressionAttributeNames: { '#v': 'version' },
                     ExpressionAttributeValues: { ':v': meta.version || 0, ':h': h }
                 });
-                return { player: publicMeta(pid, next) };
+                return { ...(extra || {}), player: publicMeta(pid, next) };
             } catch (e) {
                 if (e.name !== 'ConditionalCheckFailedException') throw e;
                 meta = await ownProfile(pid, body);
@@ -485,15 +522,14 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
         return { gold: meta.gold || 0, pot: { id: body.pot, amount: pot.amount, spins: pot.spins, status: pot.status === 'open' ? 'banked' : pot.status } };
     }
 
-    // ---- meta shop: basic artefacts and skins, merging, slots, icon
+    // ---- meta shop: eggs and skins, hatching, merging pets, pet slots, icon
 
     function buy(pid, body) {
         return mutateMeta(pid, body, m => {
-            if (body.item === 'artefact') {
-                if (!ARTEFACTS.includes(body.id)) throw new HttpError(400, 'invalid artefact');
-                if (m.gold < ARTEFACT_PRICE) throw new HttpError(409, 'not enough gold');
-                m.gold -= ARTEFACT_PRICE;
-                grantBasic(m, body.id);
+            if (body.item === 'egg') {
+                if (m.gold < EGG_PRICE) throw new HttpError(409, 'not enough gold');
+                m.gold -= EGG_PRICE;
+                m.eggs.gold++;
             } else if (body.item === 'skin') {
                 const skin = SKINS[body.id];
                 if (!skin) throw new HttpError(400, 'invalid skin');
@@ -513,37 +549,86 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
         });
     }
 
+    /** Put an egg into a free nest; it hatches HATCH_MS later. */
+    function warm(pid, body) {
+        return mutateMeta(pid, body, m => {
+            const type = body.type;
+            if (!EGG_ODDS[type]) throw new HttpError(400, 'invalid egg');
+            if (!(m.eggs[type] > 0)) throw new HttpError(409, 'no such egg');
+            if (m.nests.length >= NESTS) throw new HttpError(409, 'the nests are full');
+            m.eggs[type]--;
+            m.nests.push({ id: random(6).toString('base64url'), type, start: now() });
+        });
+    }
+
+    /** Hatch a ready egg (or, with hurry, a warming one for gems). The server rolls the pet. */
+    function hatch(pid, body, hurry) {
+        return mutateMeta(pid, body, m => {
+            const i = m.nests.findIndex(n => n.id === body.nest);
+            if (i < 0) throw new HttpError(404, 'no such nest');
+            const nest = m.nests[i];
+            const left = nest.start + HATCH_MS - now();
+            if (left > 0) {
+                if (!hurry) throw new HttpError(409, 'not ready yet');
+                const cost = Math.max(1, Math.ceil(left / 3_600_000) * HURRY_GEMS_PER_HOUR);
+                if (m.gems < cost) throw new HttpError(409, 'not enough gems');
+                m.gems -= cost;
+            }
+            m.nests.splice(i, 1);
+            const id = PETS[Math.min(PETS.length - 1, Math.floor(rng() * PETS.length))];
+            const tier = rollTier(EGG_ODDS[nest.type], rng());
+            grantPet(m, id, tier);
+            return { hatched: { id, tier, egg: nest.type } };
+        });
+    }
+
     function merge(pid, body) {
         return mutateMeta(pid, body, m => {
             const { id, tier } = body;
-            if (!ARTEFACTS.includes(id) || !isInt(tier, 2, 4)) throw new HttpError(400, 'invalid merge');
-            const lower = artKey(id, tier - 1);
-            const upper = artKey(id, tier);
-            if ((m.arts[lower] || 0) < 3) throw new HttpError(409, 'need three to merge');
+            if (!PETS.includes(id) || !isInt(tier, 2, 4)) throw new HttpError(400, 'invalid merge');
+            const lower = petKey(id, tier - 1);
+            const upper = petKey(id, tier);
+            if ((m.pets[lower] || 0) < 3) throw new HttpError(409, 'need three to merge');
             if (m.gems < MERGE_GEMS[tier]) throw new HttpError(409, 'not enough gems');
             m.gems -= MERGE_GEMS[tier];
-            m.arts[lower] -= 3;
-            if (!m.arts[lower]) delete m.arts[lower];
-            m.arts[upper] = (m.arts[upper] || 0) + 1;
-            // the merged item replaces a weaker one of the same kind in the slots
-            const i = m.slots.findIndex(s => parseArt(s)?.id === id);
-            if (i >= 0 && parseArt(m.slots[i]).tier < tier) m.slots[i] = upper;
-            else if (i < 0 && m.slots.length < MAX_SLOTS) m.slots.push(upper);
+            m.pets[lower] -= 3;
+            if (!m.pets[lower]) delete m.pets[lower];
+            m.pets[upper] = (m.pets[upper] || 0) + 1;
+            // the stronger pet replaces a weaker one of the same kind in the slots
+            const i = m.petSlots.findIndex(s => parsePet(s)?.id === id);
+            if (i >= 0 && (parsePet(m.petSlots[i]).tier < tier || !(m.pets[m.petSlots[i]] > 0))) m.petSlots[i] = upper;
         });
     }
 
     function setSlots(pid, body) {
         return mutateMeta(pid, body, m => {
             const slots = body.slots;
-            if (!Array.isArray(slots) || slots.length > MAX_SLOTS) throw new HttpError(400, 'invalid slots');
+            if (!Array.isArray(slots) || slots.length > m.petSlotCount) throw new HttpError(400, 'invalid slots');
             const ids = new Set();
             for (const k of slots) {
-                const a = parseArt(k);
+                const a = parsePet(k);
                 if (!a || ids.has(a.id)) throw new HttpError(400, 'invalid slots');
-                if (!(m.arts[k] > 0)) throw new HttpError(403, 'you do not own that artefact');
+                if (!(m.pets[k] > 0)) throw new HttpError(403, 'you do not own that pet');
                 ids.add(a.id);
             }
-            m.slots = [...slots];
+            m.petSlots = [...slots];
+        });
+    }
+
+    /** Unlock the next pet slot (2nd: gold, 3rd and 4th: gems). */
+    function unlockSlot(pid, body) {
+        return mutateMeta(pid, body, m => {
+            const n = m.petSlotCount + 1;
+            if (n > MAX_SLOTS) throw new HttpError(409, 'all slots unlocked');
+            const price = SLOT_UNLOCK[n];
+            if (price.gold) {
+                if (m.gold < price.gold) throw new HttpError(409, 'not enough gold');
+                m.gold -= price.gold;
+            } else {
+                if (m.gems < price.gems) throw new HttpError(409, 'not enough gems');
+                m.gems -= price.gems;
+            }
+            m.petSlotCount = n;
         });
     }
 
@@ -644,6 +729,10 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
                 if (method === 'POST' && action === '/buy') return json(200, await buy(pid, parseBody(event)));
                 if (method === 'POST' && action === '/equip') return json(200, await equip(pid, parseBody(event)));
                 if (method === 'POST' && action === '/merge') return json(200, await merge(pid, parseBody(event)));
+                if (method === 'POST' && action === '/warm') return json(200, await warm(pid, parseBody(event)));
+                if (method === 'POST' && action === '/hatch') return json(200, await hatch(pid, parseBody(event), false));
+                if (method === 'POST' && action === '/hurry') return json(200, await hatch(pid, parseBody(event), true));
+                if (method === 'POST' && action === '/unlock') return json(200, await unlockSlot(pid, parseBody(event)));
                 if (method === 'POST' && action === '/slots') return json(200, await setSlots(pid, parseBody(event)));
                 if (method === 'POST' && action === '/icon') return json(200, await setIcon(pid, parseBody(event)));
             }

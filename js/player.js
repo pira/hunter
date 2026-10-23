@@ -48,7 +48,7 @@ extendGame({
 
     get moveMult() {
         const fleet = this.buffs.fleet2 ? 2 : this.buffs.fleet1 ? 1.5 : 1;
-        return (1 + 0.1 * this.stack('boots')) * fleet * (this.whirl > 0 ? 1.3 : 1) * this.artefactMult('speed');
+        return (1 + 0.1 * this.stack('boots')) * fleet * (this.whirl > 0 ? 0.975 : 1) * this.artefactMult('speed');
     },
 
     get luckMult() {
@@ -145,6 +145,14 @@ extendGame({
             return;
         }
         this.hits = (this.hits || 0) + 1;
+        this.bunnyOnHit();
+        if (this.turtleBlocks()) {
+            // the turtle's green heart takes it: a short blink, no red heart lost
+            p.iframes = 70;
+            this.shake(6);
+            Sfx.tone(260, { duration: 0.12, type: 'triangle', volume: 0.1, bus: 'sfx' });
+            return;
+        }
         p.hp--;
         p.iframes = 90;
         this.shake(14);

@@ -100,6 +100,7 @@ extendGame({
         });
         this.monsters.forEach(m => { if (m.boss && m.bubble) this.drawBubble(ctx, m); });
         const alive = this.state !== 'dying' && this.state !== 'gameover';
+        if (alive) this.drawPets(ctx);
         if (alive) this.drawPlayer(ctx);
         if (alive) this.drawCleaves(ctx);
         this.drawProjectiles(ctx);
@@ -128,6 +129,10 @@ extendGame({
 
     drawCoin(ctx, c) {
         if ((c.life < 180 || c.y > this.H - 80) && Math.floor(c.t / 6) % 2 === 0) return;
+        if (c.egg) {
+            this.drawEggAt(ctx, c.x, c.y - c.z, 1.2, c.t, c.y, '#fb923c');
+            return;
+        }
         if (c.gem) {
             this.drawGem(ctx, c.x, c.y - c.z, 8, c.t, c.y);
             return;
@@ -154,6 +159,41 @@ extendGame({
         ctx.beginPath();
         ctx.ellipse(c.x - r * 0.3 * sx, y - r * 0.3, r * 0.3 * sx, r * 0.3, 0, 0, TAU);
         ctx.fill();
+    },
+
+    /** A speckled pet egg with a soft glow (boss eggs glow orange). */
+    drawEggAt(ctx, x, y, s, t = 0, groundY = null, glowColor = '#fde68a') {
+        if (groundY !== null) this.drawShadow(ctx, x, groundY + 9 * s, 7 * s);
+        const wob = Math.sin(t * 0.15) * 0.12;
+        const glow = ctx.createRadialGradient(x, y, 2, x, y, 22 * s);
+        glow.addColorStop(0, `${glowColor}aa`);
+        glow.addColorStop(1, `${glowColor}00`);
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(x, y, 22 * s, 0, TAU);
+        ctx.fill();
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(wob);
+        ctx.scale(s, s);
+        ctx.fillStyle = '#fef3c7';
+        ctx.strokeStyle = '#92400e';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 7.5, 10, 0, 0, TAU);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = glowColor;
+        for (const [sx, sy, r] of [[-3, -4, 1.8], [3, -1, 2.2], [-2, 4, 1.6], [3.5, 5, 1.2], [0, -7, 1.2]]) {
+            ctx.beginPath();
+            ctx.arc(sx, sy, r, 0, TAU);
+            ctx.fill();
+        }
+        ctx.fillStyle = 'rgba(255,255,255,0.7)';
+        ctx.beginPath();
+        ctx.ellipse(-3, -5, 1.6, 2.6, -0.4, 0, TAU);
+        ctx.fill();
+        ctx.restore();
     },
 
     /** A flat gold coin icon (HUD floaters, the Coins ×2/×3 pickups). */
@@ -368,6 +408,15 @@ extendGame({
         ctx.fillStyle = '#95d5b2';
         ctx.fillRect(-2, -8, 4, 4);
         ctx.restore();
+        if (g.rain) {
+            // falling from the sky: a target mark where it will land
+            ctx.strokeStyle = `rgba(255,80,60,${0.35 + 0.3 * Math.sin(g.z * 0.1)})`;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(g.x, g.y, Math.max(6, g.radius * (1 - g.z / 420)), 0, TAU);
+            ctx.stroke();
+            return;
+        }
         const urgent = g.timer < 24;
         ctx.strokeStyle = urgent ? (Math.floor(g.timer / 3) % 2 ? '#ff3b30' : '#fff') : '#ffd60a';
         ctx.lineWidth = 2;

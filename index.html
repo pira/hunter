@@ -79,22 +79,20 @@
         .combobar { height: 4px; background: rgba(0,0,0,.4); border-radius: 3px; overflow: hidden; margin-top: 2px; }
         #comboFill { height: 100%; background: #fff; }
         @keyframes throb { to { transform: scale(1.12); } }
-        #superBar { position: relative; width: 7.5em; height: 10px; border-radius: 6px; background: rgba(0,0,0,.5); border: 1px solid rgba(255,255,255,.25); overflow: hidden; }
-        #superFill { height: 100%; width: 0; background: linear-gradient(90deg, #6366f1, #a855f7, #ec4899); transition: width .12s; }
-        #superBar::after { content: '⚡'; position: absolute; right: 2px; top: 50%; transform: translateY(-50%); font-size: 8px; opacity: .7; }
-        #superBar.ready { border-color: #facc15; box-shadow: 0 0 10px rgba(250,204,21,.8); animation: blink .5s infinite alternate; }
-        #superBar.ready #superFill { background: linear-gradient(90deg, #facc15, #fde047, #facc15); }
-        #superBar.active #superFill { background: linear-gradient(90deg, #f97316, #fde047); transition: none; }
-        @keyframes blink { to { filter: brightness(1.6); } }
-        /* SUPER button: pops up under the score when the meter is full */
-        #superBtn { pointer-events: auto; top: calc(48px * var(--ui) + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%) scale(.4); opacity: 0; visibility: hidden; display: flex; align-items: center; gap: .35em; padding: .35em 1.1em .35em .55em; border-radius: 999px; border: 3px solid #fff7c2; background: linear-gradient(180deg, #fde047, #f59e0b); color: #3b1d00; box-shadow: 0 4px 0 #92400e, 0 0 26px rgba(250,204,21,.85); transition: transform .25s cubic-bezier(.3,1.6,.6,1), opacity .2s, visibility .2s; }
-        #superBtn span { font-size: 1.5em; line-height: 1; }
-        #superBtn b { font-family: var(--display); font-weight: normal; font-size: 1.25em; letter-spacing: 1px; }
-        #superBtn small { font-size: .65em; opacity: .7; margin-left: .2em; }
-        #superBtn.ready { opacity: 1; visibility: visible; transform: translateX(-50%) scale(1); animation: superPulse .8s ease-in-out infinite; }
-        @keyframes superPulse { 50% { transform: translateX(-50%) scale(1.08); box-shadow: 0 4px 0 #92400e, 0 0 40px rgba(250,204,21,1); } }
-        #hud.super-ready #combo { top: calc(100px * var(--ui) + env(safe-area-inset-top)); }
-        #hud.super-ready ~ #bossBar { top: calc(140px * var(--ui) + env(safe-area-inset-top)); }
+        /* SUPER: a charging ring in the lower right that turns into a round yellow button when full */
+        #superBtn { position: absolute; z-index: 3; pointer-events: auto; right: calc(18px + env(safe-area-inset-right)); bottom: calc(18px + env(safe-area-inset-bottom)); width: calc(78px * var(--ui)); height: calc(78px * var(--ui)); padding: 0; border: 0; border-radius: 50%; display: grid; place-items: center; color: #e2e8f0;
+            background: conic-gradient(#facc15 calc(var(--p, 0) * 1%), rgba(15,23,42,.55) 0); box-shadow: 0 0 0 2px rgba(255,255,255,.22), 0 4px 10px rgba(0,0,0,.35); transition: transform .2s; }
+        #superBtn::before { content: ''; position: absolute; inset: calc(7px * var(--ui)); border-radius: 50%; background: radial-gradient(circle at 50% 35%, #1e293b, #0f172a); }
+        #superBtn span { position: relative; font-size: calc(30px * var(--ui)); line-height: 1; filter: grayscale(.7); opacity: .65; }
+        #superBtn b, #superBtn small { display: none; }
+        #superBtn.active { background: conic-gradient(#fb923c calc(var(--p, 0) * 1%), rgba(15,23,42,.55) 0); }
+        #superBtn.active span { filter: none; opacity: 1; }
+        #superBtn.ready { background: radial-gradient(circle at 50% 30%, #fef08a, #facc15 55%, #f59e0b); box-shadow: 0 4px 0 #92400e, 0 0 28px rgba(250,204,21,.9); color: #3b1d00; animation: superPulse .8s ease-in-out infinite; cursor: pointer; }
+        #superBtn.ready::before { display: none; }
+        #superBtn.ready span { filter: none; opacity: 1; font-size: calc(26px * var(--ui)); margin-top: -.35em; }
+        #superBtn.ready b { display: block; position: absolute; bottom: 20%; font-family: var(--display); font-weight: normal; font-size: calc(13px * var(--ui)); letter-spacing: 1px; }
+        #superBtn.ready small { display: block; position: absolute; bottom: -1.5em; font-size: calc(10px * var(--ui)); color: #fde68a; opacity: .85; }
+        @keyframes superPulse { 50% { transform: scale(1.08); box-shadow: 0 4px 0 #92400e, 0 0 44px rgba(250,204,21,1); } }
         /* owned upgrades strip (after timed effects and one-level cards) */
         .up { position: relative; display: grid; place-items: center; width: 1.7em; height: 1.7em; font-size: 1em; border-radius: 8px; background: rgba(0,0,0,.35); }
         .up sup { position: absolute; right: -3px; top: -5px; font-family: var(--display); font-size: .6em; color: var(--gold); text-shadow: 0 1px 2px #000; }
@@ -260,10 +258,10 @@
         .cls b { font-family: var(--display); font-weight: normal; font-size: 1em; letter-spacing: .5px; }
         .cls small { font-size: .6em; letter-spacing: 1px; }
         /* UI icons drawn like the drops: gold coin, coin pouch (a pile of coins), blue diamond (gem) */
-        .coin, .pouch, .gem { display: inline-block; width: 1em; height: 1em; vertical-align: -.14em; background: center / contain no-repeat; }
-        .coin { background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='-10 -10 20 20'><circle r='8.6' fill='%23ffd60a' stroke='%23a66a00' stroke-width='1.6'/><circle r='5.6' fill='none' stroke='%23e0a800' stroke-width='1.2'/><ellipse cx='-3' cy='-3.4' rx='2.2' ry='1.5' fill='%23fff7c2' opacity='.85'/></svg>"); }
-        .pouch { width: 1.1em; background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='-10 -10.5 20 18.5'><path d='M-3.5-4C-9-2-9 7 0 7S9-2 3.5-4Z' fill='%23b7792f' stroke='%235b3410' stroke-width='1.4'/><path d='M-3.5-4L-5.5-8.5L-2-6.5L0-9L2-6.5L5.5-8.5L3.5-4Z' fill='%23c98a3c' stroke='%235b3410' stroke-width='1.4' stroke-linejoin='round'/><path d='M-3.8-4H3.8' stroke='%23ffd60a' stroke-width='1.8'/><circle cx='0' cy='2' r='2.5' fill='%23ffd60a' stroke='%23a66a00' stroke-width='.8'/></svg>"); }
-        .gem { background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='-10 -10 20 20'><path d='M-8-3.5L-4-8H4L8-3.5L0 8.5Z' fill='%2338bdf8' stroke='%230c4a6e' stroke-width='1.2' stroke-linejoin='round'/><path d='M-4-8H4L2.4-3.5H-2.4Z' fill='%23bae6fd'/><path d='M2.4-3.5H8L0 8.5Z' fill='%230284c7'/></svg>"); }
+        .i-coin, .i-pouch, .i-gem { display: inline-block; width: 1em; height: 1em; vertical-align: -.14em; background: center / contain no-repeat; }
+        .i-coin { background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='-10 -10 20 20'><circle r='8.6' fill='%23ffd60a' stroke='%23a66a00' stroke-width='1.6'/><circle r='5.6' fill='none' stroke='%23e0a800' stroke-width='1.2'/><ellipse cx='-3' cy='-3.4' rx='2.2' ry='1.5' fill='%23fff7c2' opacity='.85'/></svg>"); }
+        .i-pouch { width: 1.1em; background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='-10 -10.5 20 18.5'><path d='M-3.5-4C-9-2-9 7 0 7S9-2 3.5-4Z' fill='%23b7792f' stroke='%235b3410' stroke-width='1.4'/><path d='M-3.5-4L-5.5-8.5L-2-6.5L0-9L2-6.5L5.5-8.5L3.5-4Z' fill='%23c98a3c' stroke='%235b3410' stroke-width='1.4' stroke-linejoin='round'/><path d='M-3.8-4H3.8' stroke='%23ffd60a' stroke-width='1.8'/><circle cx='0' cy='2' r='2.5' fill='%23ffd60a' stroke='%23a66a00' stroke-width='.8'/></svg>"); }
+        .i-gem { background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='-10 -10 20 20'><path d='M-8-3.5L-4-8H4L8-3.5L0 8.5Z' fill='%2338bdf8' stroke='%230c4a6e' stroke-width='1.2' stroke-linejoin='round'/><path d='M-4-8H4L2.4-3.5H-2.4Z' fill='%23bae6fd'/><path d='M2.4-3.5H8L0 8.5Z' fill='%230284c7'/></svg>"); }
         .cdmg { font-size: .62em; line-height: 1; color: #fecaca; white-space: nowrap; }
         .cdmg b { font-family: var(--display); font-weight: normal; color: #fff; font-size: 1.15em; }
         .cdmg i { font-style: normal; color: var(--muted); font-size: .85em; }
@@ -333,6 +331,39 @@
         .slot.empty { border: 2px dashed rgba(255,255,255,.18); background: rgba(255,255,255,.03); color: var(--muted); font-size: .8em; }
         .slot .x { position: absolute; top: 2px; right: 4px; border: 0; background: none; color: var(--muted); font-size: .8em; padding: 2px; }
         .skin .perk { color: #a7f3d0; }
+        /* pets, eggs and nests */
+        .slot.pet .si { font-size: 1.8em; }
+        .slot.pet b { font-size: .85em; }
+        .slot.locked { border: 2px dashed rgba(255,255,255,.12); background: rgba(0,0,0,.2); color: var(--muted); font-size: 1.1em; gap: .3em; }
+        .slot.locked .buy { font-size: .62em; }
+        .slot.locked small { font-size: .6em; }
+        .nests { display: grid; grid-template-columns: repeat(2, 1fr); gap: .5em; margin-top: .4em; }
+        .nest { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .25em; min-height: 6.2em; padding: .5em .3em; border-radius: 14px; background: radial-gradient(circle at 50% 70%, rgba(180,120,60,.25), rgba(255,255,255,.03)); border: 2px solid rgba(255,255,255,.08); text-align: center; }
+        .nest .ni { font-size: 2em; line-height: 1; }
+        .nest.empty .ni { opacity: .6; }
+        .nest.empty .buy { font-size: .7em; }
+        .nest small { font-size: .7em; color: var(--muted); }
+        .nest b { font-family: var(--display); font-weight: normal; color: #fde68a; letter-spacing: .5px; }
+        .nest.warming .ni { filter: drop-shadow(0 0 6px var(--e)); animation: eggRock 2.4s ease-in-out infinite; }
+        .nest.ready { border-color: #facc15; box-shadow: 0 0 18px rgba(250,204,21,.45); }
+        .nest.ready .ni { filter: drop-shadow(0 0 10px var(--e)); }
+        .wobble { animation: eggShake .5s ease-in-out infinite; }
+        .buy.hatch { background: linear-gradient(180deg, #86efac, #16a34a); color: #052e16; box-shadow: 0 2px 0 #14532d; animation: throb .6s infinite alternate; }
+        @keyframes eggRock { 0%, 100% { transform: rotate(-6deg); } 50% { transform: rotate(6deg); } }
+        @keyframes eggShake { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-14deg) scale(1.05); } 75% { transform: rotate(14deg) scale(1.05); } }
+        .egg-line { display: flex; flex-wrap: wrap; align-items: center; gap: .4em .9em; margin-top: .5em; font-size: .85em; }
+        .egg-line b { color: #fde68a; }
+        .egg-line .buy { margin-left: auto; }
+        .refund { margin: .6em 0 0; padding: .5em .8em; border-radius: 12px; background: rgba(232,121,249,.14); font-size: .85em; }
+        .hatch-reveal { position: absolute; inset: 0; z-index: 30; display: grid; place-items: center; background: rgba(2,6,23,.72); animation: fadeIn .2s; }
+        .hr-card { position: relative; display: flex; flex-direction: column; align-items: center; gap: .2em; padding: 1.4em 2em; border-radius: 22px; background: radial-gradient(circle at 50% 25%, color-mix(in srgb, var(--t) 40%, #1e293b), #0f172a); border: 3px solid var(--t); box-shadow: 0 0 40px color-mix(in srgb, var(--t) 60%, transparent); text-align: center; animation: popIn .45s cubic-bezier(.3,1.6,.6,1); }
+        .hr-pet { font-size: 4.2em; line-height: 1.1; animation: eggShake .6s ease-in-out 2; }
+        .hr-card small { font-family: var(--display); letter-spacing: 2px; }
+        .hr-card b { font-family: var(--display); font-weight: normal; font-size: 1.8em; color: #fff; }
+        .hr-card p { margin: .2em 0 .8em; color: #cbd5e1; font-size: .9em; }
+        .hr-card i { color: #fde68a; font-style: normal; }
+        @keyframes popIn { from { transform: scale(.3); opacity: 0; } }
+        @keyframes fadeIn { from { opacity: 0; } }
         .icon-pick { border: 0; border-radius: 8px; padding: .15em .4em; margin-top: .15em; font-size: .75em; background: rgba(255,255,255,.08); color: #e2e8f0; }
         .icon-pick.on { background: rgba(250,204,21,.25); color: #fde68a; }
         .arts li:nth-child(odd) { background: rgba(255,255,255,.04); }
@@ -375,8 +406,6 @@
         @media (max-width: 560px) {
             #powerups { position: absolute; top: 2.7em; right: 0; flex-wrap: wrap; justify-content: flex-end; width: 11em; }
             #combo { min-width: 6em; }
-            #superBtn { font-size: .78em; padding: .3em .8em .3em .45em; }
-            #superBtn small { display: none; }
             #comboCount { display: none; }
             .pu { font-size: 1.05em; padding: 1px 4px; }
             #cards { flex-direction: column; align-items: stretch; gap: 10px; }
@@ -403,9 +432,8 @@
         <div id="hud" class="hidden">
             <div class="hud-left">
                 <div id="hearts"></div>
-                <div id="superBar" title="Super meter"><div id="superFill"></div></div>
                 <div class="lvl"><span id="levelLabel">LV 1</span><div class="xpbar"><div id="xpFill"></div></div></div>
-                <div class="purse"><span id="coins"><i class="coin"></i> 0</span><span id="gems" hidden><i class="gem"></i> 0</span></div>
+                <div class="purse"><span id="coins"><i class="i-coin"></i> 0</span><span id="gems" hidden><i class="i-gem"></i> 0</span></div>
             </div>
             <div class="hud-center"><div id="score">0</div></div>
             <div class="hud-right">
@@ -415,7 +443,7 @@
                 <button id="pauseBtn" class="icon-btn" aria-label="Pause">⏸</button>
             </div>
             <div id="combo"><div class="row"><span id="comboMult">×1</span><span id="comboCount"></span></div><div class="combobar"><div id="comboFill"></div></div></div>
-            <button id="superBtn" aria-label="Super"><span>⚡</span><b>SUPER!</b></button>
+            <button id="superBtn" aria-label="Super"><span>⚡</span><b>SUPER</b><small>SPACE</small></button>
         </div>
 
         <div id="bossBar" hidden>
@@ -469,7 +497,7 @@
             <div class="lu">
                 <h2 id="levelupTitle">LEVEL 2!</h2>
                 <p id="levelupSub">Spend coins on upgrades</p>
-                <div id="shopCoins"><i class="coin"></i> 0</div>
+                <div id="shopCoins"><i class="i-coin"></i> 0</div>
                 <div id="cards"></div>
                 <button id="continueBtn" class="btn primary">CONTINUE ▶</button>
                 <p class="shop-hint desktop-only"><kbd>1</kbd>–<kbd>4</kbd> buy · <kbd>Enter</kbd> continue</p>
@@ -558,5 +586,6 @@
     <script src="js/sprites.js"></script>
     <script src="js/profile.js"></script>
     <script src="js/meta.js"></script>
+    <script src="js/pets.js"></script>
 </body>
 </html>

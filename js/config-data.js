@@ -19,7 +19,7 @@ const DISPLAY_FONT = '"Lilita One","Arial Rounded MT Bold",system-ui,sans-serif'
 const CLASSES = {
     wizard: {
         name: 'Wizard', icon: '🧙', hearts: 2, speed: 2.86, power: 2, primary: 'bolt', color: '#8b5cf6',
-        weapon: 'Magic Bolt', blurb: 'Auto-aiming magic bolts', superName: 'Arcane Nova', superBlurb: 'Rings of giant piercing bolts'
+        weapon: 'Magic Bolt', blurb: 'Auto-aiming magic bolts', superName: 'Arcane Barrage', superBlurb: 'A stream of fireballs at the nearest monsters'
     },
     barbarian: {
         name: 'Barbarian', icon: '🪓', hearts: 4, speed: 4.2, power: 5, primary: 'cleave', color: '#f97316',
@@ -27,7 +27,7 @@ const CLASSES = {
     },
     goblin: {
         name: 'Goblin', icon: '💣', hearts: 3, speed: 5.2, power: 4, primary: 'grenade', color: '#22c55e',
-        weapon: 'Grenades', blurb: 'Lobbed bombs with a big boom', superName: 'Bombardment', superBlurb: 'Its raininng bombs'
+        weapon: 'Grenades', blurb: 'Lobbed bombs with a big boom', superName: 'Bombardment', superBlurb: "It's raining bombs!"
     }
 };
 const CLASS_ORDER = ['wizard', 'barbarian', 'goblin'];
@@ -95,9 +95,9 @@ const POWERUPS = {
 const TIMED_POWERUPS = Object.keys(POWERUPS).filter(k => POWERUPS[k].timed);
 const POISON_RADIUS = 140;
 // UI icons (CSS-drawn, match the canvas drops): a coin, a pouch = a pile of coins, a gem
-const COIN = '<i class="coin"></i>';
-const POUCH = '<i class="pouch"></i>';
-const GEM = '<i class="gem"></i>';
+const COIN = '<i class="i-coin"></i>';
+const POUCH = '<i class="i-pouch"></i>';
+const GEM = '<i class="i-gem"></i>';
 
 // Permanent shop cards. Price = cost × 3 × (1 + 0.75 × rank already owned) — a finite sink (D3).
 const UPGRADES = [
@@ -165,22 +165,29 @@ const TIERS = [
     { name: 'legendary', label: 'Legendary', color: '#f59e0b' },
     { name: 'mythic', label: 'Mythic', color: '#e879f9' }
 ];
-// Artefacts are collected items: basic ones cost gold (or come from the rare in-run artefact card),
-// three of a tier merge into one of the next tier for gems. Up to MAX_SLOTS different ones are
-// slotted in the profile and only those are active in runs. values[tier] is the bonus in %.
-const ARTEFACT_PRICE = 1000;
+// Pets are collected in the profile: they hatch from eggs (gold or boss drops), three of a kind and
+// tier merge into the next tier for gems, and the ones in the pet slots come along on hunts.
+// values[tier] is the pet's number at that tier (see `label`). Mirrors leaderboard/lambda/catalog.mjs.
 const MERGE_GEMS = [0, 0, 2, 5, 15];
 const MAX_SLOTS = 4;
-const ARTEFACTS = {
-    greed: { icon: '💍', name: 'Greed Ring', stat: 'gold', what: 'gold', values: [0, 1, 2, 3, 4] },
-    whetstone: { icon: '🪨', name: 'Whetstone', stat: 'damage', what: 'damage', values: [0, 1, 2, 3, 4] },
-    rune: { icon: '🌀', name: 'Quickening Rune', stat: 'rate', what: 'attack speed', values: [0, 1, 2, 3, 4] },
-    shard: { icon: '🔷', name: 'Storm Shard', stat: 'charge', what: 'super charge', values: [0, 2, 4, 6, 8] },
-    boots: { icon: '🥾', name: 'Wind Boots', stat: 'speed', what: 'move speed', values: [0, 1, 2, 3, 4] },
-    idol: { icon: '🗿', name: 'Luck Idol', stat: 'luck', what: 'drop chance', values: [0, 2, 4, 6, 8] },
-    charm: { icon: '🧿', name: 'Road Charm', stat: 'road', what: 'road speed', values: [0, -2, -4, -6, -8] },
-    hourglass: { icon: '⏳', name: 'Hourglass', stat: 'timed', what: 'timed effects', values: [0, 2, 4, 6, 8] },
-    amulet: { icon: '🛡️', name: 'Guardian Amulet', stat: 'guard', what: 'chance to ignore a hit', values: [0, 1, 2, 3, 4] }
+const SLOT_UNLOCK = [null, null, { gold: 1000 }, { gems: 100 }, { gems: 1000 }];
+const EGG_PRICE = 1000;
+const NESTS = 2;
+const HATCH_MS = 6 * 3600 * 1000;
+const HURRY_GEMS_PER_HOUR = 1;
+const EGG_ODDS = { gold: [80, 16, 3.5, 0.5], boss: [55, 30, 12, 3] };
+const EGGS = {
+    gold: { icon: '🥚', name: 'Pet Egg', color: '#fde68a' },
+    boss: { icon: '🥚', name: 'Boss Egg', color: '#fb923c' }
+};
+const PETS = {
+    turtle: { icon: '🐢', name: 'Turtle', what: 'extra green hearts that take hits first', values: [0, 1, 2, 3, 4], label: v => `+${v} green ${v > 1 ? 'hearts' : 'heart'}` },
+    bees: { icon: '🐝', name: 'Bees', what: 'each bee stings a monster near you every 2 s', values: [0, 1, 2, 4, 8], label: v => `${v} ${v > 1 ? 'bees' : 'bee'}` },
+    eagle: { icon: '🦅', name: 'Eagle', what: 'dives on wounded monsters every 3 s', values: [0, 2, 4, 8, 16], label: v => `${v} damage dives` },
+    frog: { icon: '🐸', name: 'Frog', what: 'swallows a monster whole every 4 s', values: [0, 2, 4, 8, 16], label: v => `eats up to ${v} HP` },
+    donkey: { icon: '🫏', alt: '🐴', name: 'Donkey', what: 'kicks monsters away before they reach you', values: [0, 2.5, 1.6, 1, 0.5], label: v => `a kick every ${v} s` },
+    squirrel: { icon: '🐿️', name: 'Squirrel', what: 'chance that a kill drops double loot', values: [0, 1, 2, 4, 8], label: v => `${v}% double drops` },
+    bunny: { icon: '🐇', name: 'Bunny', what: 'chance to drop a heart when you get hit', values: [0, 5, 10, 15, 20], label: v => `${v}% heart on a hit` }
 };
 const SKIN_PRICES = { basic: { gold: 300 }, rare: { gold: 2000 }, legendary: { gems: 25 }, mythic: { gems: 60 } };
 // What a skin adds in runs (rare and up): a small themed bonus, same stat keys as artefacts.

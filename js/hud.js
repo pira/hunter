@@ -26,9 +26,10 @@ extendGame({
     updateHud() {
         if (this.state === 'menu') return;
         const p = this.player;
-        this.setHtml('hearts', this.el.hearts, p.maxHp > 8
+        const green = p.greenMax ? Array.from({ length: p.greenMax }, (_, i) => `<span class="${i < p.greenHp ? 'full' : 'empty'}">${i < p.greenHp ? '💚' : '🤍'}</span>`).join('') : '';
+        this.setHtml('hearts', this.el.hearts, (p.maxHp > 8
             ? `❤️ <b>${p.hp}</b>`
-            : Array.from({ length: p.maxHp }, (_, i) => `<span class="${i < p.hp ? 'full' : 'empty'}">${i < p.hp ? '❤️' : '🖤'}</span>`).join(''));
+            : Array.from({ length: p.maxHp }, (_, i) => `<span class="${i < p.hp ? 'full' : 'empty'}">${i < p.hp ? '❤️' : '🖤'}</span>`).join('')) + green);
         const phaseTag = { clear: ' ✓', encounter: ' ⚔️', loot: ' 🎁', travel: ' 🚩' }[this.phase] || '';
         this.setText('level', this.el.level, `LV ${this.level}${phaseTag}`);
         this.el.xpFill.style.width = `${(this.levelProgress() * 100).toFixed(1)}%`;
@@ -43,18 +44,24 @@ extendGame({
         this.el.comboFill.style.width = `${(this.comboTimer / this.comboWindow) * 100}%`;
         this.el.combo.style.transform = `translateX(-50%) scale(${1 + (this.comboPop || 0) * 0.25})`;
 
-        // Super meter: bar under the hearts fills with kills; the SUPER button pops up under the score.
-        const ready = this.superMeter >= 100 && this.whirl <= 0 && this.state === 'playing';
-        const pct = this.whirl > 0 ? (this.whirl / WHIRLWIND_STEPS) * 100 : this.superMeter;
-        this.el.superFill.style.width = `${pct.toFixed(1)}%`;
-        const superState = `${ready}:${this.whirl > 0}:${this.cls}`;
+        // Super: the ring in the lower right fills with kills, then turns into a round SUPER button.
+        const running = this.superRunning;
+        const ready = this.superMeter >= 100 && !running && this.state === 'playing';
+        let pct = this.superMeter;
+        if (this.whirl > 0) pct = (this.whirl / WHIRLWIND_STEPS) * 100;
+        else if (running) pct = this.barrage && this.barrage.left > 0 ? Math.min(100, this.barrage.left * 5) : Math.min(100, (this.bombRain.left / 50) * 100);
+        const pr = Math.round(pct);
+        if (this.hud.superPct !== pr) {
+            this.hud.superPct = pr;
+            this.el.superBtn.style.setProperty('--p', pr);
+        }
+        const superState = `${ready}:${running}:${this.cls}`;
         if (this.hud.super !== superState) {
             this.hud.super = superState;
-            this.el.superBar.classList.toggle('ready', ready);
-            this.el.superBar.classList.toggle('active', this.whirl > 0);
             this.el.superBtn.classList.toggle('ready', ready);
-            this.el.hud.classList.toggle('super-ready', ready);
-            this.el.superBtn.innerHTML = `<span>${CLASSES[this.cls].icon}</span><b>${CLASSES[this.cls].superName.toUpperCase()}!</b>${this.isTouch ? '' : '<small>SPACE</small>'}`;
+            this.el.superBtn.classList.toggle('active', running);
+            this.el.superBtn.title = CLASSES[this.cls].superName;
+            this.el.superBtn.innerHTML = `<span>${CLASSES[this.cls].icon}</span><b>SUPER</b>${this.isTouch ? '' : '<small>SPACE</small>'}`;
         }
         // Top-right: timed effects (countdown) → this level's cards (dashed) → owned upgrades (rank).
         const active = TIMED_POWERUPS.filter(t => this.timers[t] > 0);
@@ -150,7 +157,7 @@ extendGame({
             ['Time', U.formatTime(this.time)]
         ];
         if (this.gems > 0) stats.push(['Gems', `${GEM} ${this.gems}`]);
-        if (this.artCards.length) stats.push(['Artefacts', this.artCards.map(id => ARTEFACTS[id].icon).join('')]);
+        if (this.eggCards + this.bossEggs > 0) stats.push(['Eggs', '🥚'.repeat(Math.min(6, this.eggCards + this.bossEggs))]);
         this.el.finalStats.innerHTML = stats.map(([k2, v]) => `<div><span>${k2}</span><b>${v}</b></div>`).join('');
 
         let best = 0;
@@ -180,7 +187,7 @@ extendGame({
         const name = (id && id.name) || 'Hunter';
         this.el.submitStatus.textContent = 'Saving your hunt…';
         const entry = {
-            name, cls: this.cls, skin: this.skin || undefined, coins: Math.max(0, Math.floor(this.coins)), gems: this.gems || 0, artCards: this.artCards && this.artCards.length ? this.artCards : undefined, score: this.score, level: this.level, kills: this.kills,
+            name, cls: this.cls, skin: this.skin || undefined, coins: Math.max(0, Math.floor(this.coins)), gems: this.gems || 0, eggs: this.eggCards || undefined, bossEggs: this.bossEggs || undefined, score: this.score, level: this.level, kills: this.kills,
             combo: this.bestCombo, bosses: this.bossesSlain, duration: Math.max(1, Math.round(this.time))
         };
         const runId = this.runId;

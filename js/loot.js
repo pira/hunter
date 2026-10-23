@@ -2,7 +2,17 @@
 
 extendGame({
     dropLoot(m) {
-        const luck = this.luckMult;
+        this.dropLootOnce(m);
+        // Squirrel pet: sometimes the loot comes twice
+        if (!m.minion && this.doubleDropChance && Math.random() < this.doubleDropChance) {
+            this.dropCd = 0;
+            this.dropLootOnce(m, true);
+            this.floater(m.x, m.y - m.size - 16, '🐿️ ×2', '#fdba74', 14);
+        }
+    },
+
+    dropLootOnce(m, twice = false) {
+        const luck = this.luckMult * (twice ? 2 : 1);
         const [chance, base] = m.minion ? [0.15, 1] : COIN_DROPS[m.tier] || [0, 0];
         // Coins scale with monster HP (unlike v2), so late levels pay more.
         if (Math.random() < chance) this.spawnCoins(m.x, m.y, U.coinDrop(base, this.level, 0.8 + Math.random() * 0.4), 2.2);
@@ -40,6 +50,13 @@ extendGame({
         }
     },
 
+    /** A boss egg: picked up like a gem, hatches in the profile. */
+    spawnEgg(x, y) {
+        const a = Math.random() * TAU;
+        this.coinDrops.push({ x, y, z: 8, vx: Math.cos(a) * 1.5, vy: Math.sin(a) * 1.5, vz: 6, egg: true, value: 1, life: 2400, t: 0, spin: 0 });
+        this.floater(x, y - 44, '🥚 BOSS EGG!', '#fdba74', 22);
+    },
+
     /** Gems ride the coin physics but are worth a gem each, glow blue and live longer. */
     spawnGems(x, y, n) {
         for (let i = 0; i < n; i++) {
@@ -72,7 +89,12 @@ extendGame({
             c.x = U.clamp(c.x, 8, this.W - 8);
             c.y = Math.max(8, c.y);
             const d = Math.hypot(p.x - c.x, p.y - c.y);
-            if (c.t > 18 && d < p.r + 12 && c.gem) {
+            if (c.t > 18 && d < p.r + 12 && c.egg) {
+                c.life = 0;
+                this.bossEggs++;
+                this.floater(p.x, p.y - 40, '+1 🥚 hatch it in your profile', '#fdba74', 16);
+                Sfx.arpeggio([523, 784, 1046, 1568], 0.07, { type: 'triangle', volume: 0.12 });
+            } else if (c.t > 18 && d < p.r + 12 && c.gem) {
                 c.life = 0;
                 this.gems++;
                 this.floater(p.x, p.y - 34, '+1 💎', '#7dd3fc', 18);
@@ -182,6 +204,9 @@ extendGame({
             if (p.hp < p.maxHp) {
                 p.hp++;
                 this.floater(p.x, p.y - 36, '+❤️', '#ff6b8a', 22);
+            } else if (p.greenHp < p.greenMax) {
+                p.greenHp++; // red hearts full: the turtle's shell heals
+                this.floater(p.x, p.y - 36, '+💚', '#86efac', 22);
             } else {
                 this.spawnCoins(p.x, p.y, 5, 1.5); // full health: hearts turn into coins
                 this.floater(p.x, p.y - 36, 'Full health → 🪙', '#ffd60a', 16);
@@ -193,8 +218,12 @@ extendGame({
             this.activateStun();
         } else if (pu.type === 'overcharge') {
             this.floater(p.x, p.y - 36, 'OVERCHARGE!', def.color, 22);
-            this.superMeter = 99.9;
-            this.addCharge(1);
+            if (this.superMeter >= 100) {
+                this.activateSuper(true); // already full: fire one for free and stay charged
+            } else {
+                this.superMeter = 99.9;
+                this.addCharge(1);
+            }
             Sfx.play('powerup', { volume: 0.32, rate: 1.4 });
         }
     },

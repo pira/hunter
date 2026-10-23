@@ -3,7 +3,7 @@
 class Game {
     constructor() {
         // Version system (bumped by the pre-commit hook, see VERSION-README.md)
-        this.version = "3.2.5";
+        this.version = "3.3.0";
         this.buildDate = "2026-10-23";
 
         this.canvas = document.getElementById('gameCanvas');
@@ -55,7 +55,7 @@ class Game {
         this.el = {
             hud: $('hud'), hearts: $('hearts'), level: $('levelLabel'), xpFill: $('xpFill'),
             score: $('score'), combo: $('combo'), comboMult: $('comboMult'), comboCount: $('comboCount'),
-            comboFill: $('comboFill'), powerups: $('powerups'), superBar: $('superBar'), superFill: $('superFill'), superBtn: $('superBtn'),
+            comboFill: $('comboFill'), powerups: $('powerups'), superBtn: $('superBtn'),
             classPicker: $('classPicker'),
             bossBar: $('bossBar'), bossName: $('bossName'), bossFill: $('bossFill'), bossTrail: $('bossTrail'),
             banner: $('banner'), menu: $('menu'), menuBoard: $('menuBoard'), menuBoardTitle: $('menuBoardTitle'),
@@ -508,7 +508,9 @@ class Game {
         this.coinsSpent = 0;
         this.coinFrac = 0;
         this.gems = 0;
-        this.artCards = [];
+        this.eggCards = 0;
+        this.bossEggs = 0;
+        this.petList = [];
         this.hits = 0;
         this.levelCoinsStart = 0;
         this.incomeEMA = 0;
@@ -537,7 +539,8 @@ class Game {
         this.whirlT = 0;
         if (this.whirlVoice) Sfx.fadeOut(this.whirlVoice, 0.1);
         this.whirlVoice = null;
-        this.novaQueue = null;
+        this.barrage = null;
+        this.bombRain = null;
         this.stormClock = 0;
         this.timers = Object.fromEntries(TIMED_POWERUPS.map(t => [t, 0]));
         this.stacks = {};
@@ -703,6 +706,7 @@ class Game {
 
         this.time += STEP / GAME_SPEED; // survival time in real seconds
         this.updatePlayer();
+        this.updatePets();
         this.updateWeapons();
         this.updateBullets();
         this.updateGrenades();
