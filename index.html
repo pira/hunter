@@ -193,7 +193,12 @@
         #coins, #gems { font-family: var(--display); font-size: 1.1em; color: var(--gold); text-shadow: 0 2px 0 rgba(0,0,0,.55); }
         .purse { display: flex; gap: 10px; align-items: baseline; }
         #gems { color: #7dd3fc; }
-        #sack { font-size: .78em; color: #fde68a; opacity: .85; font-family: var(--display); }
+        #sack { display: inline-flex; align-items: center; gap: .15em; font-size: .85em; color: #fde68a; font-family: var(--display); }
+        #sack[hidden] { display: none; }
+        #sack .sack-i { position: relative; display: inline-block; font-size: 1.3em; line-height: 1; }
+        #sack .sack-i b { position: absolute; left: 50%; top: -.55em; transform: translateX(-50%); font-size: .55em; }
+        #sack.bump .sack-i { animation: sackBump .22s ease-out; }
+        @keyframes sackBump { 50% { transform: scale(1.35) rotate(-8deg); } }
         #shopCoins { font-family: var(--display); font-size: 1.6em; color: var(--gold); text-shadow: 0 3px 0 rgba(0,0,0,.5); margin: -.4em 0 .6em; }
         #levelupSub .gold { color: var(--gold); font-weight: normal; font-family: var(--display); }
         #continueBtn { margin-top: 1.1em; }

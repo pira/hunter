@@ -78,12 +78,22 @@ extendGame({
             (hidden > 0 ? `<button class="up more" data-more="1" aria-label="All upgrades">+${hidden}</button>` : ''));
         this.setHtml('coins', this.el.coins, `${COIN} ${this.coins}`);
         const sack = this.roadSack || {};
-        const sackTxt = sack.coins || sack.gems || sack.eggs
-            ? `👑 ${sack.coins ? `${COIN}${sack.coins}` : ''}${sack.gems ? ` ${GEM}${sack.gems}` : ''}${sack.eggs ? ` 🥚${sack.eggs}` : ''}` : '';
+        // the boss sack: a crowned pouch collecting what the road took (shown as soon as something flies in)
+        const flying = this.sackFlights && this.sackFlights.length;
+        const sackTxt = sack.coins || sack.gems || sack.eggs || flying
+            ? `<span class="sack-i">${POUCH}<b>👑</b></span>${sack.coins || ''}${sack.gems ? ` ${GEM}${sack.gems}` : ''}${sack.eggs ? ` 🥚${sack.eggs}` : ''}` : '';
         if (this.hud.sack !== sackTxt) {
             this.hud.sack = sackTxt;
             this.el.sack.hidden = !sackTxt;
             this.el.sack.innerHTML = sackTxt;
+        }
+        if (this.sackBump > 0) {
+            if (this.sackBump === 12) {
+                this.el.sack.classList.remove('bump');
+                void this.el.sack.offsetWidth;
+                this.el.sack.classList.add('bump');
+            }
+            this.sackBump--;
         }
         if (this.gems > 0) {
             this.el.gems.hidden = false;

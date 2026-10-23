@@ -3,7 +3,7 @@
 class Game {
     constructor() {
         // Version system (bumped by the pre-commit hook, see VERSION-README.md)
-        this.version = "3.3.3";
+        this.version = "3.3.4";
         this.buildDate = "2026-10-23";
 
         this.canvas = document.getElementById('gameCanvas');
@@ -509,6 +509,7 @@ class Game {
         this.coinFrac = 0;
         this.gems = 0;
         this.roadSack = { coins: 0, gems: 0, eggs: 0 };
+        this.sackFlights = [];
         this.eggCards = 0;
         this.bossEggs = 0;
         this.petList = [];
@@ -723,6 +724,7 @@ class Game {
         this.updateLevelFlow();
         this.updatePowerups();
         this.updateCoins();
+        this.updateSackFlights();
         this.updateCombo();
         this.updateParticles();
         this.updateSpawning();

@@ -106,6 +106,7 @@ extendGame({
         this.drawProjectiles(ctx);
         this.drawLightning(ctx);
         this.drawParticles(ctx);
+        this.drawSackFlights(ctx);
         this.drawFloaters(ctx);
         this.drawScreenFx(ctx);
         this.drawStick(ctx);

@@ -56,14 +56,63 @@ extendGame({
 
     /** The boss keeps what the road took: it drops it all when it dies. */
     toRoadSack(c) {
-        const s = this.roadSack || (this.roadSack = { coins: 0, gems: 0, eggs: 0 });
-        if (c.egg) s.eggs++;
-        else if (c.gem) s.gems++;
-        else s.coins += c.value;
         c.life = 0;
-        if (this.frameNo - (this.sackFloatAt || 0) > 30) {
-            this.sackFloatAt = this.frameNo;
-            this.floater(U.clamp(c.x, 40, this.W - 40), this.H - 26, '→ 👑', '#fde68a', 14, true);
+        // it flies up into the boss's sack in the HUD, and counts once it lands there
+        this.sackFlights = this.sackFlights || [];
+        const kind = c.egg ? 'egg' : c.gem ? 'gem' : 'coin';
+        this.sackFlights.push({ kind, value: c.value, sx: U.clamp(c.x, 10, this.W - 10), sy: this.H - 4, t: -Math.floor(Math.random() * 8), dur: 46 + Math.random() * 14, side: Math.random() < 0.5 ? -1 : 1 });
+    },
+
+    /** Where the boss sack sits in the HUD, in world coordinates (falls back to the coin purse). */
+    sackTarget() {
+        if (this.frameNo === this.sackTargetAt && this.sackTargetPos) return this.sackTargetPos;
+        this.sackTargetAt = this.frameNo;
+        const el = this.el.sack && !this.el.sack.hidden ? this.el.sack : this.el.coins;
+        const r = el.getBoundingClientRect();
+        const cr = this.canvas.getBoundingClientRect();
+        this.sackTargetPos = r.width
+            ? { x: (r.left + Math.min(r.width, 20) * 0.5 - cr.left) / this.scale - this.shakeX, y: (r.top + r.height * 0.5 - cr.top) / this.scale - this.shakeY }
+            : { x: 40, y: 80 };
+        return this.sackTargetPos;
+    },
+
+    updateSackFlights() {
+        const list = this.sackFlights;
+        if (!list || !list.length) return;
+        const s = this.roadSack || (this.roadSack = { coins: 0, gems: 0, eggs: 0 });
+        for (const f of list) {
+            if (++f.t < f.dur) continue;
+            if (f.kind === 'egg') s.eggs++;
+            else if (f.kind === 'gem') s.gems++;
+            else s.coins += f.value;
+            f.done = true;
+            this.sackBump = 12;
+            if (this.frameNo - (this.sackSfxAt || 0) > 3) {
+                this.sackSfxAt = this.frameNo;
+                Sfx.tone(1250 + Math.random() * 300, { duration: 0.05, type: 'triangle', volume: 0.04, bus: 'sfx' });
+            }
+        }
+        this.sackFlights = list.filter(f => !f.done);
+    },
+
+    /** Loot flying into the boss sack: up from the bottom edge on a curve, shrinking as it goes. */
+    drawSackFlights(ctx) {
+        const list = this.sackFlights;
+        if (!list || !list.length) return;
+        const tg = this.sackTarget();
+        for (const f of list) {
+            if (f.t < 0) continue;
+            const k = f.t / f.dur;
+            const e = 1 - Math.pow(1 - k, 2.2);
+            const cx = (f.sx + tg.x) / 2 + f.side * 90;
+            const cy = Math.min(f.sy, tg.y) + (f.sy - tg.y) * 0.25;
+            const x = (1 - e) * (1 - e) * f.sx + 2 * (1 - e) * e * cx + e * e * tg.x;
+            const y = (1 - e) * (1 - e) * f.sy + 2 * (1 - e) * e * cy + e * e * tg.y;
+            const sc = 1 - 0.45 * e;
+            if (f.kind === 'gem') this.drawGem(ctx, x, y, 6 * sc, this.frameNo, y, false);
+            else if (f.kind === 'egg') this.drawEggAt(ctx, x, y, 0.8 * sc, this.frameNo, null, '#fdba74');
+            else if (f.value > 1) this.drawPouchAt(ctx, x, y, 0.9 * sc, String(f.value));
+            else this.drawCoinAt(ctx, x, y, 5 * sc);
         }
     },
 
