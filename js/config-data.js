@@ -42,28 +42,52 @@ const GRENADE_G = 0.5; // grenade gravity (px/step²) for the bounce arcs
 const WHIRLWIND_STEPS = Math.round(5 * 60 * GAME_SPEED);
 const STORM = { duration: Math.round(15 * 60 * GAME_SPEED), every: Math.round(3 * 60 * GAME_SPEED), range: 260, jump: 120, jumps: 5, damage: 6, falloff: 0.65 };
 
+// Monsters (v3.5): five families, each with ranks that grow tougher by tier — Undead, Beasts,
+// Fantasy (trolls & ogres), Bandits, Bugs. Drawn by js/mobs.js; stats follow the old shapes per tier.
+// rank 1 grunt (small) · 2 soldier (medium) · 3 officer (large) · 4 leader (elite) · 5–8 champions
+// (legendary … ultimate: the leader with a crown and a tier-coloured glow).
+const MOB_FAMILIES = {
+    undead: { color: '#e7e5e4', names: ['Skeleton', 'Skeleton Soldier', 'Skeleton Officer', 'Skeleton General', 'Bone Lord', 'Lich Knight', 'Death Knight', 'Skeleton Emperor'] },
+    beasts: { color: '#8b7d6b', names: ['Wolf Pup', 'Dire Wolf', 'Werewolf', 'Alpha Wolf', 'Wolf King', 'Moon Wolf', 'Fenrir', 'Great Fenrir'] },
+    fantasy: { color: '#65a30d', names: ['Trollkin', 'Troll', 'Ogre', 'Ogre Warlord', 'Troll King', 'Mountain Troll', 'Ogre Titan', 'Giant King'] },
+    bandits: { color: '#a16207', names: ['Thug', 'Bandit', 'Bandit Captain', 'Bandit Lord', 'Bandit King', 'Pirate King', 'Outlaw Emperor', 'Legend of the Road'] },
+    bugs: { color: '#15803d', names: ['Beetle', 'Spider', 'Scorpion', 'Mantis', 'Brood Queen', 'Hive Empress', 'Ancient Queen', 'World Eater'] }
+};
+const MOB_FAMILY_ORDER = ['undead', 'beasts', 'fantasy', 'bandits', 'bugs'];
+// each biome is home to two families (they show up three times as often there)
+const BIOME_FAMILIES = {
+    meadow: ['beasts', 'bugs'], pines: ['beasts', 'bandits'], lakes: ['bugs', 'fantasy'], hills: ['bandits', 'fantasy'],
+    autumn: ['beasts', 'undead'], swamp: ['bugs', 'fantasy'], snow: ['beasts', 'undead'], canyon: ['bandits', 'bugs'],
+    volcano: ['fantasy', 'undead'], crystal: ['bugs', 'undead'], night: ['undead', 'beasts']
+};
+const mob = (family, rank, stats) => ({ family, rank, name: MOB_FAMILIES[family].names[rank - 1], color: MOB_FAMILIES[family].color, shape: 'circle', ...stats });
 const MONSTER_TYPES = {
     small: [
-        { shape: 'circle', color: '#8B0000', size: 11, speed: 1.5, speedVariation: 0.5, health: 1, name: 'Imp', points: 10 },
-        { shape: 'square', color: '#4B0082', size: 8, speed: 1.6, speedVariation: 0.4, health: 1, name: 'Shadow', points: 10 },
-        { shape: 'triangle', color: '#006400', size: 9, speed: 1.6, speedVariation: 0.5, health: 1, name: 'Goblin', points: 10 },
-        { shape: 'diamond', color: '#8B4513', size: 10, speed: 1.4, speedVariation: 0.4, health: 1, name: 'Kobold', points: 10 }
+        mob('undead', 1, { size: 10, speed: 1.5, speedVariation: 0.5, health: 1, points: 10 }),
+        mob('beasts', 1, { size: 9, speed: 1.6, speedVariation: 0.5, health: 1, points: 10 }),
+        mob('fantasy', 1, { size: 11, speed: 1.4, speedVariation: 0.4, health: 1, points: 10 }),
+        mob('bandits', 1, { size: 10, speed: 1.5, speedVariation: 0.4, health: 1, points: 10 }),
+        mob('bugs', 1, { size: 8, speed: 1.6, speedVariation: 0.4, health: 1, points: 10 })
     ],
     medium: [
-        { shape: 'star', color: '#DC143C', size: 14, speed: 1.2, speedVariation: 0.3, health: 2, name: 'Demon', points: 25 },
-        { shape: 'hexagon', color: '#8A2BE2', size: 12, speed: 1.3, speedVariation: 0.4, health: 2, name: 'Wraith', points: 25 },
-        { shape: 'cross', color: '#228B22', size: 13, speed: 1.1, speedVariation: 0.3, health: 3, name: 'Troll', points: 25 }
+        mob('undead', 2, { size: 13, speed: 1.2, speedVariation: 0.3, health: 2, points: 25 }),
+        mob('beasts', 2, { size: 13, speed: 1.3, speedVariation: 0.4, health: 2, points: 25 }),
+        mob('fantasy', 2, { size: 14, speed: 1.1, speedVariation: 0.3, health: 3, points: 25 }),
+        mob('bandits', 2, { size: 12, speed: 1.3, speedVariation: 0.4, health: 2, points: 25 }),
+        mob('bugs', 2, { size: 12, speed: 1.25, speedVariation: 0.3, health: 2, points: 25 })
     ],
     large: [
-        { shape: 'spiky', color: '#FF4500', size: 15, speed: 0.8, speedVariation: 0.2, health: 5, name: 'Dragon Lord', points: 100 },
-        { shape: 'giant', color: '#800080', size: 19, speed: 1.0, speedVariation: 0.2, health: 4, name: 'Ancient One', points: 80 },
-        { shape: 'behemoth', color: '#2F4F4F', size: 17, speed: 0.7, speedVariation: 0.2, health: 6, name: 'Behemoth', points: 120 }
+        mob('undead', 3, { size: 15, speed: 0.9, speedVariation: 0.2, health: 5, points: 100 }),
+        mob('beasts', 3, { size: 17, speed: 1.0, speedVariation: 0.2, health: 4, points: 80 }),
+        mob('fantasy', 3, { size: 19, speed: 0.7, speedVariation: 0.2, health: 6, points: 120 }),
+        mob('bandits', 3, { size: 15, speed: 0.9, speedVariation: 0.2, health: 5, points: 100 }),
+        mob('bugs', 3, { size: 17, speed: 0.8, speedVariation: 0.2, health: 5, points: 100 })
     ],
-    elite: [{ shape: 'aura', color: '#FFD700', size: 20, speed: 1.4, speedVariation: 0.5, health: 3, name: 'Elite Guard', points: 50 }],
-    legendary: [{ shape: 'aura', color: '#FF1493', size: 24, speed: 1.5, speedVariation: 0.3, health: 10, name: 'Legendary Beast', points: 150 }],
-    mythic: [{ shape: 'aura', color: '#00FFFF', size: 28, speed: 1.8, speedVariation: 0.4, health: 14, name: 'Mythic Titan', points: 250 }],
-    ancient: [{ shape: 'aura', color: '#FF00FF', size: 34, speed: 2.2, speedVariation: 0.5, health: 20, name: 'Ancient Horror', points: 400 }],
-    ultimate: [{ shape: 'aura', color: '#FFFFFF', size: 40, speed: 2.4, speedVariation: 0.4, health: 50, name: 'Ultimate Destroyer', points: 1000 }]
+    elite: MOB_FAMILY_ORDER.map(f => mob(f, 4, { size: 20, speed: 1.4, speedVariation: 0.5, health: 3, points: 50 })),
+    legendary: MOB_FAMILY_ORDER.map(f => mob(f, 5, { size: 24, speed: 1.5, speedVariation: 0.3, health: 10, points: 150, glow: '#FF1493' })),
+    mythic: MOB_FAMILY_ORDER.map(f => mob(f, 6, { size: 28, speed: 1.8, speedVariation: 0.4, health: 14, points: 250, glow: '#00FFFF' })),
+    ancient: MOB_FAMILY_ORDER.map(f => mob(f, 7, { size: 34, speed: 2.2, speedVariation: 0.5, health: 20, points: 400, glow: '#FF00FF' })),
+    ultimate: MOB_FAMILY_ORDER.map(f => mob(f, 8, { size: 40, speed: 2.4, speedVariation: 0.4, health: 50, points: 1000, glow: '#FFFFFF' }))
 };
 const TIER_UNLOCK = { elite: 6, legendary: 11, mythic: 16, ancient: 22, ultimate: 28 };
 const DROP_CHANCE = { small: 0.004, medium: 0.01, large: 0.03, elite: 0.06, legendary: 0.1, mythic: 0.14, ancient: 0.2, ultimate: 0.4 };

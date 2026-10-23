@@ -3,7 +3,7 @@
 class Game {
     constructor() {
         // Version system (bumped by the pre-commit hook, see VERSION-README.md)
-        this.version = "3.4.0";
+        this.version = "3.5.0";
         this.buildDate = "2026-10-23";
 
         this.canvas = document.getElementById('gameCanvas');
@@ -26,7 +26,6 @@ class Game {
         this.attract = [];
 
         Sfx.init();
-        Sfx.prewarm(Object.entries(MONSTER_TYPES).flatMap(([tier, list]) => list.map(t => [t.name, tier])));
         this.bindDom();
         this.setupInput();
         this.setupPlatform();

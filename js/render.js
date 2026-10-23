@@ -472,6 +472,7 @@ extendGame({
     },
 
     drawMonster(ctx, m) {
+        if (m.family) return this.drawFamilyMob(ctx, m);
         const squash = 1 + Math.sin(m.phase) * 0.06;
         const fill = m.flash > 0 ? '#ffffff' : m.color;
         ctx.save();
@@ -524,6 +525,40 @@ extendGame({
         if (m.hp < m.maxHp && !m.dead) {
             const w = Math.min(m.size * 2.4, 6 * m.maxHp + 8);
             const y = m.y - m.size * 1.25 - 8;
+            const pct = U.clamp(m.hp / m.maxHp, 0, 1);
+            ctx.fillStyle = 'rgba(0,0,0,0.55)';
+            ctx.fillRect(m.x - w / 2 - 1, y - 1, w + 2, 6);
+            ctx.fillStyle = pct > 0.5 ? '#4cd964' : pct > 0.25 ? '#ffcc00' : '#ff3b30';
+            ctx.fillRect(m.x - w / 2, y, w * pct, 4);
+        }
+    },
+
+    drawFamilyMob(ctx, m) {
+        if (m.spawnT > 0) ctx.globalAlpha = 0.6; // just arrived: harmless for a moment
+        this.drawMob(ctx, m);
+        ctx.globalAlpha = 1;
+        const tint = (color, a) => {
+            ctx.globalAlpha = a;
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.ellipse(m.x, m.y, m.size * 0.9, m.size * 1.05, 0, 0, TAU);
+            ctx.fill();
+            ctx.globalAlpha = 1;
+        };
+        if (m.poison > 0) tint('#84cc16', 0.3);
+        if (this.timers && (m.iced || this.mobSpeedMult < 1)) tint('#bfefff', 0.3);
+        if (m.stun > 0) {
+            ctx.fillStyle = '#fde047';
+            for (let i = 0; i < 3; i++) {
+                const a = this.frameNo * 0.15 + (i * TAU) / 3;
+                ctx.beginPath();
+                ctx.arc(m.x + Math.cos(a) * m.size * 0.9, m.y - m.size * 1.2 - 4 + Math.sin(a) * 3, 2.5, 0, TAU);
+                ctx.fill();
+            }
+        }
+        if (m.hp < m.maxHp && !m.dead) {
+            const w = Math.min(m.size * 2.4, 6 * m.maxHp + 8);
+            const y = m.y - m.size * 1.35 - 8;
             const pct = U.clamp(m.hp / m.maxHp, 0, 1);
             ctx.fillStyle = 'rgba(0,0,0,0.55)';
             ctx.fillRect(m.x - w / 2 - 1, y - 1, w + 2, 6);

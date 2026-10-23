@@ -14,9 +14,15 @@ extendGame({
         return 'large';
     },
 
+    /** A monster of this tier: the biome's two home families turn up three times as often. */
     pickType(tier) {
         const list = MONSTER_TYPES[tier];
-        return { ...list[Math.floor(Math.random() * list.length)], tier };
+        const home = (this.biome && BIOME_FAMILIES[this.biome.id]) || [];
+        const weights = list.map(t => (home.includes(t.family) ? 3 : 1));
+        let r = Math.random() * weights.reduce((a, b) => a + b, 0);
+        let i = 0;
+        while (i < list.length - 1 && (r -= weights[i]) >= 0) i++;
+        return { ...list[i], tier };
     },
 
     makeMonster(type, x, y, behavior) {
@@ -26,7 +32,7 @@ extendGame({
             x, y, kbx: 0, kby: 0, type,
             size: type.size + Math.random() * type.size * 0.25,
             speed: (type.speed + Math.random() * type.speedVariation) * levelSpeed,
-            color: type.color, shape: type.shape, name: type.name, tier: type.tier,
+            color: type.color, shape: type.shape, name: type.name, tier: type.tier, family: type.family, rank: type.rank, glow: type.glow,
             hp, maxHp: hp, points: type.points,
             behavior: behavior || (Math.random() < 0.3 + Math.min(0.3, this.level * 0.01) ? 'chase' : 'random'),
             dir: Math.PI / 2 + (Math.random() - 0.5) * 1.6,
@@ -279,7 +285,8 @@ extendGame({
             if (m.boss) this.startBossDeath(m);
             else this.killMonster(m);
         } else if (sound) {
-            Sfx.hit(m.size, { volume: m.boss ? 0.3 : 0.22, flavor: sound });
+            if (m.family) Sfx.mobHit(m.family, m.size);
+            else Sfx.hit(m.size, { volume: m.boss ? 0.3 : 0.22, flavor: sound });
         }
     },
 
@@ -318,10 +325,9 @@ extendGame({
         if (m.boss) {
             this.bossDefeated(m);
         } else {
-            // Every monster type has its own procedurally generated voice.
-            const loud = m.gk || (m.tier !== 'small' && m.tier !== 'medium');
-            Sfx.creature(m.name, m.minion ? 'small' : m.gk ? 'legendary' : m.tier, { volume: loud ? 0.6 : 0.42, size: m.size });
-            if (!loud) Sfx.play('monsterDeath', { volume: 0.22, rate: 1.3 + Math.random() * 0.4 });
+            // each family has its own death sound; gatekeepers and champions fall heavier
+            const big = m.gk || (m.tier !== 'small' && m.tier !== 'medium');
+            Sfx.mobDeath(m.family || (m.gk ? 'fantasy' : 'beasts'), m.size, { volume: big ? 0.7 : 0.55, big });
         }
         if (m.onDeath) m.onDeath(m);
         this.dropLoot(m);

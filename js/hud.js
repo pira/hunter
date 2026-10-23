@@ -169,6 +169,11 @@ extendGame({
             this.player = { x: 0, y: 80 };
             this.drawBoss(icon, fake);
             this.player = save;
+        } else if (killer.family && MobArt[killer.family]) {
+            icon.lineJoin = 'round';
+            icon.ow = Math.max(1, size * 0.1);
+            icon.translate(0, -size * 0.1);
+            MobArt[killer.family](icon, killer.rank || 1, size, 0);
         } else {
             Game.drawShape(icon, killer.shape === 'aura' ? 'circle' : killer.shape, size, killer.color);
             this.drawEyes(icon, { ...killer, spawnT: 0, dir: Math.PI / 2 }, size);

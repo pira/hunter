@@ -687,7 +687,7 @@ extendGame({
     lichAdds(b, n) {
         for (let i = 0; i < n; i++) {
             const a = (i / n) * TAU;
-            const m = this.makeMonster({ name: 'Skeleton', shape: 'skull', color: '#e7e5e4', size: 12, speed: 1.1, speedVariation: 0.3, health: 3, points: 20, tier: 'medium' }, b.x + Math.cos(a) * 70, b.y + Math.sin(a) * 70, 'chase');
+            const m = this.makeMonster({ name: 'Skeleton', family: 'undead', rank: 1, shape: 'skull', color: '#e7e5e4', size: 12, speed: 1.1, speedVariation: 0.3, health: 3, points: 20, tier: 'medium' }, b.x + Math.cos(a) * 70, b.y + Math.sin(a) * 70, 'chase');
             Object.assign(m, { lichAdd: b, minion: true, spawnT: 30, enc: b.enc, hp: Math.round(3 * U.hpScale(this.level)), maxHp: Math.round(3 * U.hpScale(this.level)) });
             this.monsters.push(m);
         }

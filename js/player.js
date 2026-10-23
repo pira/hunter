@@ -200,7 +200,7 @@ extendGame({
         if (p.hp <= 0) {
             this.die(source);
         } else {
-            Sfx.play('playerHit', { volume: 0.9 });
+            Sfx.playerHurt();
         }
     },
 
@@ -214,6 +214,6 @@ extendGame({
         this.burst(p.x, p.y, '#ffffff', 40, 7);
         this.burst(p.x, p.y, '#b388ff', 30, 5);
         this.ring(p.x, p.y, 120, '#ffffff', 40);
-        Sfx.play('playerHit', { volume: 0.9, rate: 0.8 });
+        Sfx.playerHurt(0.8);
     }
 });

@@ -3,7 +3,7 @@
 // Graph:  voice -> bus (sfx | ui | voice | music) -> master -> limiter -> destination
 // - Voice manager: global cap, per-sound polyphony with oldest-voice stealing, priorities,
 //   throttles, and nodes disconnected as soon as they end.
-// - Synth sounds (tones, arpeggios, crackle, creature voices, hit thwacks) are rendered into
+// - Synth sounds (tones, arpeggios, crackle, monster hits and deaths) are rendered into
 //   AudioBuffers in plain JS once and cached, then played through the same voice manager.
 // - Health watchdog: resumes interrupted contexts, detects a "zombie" context whose clock has
 //   stopped (dead output device after an AirPods switch) and rebuilds it from cached bytes.
@@ -12,9 +12,7 @@
     const SAMPLES = {
         shoot: { src: 'sfx/gunshot.mp3', poly: 3, throttle: 70 },
         swoosh: { src: 'sfx/sword-slice.mp3', poly: 2, throttle: 110 },
-        monsterDeath: { src: 'sfx/monster-death.mp3', poly: 4, throttle: 45 },
         bossDeath: { src: 'sfx/monster-cry.mp3', poly: 2, throttle: 120 },
-        playerHit: { src: 'sfx/man-scream-ahh.mp3', poly: 1, priority: 3 },
         powerup: { src: 'sfx/powerup.mp3', poly: 2, priority: 2 },
         boom: { src: 'sfx/boom.mp3', poly: 3, throttle: 60 },
         grenade: { src: 'sfx/grenade.mp3', poly: 2, throttle: 90 },
@@ -566,90 +564,130 @@
             this.startVoice(buf, { name: 'crackle', volume: volume * 2.2, bus: 'ui', poly: 1, priority: 2 });
         },
 
-        // ---- creatures: one deterministic voice per monster type, 3 seeded variants each
+        // ---- monster families (v3.5): a quiet hit sound and a louder death per family, no voices.
+        // Each is built from small pieces (clacks, thuds, rustles, clanks, squishes) and cached
+        // in 3 seeded variants.
 
-        creatureBuffer(type, tier, variant) {
-            const key = `cr:${type}:${variant}`;
-            if (this.synth[key]) return this.synth[key];
-            const r = rng(hash(type) + variant * 7919);
-            const spec = {
-                small: { len: 0.15 }, medium: { len: 0.25 }, large: { len: 0.5 }, elite: { len: 0.35 },
-                legendary: { len: 0.6 }, mythic: { len: 0.7 }, ancient: { len: 0.8 }, ultimate: { len: 0.9 }, boss: { len: 0.9 }
-            }[tier] || { len: 0.25 };
-            const len = spec.len * (0.9 + r() * 0.2);
-            return this.render(key, len + (['legendary', 'mythic', 'ancient', 'ultimate', 'boss'].includes(tier) ? 0.35 : 0.02), (d, rate) => {
-                const n = Math.floor(rate * len);
-                const env = (i, a = 0.01, curve = 1.5) => {
-                    const t = i / n;
-                    return t < a ? t / a : Math.pow(Math.max(0, 1 - (t - a) / (1 - a)), curve);
-                };
-                if (tier === 'small') {
-                    // squeak / chirp: up-then-down sweep with vibrato
-                    const f = 600 + r() * 300;
-                    const up = 1.2 + r() * 0.4;
+        mobBuffer(kind, family, variant) {
+            const secs = kind === 'hit' ? 0.12 : 0.75;
+            return this.render(`mob:${kind}:${family}:${variant}`, secs, (d, rate) => {
+                const r = rng(hash(family + kind) + variant * 977);
+                const at = t => Math.floor(t * rate);
+                /** Add a piece: noise and/or a falling sine with an exponential decay, filtered. */
+                const piece = (t0, { len, noise = 0, f0 = 0, f1 = f0, tone = 0, decay = 6, filter, q = 0.9, gain = 1 }) => {
+                    const n = at(len);
+                    const tmp = new Float32Array(n);
                     let ph = 0;
                     for (let i = 0; i < n; i++) {
                         const t = i / n;
-                        const bend = t < 0.3 ? 1 + (up - 1) * (t / 0.3) : up - (up - 0.7) * ((t - 0.3) / 0.7);
-                        ph += (f * bend * (1 + 0.04 * Math.sin(TAU * 38 * t))) / rate;
-                        d[i] = (Math.sin(TAU * ph) + 0.35 * Math.sin(TAU * ph * 2) + 0.15 * Math.sin(TAU * ph * 3)) * env(i, 0.05, 1.2);
+                        const e = Math.exp(-decay * t) * Math.min(1, i / (rate * 0.002));
+                        if (tone) {
+                            ph += (f0 + (f1 - f0) * t) / rate;
+                            tmp[i] += Math.sin(TAU * ph) * tone * e;
+                        }
+                        if (noise) tmp[i] += (r() * 2 - 1) * noise * e;
                     }
-                } else if (tier === 'medium') {
-                    // snarl: buzzy saw with 30 Hz amplitude modulation, falling pitch
-                    const f = 250 + r() * 150;
-                    osc(n, rate, 'sawtooth', f, f * 0.7, d);
-                    for (let i = 0; i < n; i++) d[i] = (d[i] * 0.6 + (r() * 2 - 1) * 0.25) * (0.55 + 0.45 * Math.sin(TAU * (28 + r() * 0.1) * i / rate)) * env(i, 0.04, 1.3);
-                    biquad(d, rate, 'lowpass', t => 2400 - 1400 * t, 1.4);
-                } else if (tier === 'large') {
-                    // roar: noise + low saw through a sweeping resonant low-pass
-                    const f = 90 + r() * 60;
-                    osc(n, rate, 'sawtooth', f * 1.15, f * 0.8, d, 0.5);
-                    for (let i = 0; i < n; i++) d[i] = (d[i] + (r() * 2 - 1) * 0.8) * env(i, 0.12, 1.1);
-                    const peak = 700 + r() * 400;
-                    biquad(d, rate, 'lowpass', t => 300 + peak * Math.sin(Math.PI * Math.min(1, t * 1.4)), 3);
-                } else if (tier === 'elite') {
-                    // metallic: ring modulation with an inharmonic ratio
-                    const fc = 300 + r() * 200;
-                    const fm = fc * (1.37 + r() * 0.5);
+                    if (filter) biquad(tmp, rate, filter[0], filter[1], q);
+                    const o = at(t0);
+                    for (let i = 0; i < n && o + i < d.length; i++) d[o + i] += tmp[i] * gain;
+                };
+                const clack = (t0, g = 1, f = 2200) => {
+                    piece(t0, { len: 0.03, noise: 0.6, tone: 0.8, f0: f * (0.9 + r() * 0.2), f1: f * 0.8, decay: 9, filter: ['bandpass', f, 3], gain: g });
+                };
+                const thud = (t0, g = 1, f = 120, len = 0.12) => {
+                    piece(t0, { len, noise: 0.5, tone: 1, f0: f, f1: f * 0.55, decay: 7, filter: ['lowpass', 700], gain: g });
+                };
+                const rustle = (t0, len, g = 1, f = 1400) => {
+                    piece(t0, { len, noise: 1, decay: 4, filter: ['bandpass', f, 0.7], gain: g });
+                };
+                if (kind === 'hit') {
+                    if (family === 'undead') {
+                        clack(0, 1, 2000 + r() * 500);
+                        clack(0.028 + r() * 0.01, 0.5, 2600);
+                    } else if (family === 'beasts') {
+                        thud(0, 0.9, 200, 0.07);
+                        rustle(0, 0.06, 0.4, 900);
+                    } else if (family === 'fantasy') {
+                        thud(0, 1, 130, 0.1);
+                    } else if (family === 'bandits') {
+                        rustle(0, 0.05, 0.9, 1600);
+                        thud(0, 0.5, 220, 0.05);
+                    } else {
+                        piece(0, { len: 0.025, noise: 1, decay: 10, filter: ['highpass', 3000] });
+                        clack(0.012, 0.5, 4200);
+                    }
+                } else if (family === 'undead') {
+                    // bones rattle apart and clatter to the ground
+                    let t = 0;
+                    const n = 7 + Math.floor(r() * 4);
                     for (let i = 0; i < n; i++) {
-                        const t = i / rate;
-                        d[i] = Math.sin(TAU * fc * t * (1 - 0.2 * i / n)) * Math.sin(TAU * fm * t) * env(i, 0.01, 2);
+                        clack(t, 1 - i / (n * 1.4), 2600 - i * 120 + r() * 500);
+                        t += 0.03 + r() * 0.05 * (1 - i / n);
                     }
+                    thud(t * 0.6, 0.5, 140);
+                } else if (family === 'beasts') {
+                    thud(0, 1, 110, 0.25);
+                    rustle(0.02, 0.3, 0.5, 700);
+                    thud(0.16 + r() * 0.04, 0.6, 85, 0.2);
+                } else if (family === 'fantasy') {
+                    thud(0, 1, 75, 0.4);
+                    piece(0.05, { len: 0.55, noise: 1, decay: 3.5, filter: ['lowpass', 320], gain: 0.9 }); // rumble
+                    for (let i = 0; i < 4; i++) clack(0.12 + r() * 0.3, 0.25, 700 + r() * 400); // pebbles
+                } else if (family === 'bandits') {
+                    // dropped weapon: a few inharmonic metal partials, then the body hits the ground
+                    for (const [f, g] of [[1250, 0.6], [2950, 0.4], [4170, 0.3]]) {
+                        piece(0, { len: 0.35, tone: g, f0: f * (0.97 + r() * 0.06), decay: 8 });
+                    }
+                    clack(0, 0.7, 3200);
+                    thud(0.12 + r() * 0.04, 0.9, 120, 0.2);
+                    rustle(0.12, 0.15, 0.3, 1000);
                 } else {
-                    // legendary and up: layered roar (two detuned saws + noise) with reverb
-                    const f = 70 + r() * 50;
-                    osc(n, rate, 'sawtooth', f * 1.2, f * 0.75, d, 0.4);
-                    osc(n, rate, 'sawtooth', f * 1.21 * 1.5, f * 0.76 * 1.5, d, 0.25);
-                    for (let i = 0; i < n; i++) d[i] = (d[i] + (r() * 2 - 1) * 0.7 * (1 - i / n)) * env(i, 0.15, 1);
-                    biquad(d, rate, 'lowpass', t => 400 + 1200 * Math.sin(Math.PI * Math.min(1, t * 1.2)), 2.5);
-                    reverb(d, rate, 0.35, 1.2);
+                    // squish: wet sweep down plus a couple of pops
+                    piece(0, { len: 0.22, noise: 1, decay: 5, filter: ['bandpass', 1400, 1.6] });
+                    piece(0, { len: 0.18, tone: 0.8, f0: 520, f1: 140, decay: 6 });
+                    clack(0.05 + r() * 0.03, 0.4, 900);
+                    clack(0.1 + r() * 0.04, 0.3, 700);
                 }
                 normalize(d, 0.85);
             });
         },
 
-        /** Render creature voices in the background, one buffer per tick, so first kills don't hitch. */
-        prewarm(list) {
-            if (!this.ctx) return;
-            const jobs = [];
-            list.forEach(([type, tier]) => { for (let v = 0; v < 3; v++) jobs.push([type, tier, v]); });
-            const next = () => {
-                const job = jobs.shift();
-                if (!job || !this.ctx) return;
-                this.creatureBuffer(...job);
-                setTimeout(next, 30);
-            };
-            setTimeout(next, 200);
+        /** Quiet hit on a monster that survives: bone clack, thud, cloth slap or chitin tick. */
+        mobHit(family, size = 12, { volume = 0.2 } = {}) {
+            if (!this.ctx || this.muted) return;
+            const now = performance.now();
+            if (now - (this.lastPlayed.hit || 0) < 35) return;
+            this.lastPlayed.hit = now;
+            const buf = this.mobBuffer('hit', family, Math.floor(Math.random() * 3));
+            const rate = Math.min(1.25, Math.max(0.75, 13 / Math.max(8, size))) * (0.94 + Math.random() * 0.12);
+            this.startVoice(buf, { name: 'hit', volume, rate, poly: 5, priority: 0 });
         },
 
-        /** A monster voice (death cry). `size` nudges pitch: bigger mob, lower voice. */
-        creature(type, tier, { volume = 0.5, size = 12 } = {}) {
+        /** Louder death: bones collapse, a heavy fall, a crumble, a dropped blade, a squish. */
+        mobDeath(family, size = 12, { volume = 0.55, big = false } = {}) {
             if (!this.ctx || this.muted) return;
-            const variant = Math.floor(Math.random() * 3);
-            const buf = this.creatureBuffer(type, tier, variant);
-            const rate = (1 + (Math.random() - 0.5) * 0.12) * Math.min(1.25, Math.max(0.8, 14 / Math.max(8, size) * 0.9 + 0.1));
-            const big = !['small', 'medium'].includes(tier);
-            this.startVoice(buf, { name: big ? 'cry:big' : 'cry', volume, rate, poly: big ? 2 : 4, priority: big ? 2 : 1 });
+            const buf = this.mobBuffer('death', family, Math.floor(Math.random() * 3));
+            const rate = Math.min(1.2, Math.max(0.65, 14 / Math.max(8, size) * 0.85 + 0.15)) * (0.95 + Math.random() * 0.1);
+            this.startVoice(buf, { name: big ? 'die:big' : 'die', volume, rate, poly: big ? 2 : 4, priority: big ? 2 : 1 });
+        },
+
+        /** Hero takes a hit: a punchy thump and a low falling tone (no voice). */
+        playerHurt(rate = 1) {
+            if (!this.ctx || this.muted) return;
+            const buf = this.render('playerHurt', 0.35, (d, sr) => {
+                const r = rng(99);
+                const n = Math.floor(sr * 0.3);
+                let ph = 0;
+                for (let i = 0; i < n; i++) {
+                    const t = i / n;
+                    ph += (330 - 200 * t) / sr;
+                    const e = Math.exp(-5 * t) * Math.min(1, i / (sr * 0.002));
+                    d[i] = (Math.sin(TAU * ph) * 0.7 + Math.sin(TAU * ph * 1.5) * 0.25) * e + (r() * 2 - 1) * Math.exp(-30 * t) * 0.9;
+                }
+                biquad(d, sr, 'lowpass', 1800, 0.9);
+                normalize(d, 0.9);
+            });
+            this.startVoice(buf, { name: 'playerHurt', volume: 0.7, rate, poly: 1, priority: 3 });
         },
 
         /** Impact thwack: filtered noise burst + falling sine, pitched by target size. */

@@ -39,9 +39,7 @@ boom            1.2   0.5   1  0
 grenade         0.6   0.25  1  -2
 gunshot         0.35  0.15  1  -3
 level-up        1.8   0.3   1  0
-man-scream-ahh  0.9   0.25  1  -1
 monster-cry     1.2   0.4   1  -1
-monster-death   0.44  0.12  1  0
 powerup         1.3   0.4   1  0
 sword-slice     0.5   0.2   1  -2
 game-over       45    3     2  -2

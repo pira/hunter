@@ -19,6 +19,7 @@ Pick a hero, run down the monster road through eleven biomes, chain kills into a
   - 🧙 *Wizard* — auto-aiming magic bolts; super **Arcane Barrage**: a stream of fireballs (10× your bolts, two a second, double damage), each at the nearest monster.
   - 🪓 *Barbarian* — 4 hearts, a cleave that hits everything in front; super **Whirlwind**: 5 s of invincible spinning.
   - 💣 *Goblin* — fastest runner, throws grenades in pairs; super **Bombardment**: 10× a normal throw rains down at random spots over 5 s.
+- **Monsters** come in five families — 💀 Undead, 🐺 Beasts, 👹 Fantasy (trolls & ogres), 🗡️ Bandits, 🪲 Bugs — and eight ranks (from Skeleton, Skeleton Soldier, Skeleton Officer, Skeleton General up to crowned, glowing champions like the Skeleton Emperor). Each biome favours two families. Every family has its own soft hit sound and a louder death (bones collapse, a heavy fall, a dropped blade, a squish).
 - **The road** scrolls down. Monsters come from the top and burst out of the bushes; loot drifts with the road and is gone once it leaves the bottom (it blinks first). Hiding at the very bottom works for three seconds only.
 - **Levels** fill with the damage you deal. When the bar is full: **CLEAR!** → finish the stragglers → the level's encounter → loot → through the gate into the next biome → shop.
   - Encounters: a **gatekeeper** (Shieldbearer, Splitter, Bomber, Charger, Totem, Archers) or a **coordinated wave** (V-formation, Pincer, Closing Ring, Stampede, Conga Snake, Monster Rain); a **small boss** at levels 5, 15, 25… (Bonecrusher, Hexweaver, Broodmother, Voidmaw) and a **big boss** at 10, 20, 30… (Gravelord, Stormcaller, Hydra, Lich). Bosses talk.
@@ -50,11 +51,12 @@ js/                 the game, as classic scripts mixed into one Game class (no b
   profile.js        identity and profile overlay  road.js     scrolling, biomes, background tiles
   encounters.js     level flow, gatekeepers, waves, hazards
   sprites.js        vector player characters (cached per class × skin × frame)
+  mobs.js           monster families drawn as cached vector sprites (tools/mobs/lineup.html shows them all)
   meta.js           banked gold, the wheel, the profile shop (pets, eggs, skins)
   pets.js           pets on the hunt
 game-utils.js       pure helpers shared with tests (level curve, combo tiers, …)
 audio.js            Web Audio engine: buses + limiter, voice manager, health watchdog,
-                    procedural creature voices and hit sounds (samples in sfx/)
+                    synth monster hits/deaths and hero hurt sound (samples in sfx/)
 manifest.webmanifest, icons/   PWA install (fullscreen on iPhone via Add to Home Screen)
 tools/audio/        prepare.sh rebuilds sfx/ from the originals in tools/audio/src/
 tools/icons/        make-icons.py renders icons/ with headless Chromium

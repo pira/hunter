@@ -1,0 +1,41 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Monster lineup</title>
+<!-- Every monster family and rank at its in-game size (and ×3), next to the hero, on grass and road. -->
+<style>body { margin: 0; background: #222; } canvas { display: block; }</style>
+<canvas id="c"></canvas>
+<script>const extendGame = o => Object.assign(window, o);</script>
+<script src="../../config.js"></script>
+<script src="../../game-utils.js"></script>
+<script src="../../js/config-data.js"></script>
+<script src="../../js/mobs.js"></script>
+<script>
+const tiers = ['small', 'medium', 'large', 'elite', 'legendary', 'mythic', 'ancient', 'ultimate'];
+const zoom = Number(new URLSearchParams(location.search).get('zoom') || 1);
+const cellW = 110 * zoom, cellH = 120 * zoom;
+const W = 150 + cellW * tiers.length, H = 60 + cellH * MOB_FAMILY_ORDER.length;
+const cv = document.getElementById('c');
+const dpr = window.devicePixelRatio || 1;
+cv.width = W * dpr; cv.height = H * dpr; cv.style.width = W + 'px'; cv.style.height = H + 'px';
+const ctx = cv.getContext('2d');
+window.dpr = dpr * zoom; window.scale = 1;
+ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+ctx.fillStyle = '#7cc56b'; ctx.fillRect(0, 0, W, H);
+ctx.fillStyle = '#d9b77e'; ctx.fillRect(150 + cellW * 2, 0, cellW * 3, H);
+ctx.font = 'bold 12px sans-serif'; ctx.fillStyle = '#111';
+tiers.forEach((t, i) => ctx.fillText(t, 160 + cellW * i, 18));
+MOB_FAMILY_ORDER.forEach((f, row) => {
+    ctx.fillStyle = '#111';
+    ctx.fillText(f, 10, 60 + cellH * row + cellH / 2);
+    tiers.forEach((t, col) => {
+        const type = MONSTER_TYPES[t].find(x => x.family === f);
+        const m = { ...type, size: type.size * 1.12, x: 150 + cellW * col + cellW / 2, y: 60 + cellH * row + cellH / 2, phase: 0, flash: 0 };
+        ctx.save();
+        ctx.translate(m.x, m.y); ctx.scale(zoom, zoom); ctx.translate(-m.x, -m.y);
+        drawMob(ctx, m);
+        ctx.restore();
+        ctx.font = '10px sans-serif'; ctx.fillStyle = '#111';
+        ctx.fillText(`${type.name} (${type.health}hp)`, 150 + cellW * col + 4, 60 + cellH * row + cellH - 8);
+    });
+});
+</script>
