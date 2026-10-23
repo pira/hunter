@@ -237,7 +237,7 @@ extendGame({
         const pets = player.pets || {};
         const slotCount = player.petSlotCount || 1;
         const slots = this.activePets(player);
-        const eggs = player.eggs || {};
+        const eggs = typeof player.eggs === 'number' ? player.eggs : ((player.eggs && player.eggs.gold) || 0) + ((player.eggs && player.eggs.boss) || 0);
         const nests = player.nests || [];
         const skins = player.skins || {};
         const equipped = player.equipped || {};
@@ -263,20 +263,20 @@ extendGame({
         }).join('');
 
         // nests: warming eggs with a countdown; empty nests take an egg
-        const nestBoxes = !mine ? '' : Array.from({ length: NESTS }, (_, i) => {
+        // the hatchery (eggs already warming in an old second nest still show and hatch)
+        const nestBoxes = !mine ? '' : Array.from({ length: Math.max(NESTS, nests.length) }, (_, i) => {
             const n = nests[i];
             if (!n) {
-                const opts = Object.keys(EGGS).filter(t => eggs[t] > 0)
-                    .map(t => `<button class="buy" data-warm="${t}" ${off}>${EGGS[t].name}</button>`).join('');
+                const opts = eggs > 0 ? `<button class="buy" data-warm="1" ${off}>Warm an egg</button>` : '';
                 return `<div class="nest empty"><span class="ni">🪹</span>${opts || '<small>no eggs yet</small>'}</div>`;
             }
             const left = n.start + HATCH_MS - Date.now();
-            if (left <= 0) return `<div class="nest ready" style="--e:${EGGS[n.type].color}"><span class="ni wobble">🥚</span><button class="buy hatch" data-hatch="${n.id}" ${off}>Hatch!</button></div>`;
+            if (left <= 0) return `<div class="nest ready" style="--e:#fde68a"><span class="ni wobble">🥚</span><button class="buy hatch" data-hatch="${n.id}" ${off}>Hatch!</button></div>`;
             const cost = Math.max(1, Math.ceil(left / 3600000) * HURRY_GEMS_PER_HOUR);
-            return `<div class="nest warming" style="--e:${EGGS[n.type].color}"><span class="ni">🥚</span><small>${EGGS[n.type].name}</small>` +
+            return `<div class="nest warming" style="--e:#fde68a"><span class="ni">🥚</span><small>warming…</small>` +
                 `<b data-left="${n.start + HATCH_MS}">${Game.fmtLeft(left)}</b><button class="buy gem" data-hurry="${n.id}" ${gems >= cost && online ? '' : 'disabled'}>Now · ${GEM}${cost}</button></div>`;
         }).join('');
-        const eggLine = !mine ? '' : `<div class="egg-line">${Object.keys(EGGS).map(t => `<span>🥚 ${EGGS[t].name} <b>×${eggs[t] || 0}</b></span>`).join('')}` +
+        const eggLine = !mine ? '' : `<div class="egg-line"><span>🥚 Eggs <b>×${eggs}</b> <small>· buy them or beat bosses</small></span>` +
             `<button class="buy" data-buy="egg" ${gold >= EGG_PRICE && online ? '' : 'disabled'}>Buy egg · ${COIN}${EGG_PRICE.toLocaleString()}</button></div>`;
 
         const chip = (def, tier, n) => `<span class="tier" style="--t:${TIERS[tier].color}">${TIERS[tier].label}${n > 1 ? ` ×${n}` : ''} <i>${def.label(def.values[tier])}</i></span>`;
@@ -300,7 +300,7 @@ extendGame({
                     actions += `<button class="buy merge" data-merge="${id}" data-tier="${mergeTier + 1}" ${gems < cost || !online ? 'disabled' : ''}>3→1 ${TIERS[mergeTier + 1].label} · ${GEM}${cost}</button>`;
                 }
             }
-            return `<li><span class="ai">${this.petEmoji(def)}</span><span class="an"><b>${def.name}</b><small>${def.what}</small><span class="chips">${chips}</span></span><span class="acts">${actions}</span></li>`;
+            return `<li class="${best ? '' : 'unhatched'}"><span class="ai">${this.petEmoji(def)}</span><span class="an"><b>${def.name}</b><small>${def.what}</small><span class="chips">${chips}</span></span><span class="acts">${actions}</span></li>`;
         }).join('');
 
         let refund = '';
@@ -341,7 +341,7 @@ extendGame({
             `<div class="gold-line">${POUCH} <b>${gold.toLocaleString()}</b> gold <span class="gem-count">${GEM} <b>${gems.toLocaleString()}</b> gems</span>` +
             (mine ? '<small>Unspent coins are banked when a hunt ends. Gems drop rarely — bosses always drop some.</small>' : '') + '</div>' + refund +
             `<h3>🐾 Pets on the hunt <small>${slots.length}/${slotCount}${mine ? ' · they follow you and help' : ''}</small></h3><div class="slots">${slotBoxes}</div>` +
-            (mine ? `<h3>🥚 Eggs <small>a nest hatches an egg in ${HATCH_MS / 3600000} hours — leave it overnight</small></h3><div class="nests">${nestBoxes}</div>${eggLine}` : '') +
+            (mine ? `<h3>🥚 Hatchery <small>an egg hatches in ${HATCH_MS / 3600000} hours — leave it overnight</small></h3><div class="nests">${nestBoxes}</div>${eggLine}` : '') +
             (petRows ? `<h3>📖 Pet collection${mine ? ' <small>merge 3 of a kind into the next tier</small>' : ''}</h3><ul class="arts">${petRows}</ul>` : '') +
             (skinCards ? `<h3>🎨 Skins${mine ? ' <small>rare and better skins give a small bonus</small>' : ''}</h3>${skinCards}` : '') +
             (mine && !online ? '<p class="since">The shop needs the online leaderboard.</p>' : '');
@@ -352,7 +352,7 @@ extendGame({
         act('button[data-icon]', b => Leaderboard.meta('icon', { cls: b.dataset.icon, skin: b.dataset.skin }));
         act('button[data-merge]', b => Leaderboard.meta('merge', { id: b.dataset.merge, tier: Number(b.dataset.tier) }));
         act('button[data-unlock]', () => Leaderboard.meta('unlock', {}));
-        act('button[data-warm]', b => Leaderboard.meta('warm', { type: b.dataset.warm }));
+        act('button[data-warm]', () => Leaderboard.meta('warm', {}));
         act('button[data-hatch]', b => Leaderboard.meta('hatch', { nest: b.dataset.hatch }));
         act('button[data-hurry]', b => Leaderboard.meta('hurry', { nest: b.dataset.hurry }));
         act('button[data-slot]', b => {

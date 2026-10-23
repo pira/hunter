@@ -12,7 +12,7 @@
 //   POST /player/{id}/spin           double-or-nothing on the run's pot { secret, pot, spins }
 //   POST /player/{id}/bank           close the pot { secret, pot }
 //   POST /player/{id}/buy            pet egg (gold) or skin (gold/gems) { secret, item: 'egg'|'skin', id? }
-//   POST /player/{id}/warm           put an egg in a free nest { secret, type: 'gold'|'boss' }
+//   POST /player/{id}/warm           put an egg in a free nest { secret }
 //   POST /player/{id}/hatch          hatch a ready egg { secret, nest } → { hatched: { id, tier } }
 //   POST /player/{id}/hurry          hatch a warming egg now for gems { secret, nest }
 //   POST /player/{id}/merge          3 pets × tier-1 → 1 × tier (gems) { secret, id, tier }
@@ -114,7 +114,8 @@ export function upgradeMeta(meta) {
     m.pets = { ...(m.pets || {}) };
     m.petSlots = Array.isArray(m.petSlots) ? [...m.petSlots] : [];
     m.petSlotCount = m.petSlotCount || 1;
-    m.eggs = { gold: 0, boss: 0, ...(m.eggs || {}) };
+    // eggs: a count (3.3.0 kept bought and boss eggs apart; they are one kind now)
+    if (typeof m.eggs !== 'number') m.eggs = ((m.eggs && m.eggs.gold) || 0) + ((m.eggs && m.eggs.boss) || 0);
     m.nests = Array.isArray(m.nests) ? m.nests.map(n => ({ ...n })) : [];
     if (m.icon === undefined) m.icon = null;
     m.version = m.version || 0;
@@ -380,8 +381,7 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
             // Unspent gold is banked 100% at death (D5); the pot lets it ride on the wheel.
             next.gold += unspent;
             next.gems += run.gems || 0;
-            next.eggs.gold += run.eggCards || 0;
-            next.eggs.boss += run.bossEggs || 0;
+            next.eggs += (run.eggCards || 0) + (run.bossEggs || 0);
             const metaPut = meta
                 ? { Put: { Item: next, ConditionExpression: '#v = :v', ExpressionAttributeNames: { '#v': 'version' }, ExpressionAttributeValues: { ':v': meta.version || 0 } } }
                 : { Put: { Item: next, ConditionExpression: 'attribute_not_exists(pk)' } };
@@ -411,7 +411,7 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
     function newMeta(pid, secret, ts) {
         return {
             pk: `player#${pid}`, sk: 'meta', secretHash: sha256(secret), createdAt: ts, runs: 0, kills: 0, bosses: 0, playSeconds: 0,
-            bestScore: 0, bestLevel: 0, gold: 0, gems: 0, pets: {}, petSlots: [], petSlotCount: 1, eggs: { gold: 0, boss: 0 }, nests: [], icon: null, skins: {}, equipped: {}, version: 0
+            bestScore: 0, bestLevel: 0, gold: 0, gems: 0, pets: {}, petSlots: [], petSlotCount: 1, eggs: 0, nests: [], icon: null, skins: {}, equipped: {}, version: 0
         };
     }
 
@@ -529,7 +529,7 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
             if (body.item === 'egg') {
                 if (m.gold < EGG_PRICE) throw new HttpError(409, 'not enough gold');
                 m.gold -= EGG_PRICE;
-                m.eggs.gold++;
+                m.eggs++;
             } else if (body.item === 'skin') {
                 const skin = SKINS[body.id];
                 if (!skin) throw new HttpError(400, 'invalid skin');
@@ -552,12 +552,10 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
     /** Put an egg into a free nest; it hatches HATCH_MS later. */
     function warm(pid, body) {
         return mutateMeta(pid, body, m => {
-            const type = body.type;
-            if (!EGG_ODDS[type]) throw new HttpError(400, 'invalid egg');
-            if (!(m.eggs[type] > 0)) throw new HttpError(409, 'no such egg');
+            if (!(m.eggs > 0)) throw new HttpError(409, 'no eggs');
             if (m.nests.length >= NESTS) throw new HttpError(409, 'the nests are full');
-            m.eggs[type]--;
-            m.nests.push({ id: random(6).toString('base64url'), type, start: now() });
+            m.eggs--;
+            m.nests.push({ id: random(6).toString('base64url'), start: now() });
         });
     }
 
@@ -576,9 +574,9 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
             }
             m.nests.splice(i, 1);
             const id = PETS[Math.min(PETS.length - 1, Math.floor(rng() * PETS.length))];
-            const tier = rollTier(EGG_ODDS[nest.type], rng());
+            const tier = rollTier(EGG_ODDS, rng());
             grantPet(m, id, tier);
-            return { hatched: { id, tier, egg: nest.type } };
+            return { hatched: { id, tier } };
         });
     }
 

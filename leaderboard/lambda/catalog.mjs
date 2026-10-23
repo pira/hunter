@@ -10,13 +10,14 @@ export const MAX_SLOTS = 4;
 export const SLOT_UNLOCK = [null, null, { gold: 1000 }, { gems: 100 }, { gems: 1000 }]; // price of slot n
 export const petKey = (id, tier) => `${id}_${tier}`;
 
-// Eggs: a nest warms one egg; two nests. Hatching takes a night; gems can hurry it.
+// Eggs: one hatchery warms one egg at a time. Hatching takes a night; gems can hurry it.
 export const EGG_PRICE = 1000; // gold
-export const NESTS = 2;
+export const NESTS = 1;
 export const HATCH_MS = 6 * 3600 * 1000;
 export const HURRY_GEMS_PER_HOUR = 1;
 // tier odds in % (basic, rare, legendary, mythic)
-export const EGG_ODDS = { gold: [80, 16, 3.5, 0.5], boss: [55, 30, 12, 3] };
+// one kind of egg, whether bought or dropped by a boss
+export const EGG_ODDS = [80, 16, 3.5, 0.5];
 
 // v3.2 artefacts are gone: owned ones were turned back into what they cost.
 export const ART_REFUND_GOLD = [0, 1000, 3000, 9000, 27000];

@@ -180,14 +180,10 @@ const MERGE_GEMS = [0, 0, 2, 5, 15];
 const MAX_SLOTS = 4;
 const SLOT_UNLOCK = [null, null, { gold: 1000 }, { gems: 100 }, { gems: 1000 }];
 const EGG_PRICE = 1000;
-const NESTS = 2;
+const NESTS = 1;
 const HATCH_MS = 6 * 3600 * 1000;
 const HURRY_GEMS_PER_HOUR = 1;
-const EGG_ODDS = { gold: [80, 16, 3.5, 0.5], boss: [55, 30, 12, 3] };
-const EGGS = {
-    gold: { icon: '🥚', name: 'Pet Egg', color: '#fde68a' },
-    boss: { icon: '🥚', name: 'Boss Egg', color: '#fb923c' }
-};
+const EGG_ODDS = [80, 16, 3.5, 0.5]; // one kind of egg, bought or dropped by a boss
 const PETS = {
     turtle: { icon: '🐢', name: 'Turtle', what: 'extra green hearts that take hits first', values: [0, 1, 2, 3, 4], label: v => `+${v} green ${v > 1 ? 'hearts' : 'heart'}` },
     bees: { icon: '🐝', name: 'Bees', what: 'each bee stings a monster near you every 2 s', values: [0, 1, 2, 4, 8], label: v => `${v} ${v > 1 ? 'bees' : 'bee'}` },

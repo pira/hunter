@@ -232,28 +232,28 @@ describe('lambda: banking, wheel and meta shop', () => {
         assert.equal((await api.call('POST', `/player/${PID}/spin`, { secret: SECRET, pot: pot.id, spins: 0 })).status, 409);
     });
 
-    it('buys eggs, warms them in two nests, hatches after the night (or now for gems)', async () => {
+    it('buys eggs, warms one in the hatchery, hatches after the night (or now for gems)', async () => {
         const api = rigged();
         await finishRun(api, 1500, { gems: 3 });
         const p = `/player/${PID}`;
         const post = (route, body = {}) => api.call('POST', `${p}/${route}`, { secret: SECRET, ...body });
         const bought = await post('buy', { item: 'egg' });
         assert.equal(bought.status, 200);
-        assert.equal(bought.body.player.eggs.gold, 1);
+        assert.equal(bought.body.player.eggs, 1);
         assert.equal(bought.body.player.gold, 500);
         assert.equal((await post('buy', { item: 'egg' })).status, 409); // gold spent
-        assert.equal((await post('warm', { type: 'boss' })).status, 409); // no boss egg
-        const warm = await post('warm', { type: 'gold' });
+        const warm = await post('warm');
         assert.equal(warm.status, 200);
         const nest = warm.body.player.nests[0];
-        assert.equal(warm.body.player.eggs.gold, 0);
+        assert.equal(warm.body.player.eggs, 0);
+        assert.equal((await post('warm')).status, 409); // no eggs left
         assert.equal((await post('hatch', { nest: nest.id })).status, 409); // not ready
         api.advance(3 * 3600 * 1000 + 1);
         // hurry: 3 h left → 3 gems; rng picks pet index 0.5*7 → 'frog', tier roll 0.9 → rare (80 < 90 < 96)
         rngs.push(0.5, 0.9);
         const hurried = await post('hurry', { nest: nest.id });
         assert.equal(hurried.status, 200);
-        assert.deepEqual(hurried.body.hatched, { id: 'frog', tier: 2, egg: 'gold' });
+        assert.deepEqual(hurried.body.hatched, { id: 'frog', tier: 2 });
         assert.equal(hurried.body.player.gems, 0);
         assert.equal(hurried.body.player.pets.frog_2, 1);
         assert.deepEqual(hurried.body.player.petSlots, ['frog_2']); // the first pet goes into the free slot
@@ -267,20 +267,19 @@ describe('lambda: banking, wheel and meta shop', () => {
         const post = (route, body = {}) => api.call('POST', `${p}/${route}`, { secret: SECRET, ...body });
         // three basic bee eggs straight into the profile (as if bought earlier)
         const m = t.db.get(`player#${PID}`, 'meta');
-        await t.db.send('Put', { Item: { ...m, eggs: { gold: 3, boss: 1 }, gold: 1600 } });
-        for (const type of ['gold', 'gold']) assert.equal((await post('warm', { type })).status, 200);
-        assert.equal((await post('warm', { type: 'boss' })).status, 409); // two nests only
-        api.advance(6 * 3600 * 1000);
+        await t.db.send('Put', { Item: { ...m, eggs: { gold: 3, boss: 1 }, gold: 1600 } }); // 3.3.0 shape: becomes 4 eggs
+        assert.equal((await post('warm')).status, 200);
+        assert.equal((await post('warm')).status, 409); // one hatchery
+        assert.equal((await api.call('GET', p)).body.player.eggs, 3);
         let res;
-        for (const n of (await api.call('GET', p)).body.player.nests) {
+        for (let i = 0; i < 3; i++) {
+            if (i) await post('warm');
+            api.advance(6 * 3600 * 1000);
             rngs.push(0.2, 0); // bees, basic
-            res = await post('hatch', { nest: n.id });
+            const nest = (await api.call('GET', p)).body.player.nests[0];
+            res = await post('hatch', { nest: nest.id });
             assert.equal(res.status, 200);
         }
-        res = await post('warm', { type: 'gold' });
-        api.advance(6 * 3600 * 1000);
-        rngs.push(0.2, 0);
-        res = await post('hatch', { nest: res.body.player.nests[0].id });
         assert.equal(res.body.player.pets.bees_1, 3);
         const merged = await post('merge', { id: 'bees', tier: 2 });
         assert.equal(merged.status, 200);
@@ -303,9 +302,9 @@ describe('lambda: banking, wheel and meta shop', () => {
         assert.equal((await finishRun(api, 0, { eggs: 5 })).status, 422); // level 5 → at most 2
         assert.equal((await finishRun(api, 0, { bossEggs: 1 })).status, 422); // no boss killed
         const ok = await finishRun(api, 0, { eggs: 2, artCards: ['greed'] });
-        assert.equal(ok.body.player.eggs.gold, 2);
+        assert.equal(ok.body.player.eggs, 2);
         const old = await finishRun(api, 0, { artCards: ['greed'] }); // a 3.2 client
-        assert.equal(old.body.player.eggs.gold, 3);
+        assert.equal(old.body.player.eggs, 3);
     });
 
     it('turns old artefacts back into gold and gems', async () => {

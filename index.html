@@ -338,7 +338,7 @@
         .slot.locked { border: 2px dashed rgba(255,255,255,.12); background: rgba(0,0,0,.2); color: var(--muted); font-size: 1.1em; gap: .3em; }
         .slot.locked .buy { font-size: .62em; }
         .slot.locked small { font-size: .6em; }
-        .nests { display: grid; grid-template-columns: repeat(2, 1fr); gap: .5em; margin-top: .4em; }
+        .nests { display: grid; grid-template-columns: repeat(auto-fit, minmax(10em, 1fr)); gap: .5em; margin-top: .4em; }
         .nest { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .25em; min-height: 6.2em; padding: .5em .3em; border-radius: 14px; background: radial-gradient(circle at 50% 70%, rgba(180,120,60,.25), rgba(255,255,255,.03)); border: 2px solid rgba(255,255,255,.08); text-align: center; }
         .nest .ni { font-size: 2em; line-height: 1; }
         .nest.empty .ni { opacity: .6; }
@@ -354,6 +354,11 @@
         @keyframes eggShake { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-14deg) scale(1.05); } 75% { transform: rotate(14deg) scale(1.05); } }
         .egg-line { display: flex; flex-wrap: wrap; align-items: center; gap: .4em .9em; margin-top: .5em; font-size: .85em; }
         .egg-line b { color: #fde68a; }
+        .egg-line small { color: var(--muted); }
+        /* pets you haven't hatched yet: a grey silhouette */
+        .arts li.unhatched { opacity: .5; }
+        .arts li.unhatched .an b, .arts li.unhatched .an small { color: var(--muted); }
+        .arts li.unhatched .ai { filter: grayscale(1) brightness(.7); }
         .egg-line .buy { margin-left: auto; }
         .refund { margin: .6em 0 0; padding: .5em .8em; border-radius: 12px; background: rgba(232,121,249,.14); font-size: .85em; }
         .hatch-reveal { position: absolute; inset: 0; z-index: 30; display: grid; place-items: center; background: rgba(2,6,23,.72); animation: fadeIn .2s; }

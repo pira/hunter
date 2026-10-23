@@ -63,7 +63,7 @@ extendGame({
     spawnEgg(x, y) {
         const a = Math.random() * TAU;
         this.coinDrops.push({ x, y, z: 8, vx: Math.cos(a) * 1.5, vy: Math.sin(a) * 1.5 + this.lootPop(y), vz: 6, egg: true, value: 1, life: 1, t: 0, spin: 0 });
-        this.floater(x, y - 44, '🥚 BOSS EGG!', '#fdba74', 22);
+        this.floater(x, y - 44, '🥚 PET EGG!', '#fdba74', 22);
     },
 
     /** Gems ride the coin physics but are worth a gem each, glow blue and live longer. */
