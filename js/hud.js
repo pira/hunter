@@ -149,6 +149,9 @@ extendGame({
     showGameOver() {
         this.state = 'gameover';
         this.clearSavedRun();
+        this.noteClassBest(this.cls, this.level);
+        const tierNow = U.masteryTier(this.classBest(this.cls));
+        if (tierNow > (this.runMasteryTier || 0)) this.masteryUp = { cls: this.cls, tier: tierNow };
         this.releaseWakeLock();
         Sfx.setActive(false);
         this.timeScale = 1;
@@ -189,6 +192,8 @@ extendGame({
             ['Time', U.formatTime(this.time)]
         ];
         if (this.gems > 0) stats.push(['Gems', `${GEM} ${this.gems}`]);
+        if (this.masteryUp && this.masteryUp.cls === this.cls) stats.push(['Mastery', `${this.masteryBadge(this.masteryUp.tier)} new!`]);
+        this.masteryUp = null;
         if (this.eggCards + this.bossEggs > 0) stats.push(['Eggs', '🥚'.repeat(Math.min(6, this.eggCards + this.bossEggs))]);
         this.el.finalStats.innerHTML = stats.map(([k2, v]) => `<div><span>${k2}</span><b>${v}</b></div>`).join('');
 
@@ -342,7 +347,8 @@ extendGame({
             if (isMine) marked = true;
             const name = String(s.name).replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
             const pid = typeof s.playerId === 'string' && /^[0-9a-f-]{36}$/.test(s.playerId) ? ` data-pid="${s.playerId}"` : '';
-            return `<li class="${isMine ? 'mine' : ''}"${pid}><span class="rank">${i + 1}</span><span class="name${SKINS[s.skin] && SKINS[s.skin].rarity === 'mythic' ? ' glow' : ''}">${CLASSES[s.cls] ? `<span class="cls-i">${CLASSES[s.cls].icon}</span>` : ''}${name}</span>` +
+            const badge = Number.isInteger(s.mastery) && s.mastery > 0 && s.mastery < 100 ? this.masteryBadge(s.mastery) : '';
+            return `<li class="${isMine ? 'mine' : ''}"${pid}><span class="rank">${i + 1}</span><span class="name${SKINS[s.skin] && SKINS[s.skin].rarity === 'mythic' ? ' glow' : ''}">${CLASSES[s.cls] ? `<span class="cls-i">${CLASSES[s.cls].icon}</span>` : ''}${name}${badge}</span>` +
                 `<span class="lvl">Lv ${Number(s.level) || 1}</span><span class="pts">${(Number(s.score) || 0).toLocaleString()}</span></li>`;
         }).join('');
         listEl.querySelectorAll('li[data-pid]').forEach(li => li.addEventListener('click', () => this.openProfile(li.dataset.pid)));

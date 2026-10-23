@@ -12,7 +12,8 @@ extendGame({
         const p = this.player;
         this.petList = this.activePets(cache).map((key, i) => {
             const { id, tier, def } = this.parsePet(key);
-            const pet = { id, tier, def, v: def.values[tier], spot: PET_SPOTS[i], x: p.x + PET_SPOTS[i][0], y: p.y + PET_SPOTS[i][1], cd: PET_STEP * (1 + i * 0.4), t: 0, act: null };
+            const lv = Game.petLevel(cache, id);
+            const pet = { id, tier, def, lv, v: Game.petValue(id, tier, lv), sting: 1 + PET_LEVEL_BONUS * lv, spot: PET_SPOTS[i], x: p.x + PET_SPOTS[i][0], y: p.y + PET_SPOTS[i][1], cd: PET_STEP * (1 + i * 0.4), t: 0, act: null };
             if (id === 'bees') pet.bees = Array.from({ length: pet.v }, (_, k) => ({ a: (k / pet.v) * TAU, cd: PET_STEP * (0.6 + (2 * k) / pet.v), fly: null }));
             return pet;
         });
@@ -79,7 +80,7 @@ extendGame({
                 const f = b.fly;
                 f.t++;
                 if (f.t === 12) {
-                    if (!f.m.dead) this.damageMonster(f.m, 1, { sound: false, aoe: true, numColor: '#facc15' });
+                    if (!f.m.dead) this.damageMonster(f.m, pet.sting, { sound: false, aoe: true, numColor: '#facc15' }); // fed bees sting harder
                     if (Math.random() < 0.3) Sfx.tone(900 + Math.random() * 300, { duration: 0.05, type: 'sawtooth', volume: 0.025, bus: 'sfx' });
                 }
                 if (f.t >= 24) b.fly = null;
@@ -344,5 +345,24 @@ Object.assign(Game, {
         } catch (e) {
             return true;
         }
+    }
+});
+
+Object.assign(Game, {
+    /** A pet kind's level (fed with gold in the profile), 0–PET_LEVEL_MAX. */
+    petLevel(profile, id) {
+        const lv = Number(((profile && profile.petLevels) || {})[id]) || 0;
+        return U.clamp(Math.floor(lv), 0, PET_LEVEL_MAX);
+    },
+
+    /** The pet's number at a tier and level: +5% a level (the donkey kicks that much more often);
+     *  the turtle's hearts are whole, so it gets one more at levels 5 and 10; bees sting harder instead. */
+    petValue(id, tier, lv = 0) {
+        const base = PETS[id].values[tier];
+        const k = 1 + PET_LEVEL_BONUS * lv;
+        if (id === 'turtle') return base + Math.floor(lv / 5);
+        if (id === 'bees') return base;
+        if (id === 'donkey') return Math.round((base / k) * 100) / 100;
+        return Math.round(base * k * 100) / 100;
     }
 });

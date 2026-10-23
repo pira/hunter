@@ -2,7 +2,7 @@
 """Late-game economy run: the balance bot plays each class up to a level and prints one row per level
 (seconds, fight seconds, kills, coins earned, share of the fight with a ×2+ gold boost, mean coin
 multiplier, monsters alive, powerups picked up, coins in hand). Serve the repo first, then:
-    python3 tools/sim/econ.py wizard,barbarian,goblin 40 400000 [mythic|rare][,mortal]"""
+    python3 tools/sim/econ.py wizard,barbarian,goblin 40 400000 [mythic|rare][,mortal][,best25]  (best25 = class mastery as if level 25 was reached)"""
 import os
 PORT = int(os.environ.get('PORT', 8000))
 import sys, json, pathlib
@@ -10,7 +10,8 @@ from playwright.sync_api import sync_playwright
 bot = (pathlib.Path(__file__).parent / 'bot.js').read_text()
 flags = (sys.argv[4] if len(sys.argv) > 4 else '').split(',')
 perks = next(({'mythic': {'drops': 1}, 'rare': {'coinDrop': 0.05}}[f] for f in flags if f in ('mythic', 'rare')), None)
-opts = {**({'perks': perks} if perks else {}), **({'mortal': True} if 'mortal' in flags else {})}
+best = next((int(f[4:]) for f in flags if f.startswith('best')), 0)
+opts = {**({'perks': perks} if perks else {}), **({'mortal': True} if 'mortal' in flags else {}), **({'best': best} if best else {})}
 with sync_playwright() as p:
     b = p.chromium.launch()
     for cls in sys.argv[1].split(','):

@@ -375,4 +375,52 @@ describe('lambda: banking, wheel and meta shop', () => {
         const res = await finishRun(api, 0, { skin: 'celestial' });
         assert.equal(res.body.scores.find(s => s.playerId === PID && s.skin).skin, 'frost');
     });
+
+    it('keeps the best level per class (mastery) and puts the badge on the board', async () => {
+        const api = rigged();
+        await finishRun(api, 0, { level: 12, score: 5000 }); // wizard reached 12: the level-10 boss fell
+        await finishRun(api, 0, { level: 7, cls: 'goblin' });
+        await finishRun(api, 0, { level: 9 });
+        const prof = (await api.call('GET', `/player/${PID}`)).body.player;
+        assert.deepEqual(prof.classBest, { wizard: 12, goblin: 7 });
+        const board = (await t.call('GET', '/scores', undefined, '1.2.3.4', { board: 'v3' })).body.scores;
+        assert.equal(board.find(s => s.cls === 'wizard' && s.level === 12).mastery, 1);
+        assert.equal(board.find(s => s.cls === 'goblin').mastery, undefined);
+    });
+
+    it('works out mastery for profiles from before v3.7 from their run history', async () => {
+        const api = rigged();
+        await finishRun(api, 0, { level: 6 });
+        await finishRun(api, 0, { level: 11, cls: 'barbarian' });
+        const m = t.db.get(`player#${PID}`, 'meta');
+        delete m.classBest;
+        await t.db.send('Put', { Item: m });
+        assert.deepEqual((await api.call('GET', `/player/${PID}`)).body.player.classBest, { wizard: 6, barbarian: 11 });
+        // the next write stores it
+        await finishRun(api, 0, { level: 3 });
+        assert.deepEqual(t.db.get(`player#${PID}`, 'meta').classBest, { wizard: 6, barbarian: 11 });
+    });
+
+    it('feeds owned pets up to level 10 for gold, and builds a second nest', async () => {
+        const api = rigged();
+        await finishRun(api, 0);
+        const post = (route, body = {}) => api.call('POST', `/player/${PID}/${route}`, { secret: SECRET, ...body });
+        const m = t.db.get(`player#${PID}`, 'meta');
+        await t.db.send('Put', { Item: { ...m, gold: 300000, pets: { bees_2: 1 }, eggs: 3 } });
+        assert.equal((await post('feed', { id: 'frog' })).status, 403); // not owned
+        assert.equal((await post('feed', { id: 'dragon' })).status, 400);
+        let res;
+        for (let i = 0; i < 10; i++) res = await post('feed', { id: 'bees' });
+        assert.equal(res.body.player.petLevels.bees, 10);
+        assert.equal(res.body.player.gold, 300000 - 222500);
+        assert.equal((await post('feed', { id: 'bees' })).status, 409); // top level
+        // hatchery: one nest, then a second for 15k gold
+        assert.equal((await post('warm')).status, 200);
+        assert.equal((await post('warm')).status, 409);
+        const built = await post('nest');
+        assert.equal(built.body.player.nestCount, 2);
+        assert.equal(built.body.player.gold, 300000 - 222500 - 15000);
+        assert.equal((await post('warm')).status, 200);
+        assert.equal((await post('nest')).status, 409); // all nests built
+    });
 });

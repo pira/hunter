@@ -61,7 +61,8 @@ extendGame({
         const cycle = Math.floor((n - 1) / 4);
         // v3.6: past level 12 bosses also get part of the monsters' steeper HP climb (×1.4 at L30, ×1.6 at L40)
         const late = Math.pow(U.hpScale(this.level) / U.hpStep(this.level), 0.75);
-        const hp = Math.round(def.hp * (1 + (big ? 0.5 : 0.4) * (n - 1)) * (1 + 0.4 * cycle) * late);
+        // and on a mastered level (beaten before with this class) the boss has less HP: ÷√(level speed)
+        const hp = Math.round(def.hp * (1 + (big ? 0.5 : 0.4) * (n - 1)) * (1 + 0.4 * cycle) * late / Math.sqrt(this.levelSpeed));
         const b = this.makeBossBody(def, hp, cycle, this.W / 2, -def.size * 2);
         this.boss = b;
         this.bossParts = [b];

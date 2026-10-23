@@ -193,6 +193,28 @@ describe('GameUtils level flow', () => {
     });
 });
 
+describe('GameUtils class mastery', () => {
+    it('gives a tier for every tenth-level boss beaten', () => {
+        assert.equal(GameUtils.masteryTier(0), 0);
+        assert.equal(GameUtils.masteryTier(10), 0);
+        assert.equal(GameUtils.masteryTier(11), 1);
+        assert.equal(GameUtils.masteryTier(21), 2);
+        assert.equal(GameUtils.masteryTier(45), 4);
+    });
+
+    it('runs a block ×2 once its boss fell, ×3 once the next one fell too', () => {
+        assert.equal(GameUtils.masterySpeed(5, 10), 1);
+        assert.equal(GameUtils.masterySpeed(5, 11), 2);
+        assert.equal(GameUtils.masterySpeed(10, 11), 2);
+        assert.equal(GameUtils.masterySpeed(11, 11), 1);
+        assert.equal(GameUtils.masterySpeed(3, 21), 3);
+        assert.equal(GameUtils.masterySpeed(15, 21), 2);
+        assert.equal(GameUtils.masterySpeed(25, 21), 1);
+        assert.equal(GameUtils.masterySpeed(25, 41), 3);
+        assert.equal(GameUtils.masterySpeed(35, 41), 2);
+    });
+});
+
 describe('GameUtils economy', () => {
     it('keeps coin drops flat with the level (v3.6) and never drops nothing', () => {
         assert.equal(GameUtils.coinDrop(1, 1, 0.8), 1);

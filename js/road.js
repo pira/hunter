@@ -121,7 +121,7 @@ extendGame({
     },
 
     get roadSpeed() {
-        if (this.phase === 'travel') return ROAD_SPEED * TRAVEL_SPEED;
+        if (this.phase === 'travel') return ROAD_SPEED * TRAVEL_SPEED * (this.levelSpeed > 1 ? 1.6 : 1); // mastered levels travel quicker
         if (this.phase === 'intro') return 0;
         return ROAD_SPEED * this.roadMult * (this.state === 'dying' ? 0.5 : 1);
     },

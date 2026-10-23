@@ -232,7 +232,16 @@ const MERGE_GEMS = [0, 0, 2, 5, 15];
 const MAX_SLOTS = 4;
 const SLOT_UNLOCK = [null, null, { gold: 1000 }, { gems: 100 }, { gems: 1000 }];
 const EGG_PRICE = 1000;
-const NESTS = 1;
+const NESTS = 1;                     // nests everyone has; more can be unlocked
+const MAX_NESTS = 2;
+const NEST_UNLOCK = [null, null, { gold: 15000 }];
+// Pet levels (v3.7): feeding gold to a kind of pet levels up all its tiers, +5% a level up to 10.
+const PET_LEVEL_MAX = 10;
+const PET_LEVEL_BONUS = 0.05;
+const FEED_COST = [500, 900, 1600, 2900, 5200, 9400, 17000, 30000, 55000, 100000];
+// Class mastery (v3.7): beat the level-10/20/30… boss with a class and its early levels speed up
+// (U.masterySpeed). Badge colours per tier, then the last one repeats.
+const MASTERY_COLORS = [null, '#cd7f32', '#d1d5db', '#facc15', '#7dd3fc', '#e879f9'];
 const HATCH_MS = 6 * 3600 * 1000;
 const HURRY_GEMS_PER_HOUR = 1;
 const EGG_ODDS = [80, 16, 3.5, 0.5]; // one kind of egg, bought or dropped by a boss

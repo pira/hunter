@@ -308,6 +308,15 @@
         .cls:hover { transform: translateY(-3px); }
         .cls.on { border-color: var(--c); background: radial-gradient(circle at 50% 35%, color-mix(in srgb, var(--c) 45%, transparent), rgba(255,255,255,.03) 70%); box-shadow: 0 0 18px color-mix(in srgb, var(--c) 55%, transparent); transform: translateY(-3px); }
         .cls.on b { color: #fff; }
+        .cls { position: relative; }
+        .cls .mslot { position: absolute; top: .25em; right: .25em; }
+        .mastery { display: inline-block; margin-left: .3em; padding: 0 .35em; border-radius: .6em; font: 700 .62em/1.45 system-ui, sans-serif; letter-spacing: .5px; color: #1c1917; background: var(--m); box-shadow: 0 0 6px color-mix(in srgb, var(--m) 70%, transparent); vertical-align: middle; }
+        .mastery-row { grid-column: 1 / -1; }
+        .stat-grid b .mastery { color: #1c1917; font-size: .6em; text-transform: none; }
+        .mline { display: inline-block; margin-top: .3em; font-size: .92em; }
+        .mline small { display: block; opacity: .65; font-size: .85em; }
+        .mline .lane { margin-left: .3em; padding: 0 .5em; border-radius: .7em; font-size: .85em; border: 1px solid rgba(255,255,255,.35); background: rgba(255,255,255,.08); color: #fff; }
+        .mline .lane.on { background: #facc15; color: #1c1917; border-color: #facc15; }
         .class-info { min-height: 2.6em; margin: 0 0 .9em; font-size: .82em; line-height: 1.45; color: #cbd5e1; }
         .class-info .sup { color: #fde047; }
         /* profile */
@@ -383,6 +392,15 @@
         .nest.warming .ni { filter: drop-shadow(0 0 6px var(--e)); animation: eggRock 2.4s ease-in-out infinite; }
         .nest.ready { border-color: #facc15; box-shadow: 0 0 18px rgba(250,204,21,.45); }
         .nest.ready .ni { filter: drop-shadow(0 0 10px var(--e)); }
+        .nest.locked { background: rgba(255,255,255,.03); border-style: dashed; }
+        .nest.locked .ni { font-size: 1.4em; opacity: .7; }
+        .nest.locked .buy { font-size: .7em; }
+        .plv { font-style: normal; font-family: system-ui, sans-serif; font-size: .7em; padding: 0 .35em; border-radius: .6em; background: #f59e0b; color: #1c1917; vertical-align: middle; }
+        .plv-pips { display: flex; gap: 2px; margin: .2em 0 .1em; }
+        .plv-pips i { width: .55em; height: .35em; border-radius: 2px; background: rgba(255,255,255,.14); }
+        .plv-pips i.on { background: #f59e0b; box-shadow: 0 0 4px rgba(245,158,11,.6); }
+        .buy.feed { background: linear-gradient(180deg, #fdba74, #ea580c); color: #2b1203; box-shadow: 0 2px 0 #9a3412; }
+        .buy.feed:disabled { background: #334155; color: #94a3b8; box-shadow: none; }
         .wobble { animation: eggShake .5s ease-in-out infinite; }
         .buy.hatch { background: linear-gradient(180deg, #86efac, #16a34a); color: #052e16; box-shadow: 0 2px 0 #14532d; animation: throb .6s infinite alternate; }
         @keyframes eggRock { 0%, 100% { transform: rotate(-6deg); } 50% { transform: rotate(6deg); } }

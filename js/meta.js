@@ -9,7 +9,72 @@ extendGame({
         const perk = this.skin && skinPerk(this.skin);
         if (perk) for (const [k, v] of Object.entries(perk.bonus)) bonus[k] = (bonus[k] || 0) + v;
         this.artefacts = { mult: key => 1 + (bonus[key] || 0) };
+        // class mastery: how far this class has got (decides which early levels run faster)
+        this.masteryBest = this.fastLaneOn() ? this.classBest(this.cls) : 0;
         if (this.loadPets) this.loadPets();
+    },
+
+    // ------------------------------------------------------------------ class mastery (v3.7)
+
+    /** Best level reached with a class: the server's (from checked runs) or this device's, whichever is higher. */
+    classBest(cls) {
+        const cache = Leaderboard.cachedProfile() || {};
+        let local = {};
+        try {
+            local = JSON.parse(localStorage.getItem('hunter.classBest')) || {};
+        } catch (e) { /* storage unavailable */ }
+        return Math.max(((cache.classBest || {})[cls]) || 0, local[cls] || 0);
+    },
+
+    /** Remember the level a run reached (the server keeps its own count from submitted runs). */
+    noteClassBest(cls, level) {
+        try {
+            const local = JSON.parse(localStorage.getItem('hunter.classBest')) || {};
+            if (level > (local[cls] || 0)) {
+                local[cls] = level;
+                localStorage.setItem('hunter.classBest', JSON.stringify(local));
+            }
+        } catch (e) { /* storage unavailable */ }
+    },
+
+    fastLaneOn() {
+        return this.storeGet('hunter.fastLane') !== '0';
+    },
+
+    /** ×1, ×2 or ×3: how much faster the current level runs (the level bar fills that much faster). */
+    get levelSpeed() {
+        return U.masterySpeed(this.level, this.masteryBest || 0);
+    },
+
+    /** "levels 1–10 ×3 · 11–20 ×2" for a best level. */
+    masteryText(best) {
+        const parts = [];
+        for (let block = 1; 10 * block < best; block++) {
+            const k = U.masterySpeed(10 * block, best);
+            const last = parts[parts.length - 1];
+            if (last && last.k === k) last.to = 10 * block;
+            else parts.push({ from: 10 * block - 9, to: 10 * block, k });
+        }
+        return parts.length ? `levels ${parts.map(p => `${p.from}–${p.to} ×${p.k}`).join(', ')}` : '';
+    },
+
+    /** The class card's mastery line: what is mastered, the fast-lane switch, and the next goal. */
+    masteryLine(cls) {
+        const best = this.classBest(cls);
+        const tier = U.masteryTier(best);
+        const next = 10 * (tier + 1);
+        const name = CLASSES[cls].name;
+        if (!tier) return `<br><span class="mline">🏅 Beat the level ${next} boss as ${name} and levels 1–10 run twice as fast</span>`;
+        const on = this.fastLaneOn();
+        return `<br><span class="mline">${this.masteryBadge(tier)} <b>Mastery ${Game.roman(tier)}</b> · ${this.masteryText(best)}` +
+            ` <button class="lane ${on ? 'on' : ''}" data-lane="1" title="Fast lane: mastered levels fill their bar faster">⚡ ${on ? 'ON' : 'OFF'}</button>` +
+            `<small>next: beat the level ${next} boss</small></span>`;
+    },
+
+    masteryBadge(tier) {
+        if (!(tier > 0)) return '';
+        const color = MASTERY_COLORS[Math.min(tier, MASTERY_COLORS.length - 1)];
+        return `<span class="mastery" style="--m:${color}" title="Mastery ${tier}">${Game.roman(tier)}</span>`;
     },
 
     parsePet(key) {
@@ -239,6 +304,8 @@ extendGame({
         const slots = this.activePets(player);
         const eggs = typeof player.eggs === 'number' ? player.eggs : ((player.eggs && player.eggs.gold) || 0) + ((player.eggs && player.eggs.boss) || 0);
         const nests = player.nests || [];
+        const nestCount = Math.max(NESTS, player.nestCount || 0);
+        const lvOf = id => Game.petLevel(player, id);
         const skins = player.skins || {};
         const equipped = player.equipped || {};
         const icon = player.icon || null;
@@ -258,14 +325,20 @@ extendGame({
             }
             const a = this.parsePet(slots[i]);
             if (!a) return `<div class="slot empty">${mine ? 'empty<small>pick a pet below</small>' : '—'}</div>`;
-            return `<div class="slot pet" style="--t:${TIERS[a.tier].color}"><span class="si">${this.petEmoji(a.def)}</span><b>${a.def.name}</b><small>${a.def.label(a.def.values[a.tier])}</small>` +
+            const lv = lvOf(a.id);
+            return `<div class="slot pet" style="--t:${TIERS[a.tier].color}"><span class="si">${this.petEmoji(a.def)}</span><b>${a.def.name}${lv ? ` <em class="plv">Lv ${lv}</em>` : ''}</b><small>${a.def.label(Game.petValue(a.id, a.tier, lv))}</small>` +
                 (mine ? `<button class="x" data-unslot="${a.id}" ${off} aria-label="Leave at home">✕</button>` : '') + '</div>';
         }).join('');
 
         // nests: warming eggs with a countdown; empty nests take an egg
         // the hatchery (eggs already warming in an old second nest still show and hatch)
-        const nestBoxes = !mine ? '' : Array.from({ length: Math.max(NESTS, nests.length) }, (_, i) => {
+        const nestBoxes = !mine ? '' : Array.from({ length: Math.max(nestCount, nests.length) + (nestCount < MAX_NESTS ? 1 : 0) }, (_, i) => {
             const n = nests[i];
+            if (!n && i >= nestCount) {
+                // the next nest, for sale
+                const pr = NEST_UNLOCK[nestCount + 1];
+                return `<div class="nest locked"><span class="ni">🔒</span><small>another nest: two eggs at once</small><button class="buy ${pr.gems ? 'gem' : ''}" data-nest="1" ${afford(pr) && online ? '' : 'disabled'}>Build · ${price(pr)}</button></div>`;
+            }
             if (!n) {
                 const opts = eggs > 0 ? `<button class="buy" data-warm="1" ${off}>Warm an egg</button>` : '';
                 return `<div class="nest empty"><span class="ni">🪹</span>${opts || '<small>no eggs yet</small>'}</div>`;
@@ -279,12 +352,14 @@ extendGame({
         const eggLine = !mine ? '' : `<div class="egg-line"><span>🥚 Eggs <b>×${eggs}</b> <small>· buy them or beat bosses</small></span>` +
             `<button class="buy" data-buy="egg" ${gold >= EGG_PRICE && online ? '' : 'disabled'}>Buy egg · ${COIN}${EGG_PRICE.toLocaleString()}</button></div>`;
 
-        const chip = (def, tier, n) => `<span class="tier" style="--t:${TIERS[tier].color}">${TIERS[tier].label}${n > 1 ? ` ×${n}` : ''} <i>${def.label(def.values[tier])}</i></span>`;
+        const chip = (id, def, tier, n) => `<span class="tier" style="--t:${TIERS[tier].color}">${TIERS[tier].label}${n > 1 ? ` ×${n}` : ''} <i>${def.label(Game.petValue(id, tier, lvOf(id)))}</i></span>`;
         const petRows = Object.entries(PETS).map(([id, def]) => {
             const owned = [1, 2, 3, 4].map(t => pets[`${id}_${t}`] || 0);
             const best = owned.reduce((b, n, i) => (n > 0 ? i + 1 : b), 0);
             if (!mine && !best) return '';
-            const chips = best ? owned.map((n, i) => (n ? chip(def, i + 1, n) : '')).join('') : '<span class="tier none">not hatched yet</span>';
+            const chips = best ? owned.map((n, i) => (n ? chip(id, def, i + 1, n) : '')).join('') : '<span class="tier none">not hatched yet</span>';
+            const lv = lvOf(id);
+            const pips = best ? `<span class="plv-pips" title="Level ${lv} of ${PET_LEVEL_MAX}: +${Math.round(lv * PET_LEVEL_BONUS * 100)}%">${Array.from({ length: PET_LEVEL_MAX }, (_, k) => `<i class="${k < lv ? 'on' : ''}"></i>`).join('')}</span>` : '';
             let actions = '';
             if (mine && best) {
                 const slotted = this.parsePet(slots.find(k => k.startsWith(`${id}_`)));
@@ -294,13 +369,19 @@ extendGame({
                 } else {
                     actions += '<span class="maxed">ON THE HUNT</span>';
                 }
+                if (lv < PET_LEVEL_MAX) {
+                    const cost = FEED_COST[lv];
+                    actions += `<button class="buy feed" data-feed="${id}" ${gold < cost || !online ? 'disabled' : ''} title="Level ${lv + 1}: +${Math.round((lv + 1) * PET_LEVEL_BONUS * 100)}%">🍖 Lv ${lv + 1} · ${COIN}${cost.toLocaleString()}</button>`;
+                } else {
+                    actions += '<span class="maxed">LEVEL MAX</span>';
+                }
                 const mergeTier = [1, 2, 3].find(t => owned[t - 1] >= 3);
                 if (mergeTier) {
                     const cost = MERGE_GEMS[mergeTier + 1];
                     actions += `<button class="buy merge" data-merge="${id}" data-tier="${mergeTier + 1}" ${gems < cost || !online ? 'disabled' : ''}>3→1 ${TIERS[mergeTier + 1].label} · ${GEM}${cost}</button>`;
                 }
             }
-            return `<li class="${best ? '' : 'unhatched'}"><span class="ai">${this.petEmoji(def)}</span><span class="an"><b>${def.name}</b><small>${def.what}</small><span class="chips">${chips}</span></span><span class="acts">${actions}</span></li>`;
+            return `<li class="${best ? '' : 'unhatched'}"><span class="ai">${this.petEmoji(def)}</span><span class="an"><b>${def.name}${lv ? ` <em class="plv">Lv ${lv}</em>` : ''}</b><small>${def.what}</small>${pips}<span class="chips">${chips}</span></span><span class="acts">${actions}</span></li>`;
         }).join('');
 
         let refund = '';
@@ -341,8 +422,8 @@ extendGame({
             `<div class="gold-line">${POUCH} <b>${gold.toLocaleString()}</b> gold <span class="gem-count">${GEM} <b>${gems.toLocaleString()}</b> gems</span>` +
             (mine ? '<small>Unspent coins are banked when a hunt ends. Gems drop rarely — bosses always drop some.</small>' : '') + '</div>' + refund +
             `<h3>🐾 Pets on the hunt <small>${slots.length}/${slotCount}${mine ? ' · they follow you and help' : ''}</small></h3><div class="slots">${slotBoxes}</div>` +
-            (mine ? `<h3>🥚 Hatchery <small>an egg hatches in ${HATCH_MS / 3600000} hours — leave it overnight</small></h3><div class="nests">${nestBoxes}</div>${eggLine}` : '') +
-            (petRows ? `<h3>📖 Pet collection${mine ? ' <small>merge 3 of a kind into the next tier</small>' : ''}</h3><ul class="arts">${petRows}</ul>` : '') +
+            (mine ? `<h3>🥚 Hatchery <small>an egg hatches in ${HATCH_MS / 3600000} hours — leave it overnight${nestCount > 1 ? ` · ${nestCount} nests` : ''}</small></h3><div class="nests">${nestBoxes}</div>${eggLine}` : '') +
+            (petRows ? `<h3>📖 Pet collection${mine ? ' <small>feed a pet to level it up (+5% a level, every tier) · merge 3 of a kind into the next tier</small>' : ''}</h3><ul class="arts">${petRows}</ul>` : '') +
             (skinCards ? `<h3>🎨 Skins${mine ? ' <small>every skin gives a bonus by rarity</small>' : ''}</h3>${skinCards}` : '') +
             (mine && !online ? '<p class="since">The shop needs the online leaderboard.</p>' : '');
         el.querySelectorAll('canvas[data-skin]').forEach(cv => this.drawPortrait(cv, cv.dataset.cls, cv.dataset.skin));
@@ -352,6 +433,8 @@ extendGame({
         act('button[data-icon]', b => Leaderboard.meta('icon', { cls: b.dataset.icon, skin: b.dataset.skin }));
         act('button[data-merge]', b => Leaderboard.meta('merge', { id: b.dataset.merge, tier: Number(b.dataset.tier) }));
         act('button[data-unlock]', () => Leaderboard.meta('unlock', {}));
+        act('button[data-feed]', b => Leaderboard.meta('feed', { id: b.dataset.feed }));
+        act('button[data-nest]', () => Leaderboard.meta('nest', {}));
         act('button[data-warm]', () => Leaderboard.meta('warm', {}));
         act('button[data-hatch]', b => Leaderboard.meta('hatch', { nest: b.dataset.hatch }));
         act('button[data-hurry]', b => Leaderboard.meta('hurry', { nest: b.dataset.hurry }));
@@ -388,7 +471,7 @@ extendGame({
         box.className = 'hatch-reveal';
         box.style.setProperty('--t', t.color);
         box.innerHTML = `<div class="hr-card"><span class="hr-pet">${this.petEmoji(def)}</span><small style="color:${t.color}">${t.label.toUpperCase()}</small>` +
-            `<b>${def.name}!</b><p>${def.what}<br><i>${def.label(def.values[h.tier])}</i></p><button class="btn primary">Yay!</button></div>`;
+            `<b>${def.name}!</b><p>${def.what}<br><i>${def.label(Game.petValue(h.id, h.tier, Game.petLevel(Leaderboard.cachedProfile(), h.id)))}</i></p><button class="btn primary">Yay!</button></div>`;
         this.el.profile.appendChild(box);
         const close = () => box.remove();
         box.addEventListener('click', close);
@@ -412,6 +495,8 @@ extendGame({
                 Sfx.tone(700, { duration: 0.12, type: 'square', volume: 0.06, slide: 300 }); // crack!
             } else if (btn.dataset.merge) {
                 Sfx.arpeggio([523, 784, 1046, 1568, 2093], 0.07, { type: 'triangle', volume: 0.13 });
+            } else if (btn.dataset.feed) {
+                Sfx.arpeggio([392, 523, 659, 784], 0.05, { type: 'triangle', volume: 0.12 }); // munch, level up
             } else if (btn.dataset.buy) {
                 Sfx.arpeggio([659, 880, 1175, 1568], 0.06, { type: 'triangle', volume: 0.12 });
             } else {
@@ -435,5 +520,14 @@ extendGame({
         if (p && p.icon && CLASSES[p.icon.cls]) return [p.icon.cls, p.icon.skin && (p.skins || {})[p.icon.skin] ? p.icon.skin : ''];
         const cls = CLASSES[fallbackCls] ? fallbackCls : mine && CLASSES[this.cls] ? this.cls : 'wizard';
         return [cls, mine ? this.equippedSkin(cls) : ((p && p.equipped) || {})[cls] || ''];
+    }
+});
+
+Object.assign(Game, {
+    roman(n) {
+        const r = [[10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']];
+        let out = '';
+        for (const [v, t] of r) while (n >= v) { out += t; n -= v; }
+        return out;
     }
 });

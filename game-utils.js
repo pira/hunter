@@ -189,6 +189,21 @@
         return Math.round(70 * (1 + 0.3 * (L - 1)) * hpScale(L));
     }
 
+    /** Class mastery tier from the best level reached with that class: reaching level 11 means the
+     *  level-10 boss fell (tier 1), 21 → tier 2, … (must match catalog.mjs masteryTier). */
+    function masteryTier(best) {
+        return Math.max(0, Math.floor(((best || 0) - 1) / 10));
+    }
+
+    /** How much faster a level runs with mastery: a block of ten levels is ×2 once its boss has been
+     *  beaten with this class, ×3 once the next block's boss has been beaten too. */
+    function masterySpeed(level, best) {
+        const block = Math.ceil(Math.max(1, level) / 10);
+        if ((best || 0) > 10 * (block + 1)) return 3;
+        if ((best || 0) > 10 * block) return 2;
+        return 1;
+    }
+
     /** Encounter at the end of a level: big boss every 10, small boss at 5/15/25…, else gatekeeper/wave. */
     function encounterKind(level) {
         if (level % 10 === 0) return 'bigBoss';
@@ -251,6 +266,8 @@
         expectedIncome,
         levelDamage,
         encounterKind,
+        masteryTier,
+        masterySpeed,
         hpScale,
         hpStep,
         coinScale,

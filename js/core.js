@@ -3,8 +3,8 @@
 class Game {
     constructor() {
         // Version system (bumped by the pre-commit hook, see VERSION-README.md)
-        this.version = "3.6.0";
-        this.buildDate = "2026-10-23";
+        this.version = "3.7.0";
+        this.buildDate = "2026-10-24";
 
         this.canvas = document.getElementById('gameCanvas');
         this.ctx = this.canvas.getContext('2d');
@@ -138,7 +138,7 @@ class Game {
             return `<button class="cls" data-cls="${id}" style="--c:${c.color}" aria-label="${c.name}">` +
                 `<canvas width="120" height="120"></canvas><b>${c.name}</b><small>${'❤️'.repeat(c.hearts)}</small>` +
                 `<span class="cdmg" title="Damage per basic hit">💪 <b>${Game.fmtDmg(PRIMARY[c.primary].damage)}</b></span>` +
-                `<span class="cstat" title="Speed">👟<span>${pips(speed)}</span></span></button>`;
+                `<span class="cstat" title="Speed">👟<span>${pips(speed)}</span></span><span class="mslot"></span></button>`;
         }).join('');
         this.el.classInfo = document.getElementById('classInfo');
         this.el.classPicker.querySelectorAll('.cls').forEach(btn => {
@@ -155,7 +155,16 @@ class Game {
         this.storeSet('hunter.class', id);
         const c = CLASSES[id];
         this.el.classPicker.querySelectorAll('.cls').forEach(btn => btn.classList.toggle('on', btn.dataset.cls === id));
-        this.el.classInfo.innerHTML = `<b style="color:${c.color}">${c.weapon}</b> — ${c.blurb}<br><b class="sup">⚡ ${c.superName}</b> — ${c.superBlurb}`;
+        this.el.classInfo.innerHTML = `<b style="color:${c.color}">${c.weapon}</b> — ${c.blurb}<br><b class="sup">⚡ ${c.superName}</b> — ${c.superBlurb}` + this.masteryLine(id);
+        this.el.classPicker.querySelectorAll('.cls').forEach(btn => {
+            btn.querySelector('.mslot').innerHTML = this.masteryBadge(U.masteryTier(this.classBest(btn.dataset.cls)));
+        });
+        const lane = this.el.classInfo.querySelector('[data-lane]');
+        if (lane) lane.addEventListener('click', () => {
+            this.storeSet('hunter.fastLane', this.fastLaneOn() ? '0' : '1');
+            this.pickClass(this.cls, true);
+            Sfx.tone(this.fastLaneOn() ? 988 : 660, { duration: 0.08, type: 'triangle', volume: 0.1 });
+        });
         if (this.el.whoAvatar) this.drawAvatar(this.el.whoAvatar, id, this.equippedSkin ? this.equippedSkin(id) : '');
         this.drawPortrait(document.getElementById('logoHero'), id, this.equippedSkin ? this.equippedSkin(id) : '');
         if (!quiet) Sfx.tone({ wizard: 784, barbarian: 392, goblin: 587 }[id], { duration: 0.09, type: 'triangle', volume: 0.1 });
@@ -528,6 +537,7 @@ class Game {
         this.bossEggs = 0;
         this.petList = [];
         this.hits = 0;
+        this.runMasteryTier = U.masteryTier(this.classBest(this.cls)); // to tell a new tier at game over
         this.levelCoinsStart = 0;
         this.incomeEMA = 0;
         this.buffs = {};

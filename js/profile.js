@@ -124,6 +124,10 @@ extendGame({
             ['Bosses', p.bosses || 0], ['Play time', U.formatTime(p.playSeconds || 0)], ['Avg score', p.runs ? Math.round((res.runs || []).reduce((n, r) => n + r.score, 0) / Math.max(1, (res.runs || []).length)).toLocaleString() : 0]
         ];
         el.profileStats.innerHTML = stats.map(([k, v, cls]) => `<div class="${cls || ''}"><span>${k}</span><b>${esc(v)}</b></div>`).join('');
+        // class mastery: one badge per class that has beaten a tenth-level boss
+        const cb = p.classBest || {};
+        const ranks = CLASS_ORDER.map(c => [c, U.masteryTier(Number(cb[c]) || 0)]).filter(([, t]) => t > 0);
+        if (ranks.length) el.profileStats.innerHTML += `<div class="mastery-row"><span>Mastery</span><b>${ranks.map(([c, t]) => `${CLASSES[c].icon}${this.masteryBadge(t)}`).join(' ')}</b></div>`;
         const runs = res.runs || [];
         el.profileRuns.innerHTML = runs.length
             ? runs.map((r, i) => `<li><span class="rank">${i + 1}</span><span>${CLASSES[r.cls] ? `<span class="cls-i" title="${CLASSES[r.cls].name}">${CLASSES[r.cls].icon}</span> ` : ''}<span class="pts">${(r.score || 0).toLocaleString()}</span> <span class="meta">Lv ${r.level} · ${r.kills} kills${r.bosses ? ` · ${r.bosses} 👑` : ''}</span>` +

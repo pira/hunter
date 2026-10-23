@@ -18,6 +18,8 @@
 //   POST /player/{id}/merge          3 pets × tier-1 → 1 × tier (gems) { secret, id, tier }
 //   POST /player/{id}/slots          pets taken on hunts { secret, slots: ['bees_2', …] } (≤ unlocked, distinct)
 //   POST /player/{id}/unlock         unlock the next pet slot { secret }
+//   POST /player/{id}/feed           level up a kind of pet for gold { secret, id }
+//   POST /player/{id}/nest           unlock the next hatchery nest { secret }
 //   POST /player/{id}/icon           public profile icon { secret, cls, skin ('' = class default) }
 //   POST /player/{id}/equip          wear an owned skin { secret, cls, skin ('' = none) }
 //
@@ -31,8 +33,8 @@
 //   pk="pot#<nonce>"   sk="pot"                           the run's banked gold on the wheel (TTL 24 h)
 import { createHmac, createHash, randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
 import {
-    PETS, MERGE_GEMS, MAX_SLOTS, SLOT_UNLOCK, petKey, EGG_PRICE, NESTS, HATCH_MS, HURRY_GEMS_PER_HOUR, EGG_ODDS,
-    ART_REFUND_GOLD, ART_REFUND_GEMS, SKINS, SKIN_PRICES, WHEEL_WIN
+    PETS, MERGE_GEMS, MAX_SLOTS, SLOT_UNLOCK, petKey, EGG_PRICE, NESTS, MAX_NESTS, NEST_UNLOCK, HATCH_MS, HURRY_GEMS_PER_HOUR, EGG_ODDS,
+    ART_REFUND_GOLD, ART_REFUND_GEMS, SKINS, SKIN_PRICES, WHEEL_WIN, PET_LEVEL_MAX, FEED_COST, masteryTier
 } from './catalog.mjs';
 
 export const BOARD = 'board#v2';
@@ -45,7 +47,7 @@ export const MAX_TOKEN_MS = 7 * 24 * 3600 * 1000; // a run may be paused (and sa
 export const SUBMITS_PER_MINUTE = 6;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const SECRET_RE = /^[A-Za-z0-9_-]{32,128}$/;
-const PUBLIC_META = ['name', 'bestScore', 'bestLevel', 'runs', 'kills', 'bosses', 'playSeconds', 'createdAt', 'updatedAt', 'gold', 'gems', 'pets', 'petSlots', 'petSlotCount', 'eggs', 'nests', 'artRefund', 'icon', 'skins', 'equipped'];
+const PUBLIC_META = ['name', 'bestScore', 'bestLevel', 'runs', 'kills', 'bosses', 'playSeconds', 'createdAt', 'updatedAt', 'gold', 'gems', 'pets', 'petSlots', 'petSlotCount', 'eggs', 'nests', 'nestCount', 'artRefund', 'icon', 'skins', 'equipped', 'classBest', 'petLevels'];
 const POT_RE = /^[A-Za-z0-9_-]{6,40}$/;
 const POT_TTL = 24 * 3600;
 
@@ -118,6 +120,10 @@ export function upgradeMeta(meta) {
     // eggs: a count (3.3.0 kept bought and boss eggs apart; they are one kind now)
     if (typeof m.eggs !== 'number') m.eggs = ((m.eggs && m.eggs.gold) || 0) + ((m.eggs && m.eggs.boss) || 0);
     m.nests = Array.isArray(m.nests) ? m.nests.map(n => ({ ...n })) : [];
+    m.nestCount = Math.max(NESTS, m.nestCount || 0);
+    m.petLevels = { ...(m.petLevels || {}) };
+    // best level per class (mastery); profiles from before v3.7 get it from their run history
+    if (m.classBest) m.classBest = { ...m.classBest };
     if (m.icon === undefined) m.icon = null;
     m.version = m.version || 0;
     return m;
@@ -196,8 +202,8 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
             } while (ExclusiveStartKey && items.length < limit && ++pages < 10);
             items = items.slice(0, limit);
         }
-        return items.map(({ id, name, score, level, kills, combo, bosses, duration, ts, playerId, cls, skin }) =>
-            ({ id, name, score, level, kills, combo, bosses, duration, ts, playerId, cls, skin }));
+        return items.map(({ id, name, score, level, kills, combo, bosses, duration, ts, playerId, cls, skin, mastery }) =>
+            ({ id, name, score, level, kills, combo, bosses, duration, ts, playerId, cls, skin, mastery }));
     }
 
     async function rankOf(board, sk) {
@@ -226,6 +232,29 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
             ReturnValues: 'UPDATED_NEW'
         });
         return out.Attributes.hits > perMinute;
+    }
+
+    /** Best level per class from a player's whole run history (profiles from before v3.7). */
+    async function historyClassBest(pid) {
+        const best = {};
+        let ExclusiveStartKey;
+        let pages = 0;
+        do {
+            const out = await send('Query', {
+                KeyConditionExpression: 'pk = :pk AND begins_with(sk, :run)',
+                ExpressionAttributeValues: { ':pk': `player#${pid}`, ':run': 'run#' },
+                ProjectionExpression: 'cls, #l', ExpressionAttributeNames: { '#l': 'level' },
+                Limit: 500, ExclusiveStartKey
+            });
+            for (const r of out.Items || []) if (CLASSES.includes(r.cls) && r.level > (best[r.cls] || 0)) best[r.cls] = r.level;
+            ExclusiveStartKey = out.LastEvaluatedKey;
+        } while (ExclusiveStartKey && ++pages < 40);
+        return best;
+    }
+
+    async function withClassBest(pid, meta) {
+        if (!meta || meta.classBest) return meta;
+        return { ...meta, classBest: await historyClassBest(pid) };
     }
 
     async function getMeta(pid) {
@@ -321,7 +350,7 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
 
         const pid = body.playerId;
         let meta = null;
-        if (pid !== undefined) meta = await authorize(pid, body.secret);
+        if (pid !== undefined) meta = await withClassBest(pid, await authorize(pid, body.secret));
 
         if (await rateLimited(ip)) throw new HttpError(429, 'slow down');
 
@@ -336,6 +365,11 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
         // The skin shown on the board is whatever the profile has equipped — never the client's word.
         delete boardItem.skin;
         if (meta && meta.equipped && run.cls && meta.equipped[run.cls]) boardItem.skin = meta.equipped[run.cls];
+        // the class mastery badge, including what this run just earned
+        if (pid && run.cls) {
+            const tier = masteryTier(Math.max((meta && meta.classBest && meta.classBest[run.cls]) || 0, run.level));
+            if (tier > 0) boardItem.mastery = tier;
+        }
 
         if (!pid) {
             try {
@@ -378,6 +412,8 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
             next.playSeconds += run.duration;
             next.bestScore = Math.max(next.bestScore || 0, run.score);
             next.bestLevel = Math.max(next.bestLevel || 0, run.level);
+            next.classBest = { ...(next.classBest || {}) };
+            if (run.cls) next.classBest[run.cls] = Math.max(next.classBest[run.cls] || 0, run.level);
             next.version = (meta ? meta.version || 0 : 0) + 1;
             // Unspent gold is banked 100% at death (D5); the pot lets it ride on the wheel.
             next.gold += unspent;
@@ -402,7 +438,7 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
                 const reasons = (e.CancellationReasons || []).map(r => r && r.Code);
                 if (reasons[0] === 'ConditionalCheckFailed') throw new HttpError(409, 'run already submitted');
                 if (reasons[3] !== 'ConditionalCheckFailed') throw e;
-                meta = await getMeta(pid); // someone else wrote the profile meanwhile: re-read and retry
+                meta = await withClassBest(pid, await getMeta(pid)); // someone else wrote the profile meanwhile: re-read and retry
                 if (meta && meta.secretHash !== sha256(secret)) throw new HttpError(403, 'not your profile');
             }
         }
@@ -412,7 +448,7 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
     function newMeta(pid, secret, ts) {
         return {
             pk: `player#${pid}`, sk: 'meta', secretHash: sha256(secret), createdAt: ts, runs: 0, kills: 0, bosses: 0, playSeconds: 0,
-            bestScore: 0, bestLevel: 0, gold: 0, gems: 0, pets: {}, petSlots: [], petSlotCount: 1, eggs: 0, nests: [], icon: null, skins: {}, equipped: {}, version: 0
+            bestScore: 0, bestLevel: 0, gold: 0, gems: 0, pets: {}, petSlots: [], petSlotCount: 1, eggs: 0, nests: [], nestCount: NESTS, icon: null, skins: {}, equipped: {}, classBest: {}, petLevels: {}, version: 0
         };
     }
 
@@ -456,7 +492,7 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
     async function ownProfile(pid, body) {
         const meta = await authorize(pid, body.secret);
         if (!meta) throw new HttpError(404, 'no such player');
-        return ensureMaps(pid, meta);
+        return withClassBest(pid, await ensureMaps(pid, meta));
     }
 
     // ---- banking + wheel (D5): the server rolls, the client only animates the result
@@ -554,7 +590,7 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
     function warm(pid, body) {
         return mutateMeta(pid, body, m => {
             if (!(m.eggs > 0)) throw new HttpError(409, 'no eggs');
-            if (m.nests.length >= NESTS) throw new HttpError(409, 'the nests are full');
+            if (m.nests.length >= m.nestCount) throw new HttpError(409, 'the nests are full');
             m.eggs--;
             m.nests.push({ id: random(6).toString('base64url'), start: now() });
         });
@@ -631,6 +667,38 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
         });
     }
 
+    /** Feed a kind of pet you own: +1 level (all its tiers), for gold. */
+    function feed(pid, body) {
+        return mutateMeta(pid, body, m => {
+            const { id } = body;
+            if (!PETS.includes(id)) throw new HttpError(400, 'invalid pet');
+            if (![1, 2, 3, 4].some(t => m.pets[petKey(id, t)] > 0)) throw new HttpError(403, 'you do not own that pet');
+            const lvl = m.petLevels[id] || 0;
+            if (lvl >= PET_LEVEL_MAX) throw new HttpError(409, 'already at the top level');
+            const cost = FEED_COST[lvl];
+            if (m.gold < cost) throw new HttpError(409, 'not enough gold');
+            m.gold -= cost;
+            m.petLevels[id] = lvl + 1;
+        });
+    }
+
+    /** Unlock the next nest in the hatchery. */
+    function unlockNest(pid, body) {
+        return mutateMeta(pid, body, m => {
+            const n = m.nestCount + 1;
+            if (n > MAX_NESTS) throw new HttpError(409, 'all nests unlocked');
+            const price = NEST_UNLOCK[n];
+            if (price.gold) {
+                if (m.gold < price.gold) throw new HttpError(409, 'not enough gold');
+                m.gold -= price.gold;
+            } else {
+                if (m.gems < price.gems) throw new HttpError(409, 'not enough gems');
+                m.gems -= price.gems;
+            }
+            m.nestCount = n;
+        });
+    }
+
     function setIcon(pid, body) {
         return mutateMeta(pid, body, m => {
             const { cls } = body;
@@ -655,7 +723,7 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
 
     async function getPlayer(pid) {
         if (!UUID.test(pid || '')) throw new HttpError(400, 'invalid player id');
-        const meta = await getMeta(pid);
+        const meta = await withClassBest(pid, await getMeta(pid));
         if (!meta) throw new HttpError(404, 'no such player');
         const out = await send('Query', {
             KeyConditionExpression: 'pk = :pk AND begins_with(sk, :run)',
@@ -767,6 +835,8 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
                 if (method === 'POST' && action === '/unlock') return json(200, await unlockSlot(pid, parseBody(event)));
                 if (method === 'POST' && action === '/slots') return json(200, await setSlots(pid, parseBody(event)));
                 if (method === 'POST' && action === '/icon') return json(200, await setIcon(pid, parseBody(event)));
+                if (method === 'POST' && action === '/feed') return json(200, await feed(pid, parseBody(event)));
+                if (method === 'POST' && action === '/nest') return json(200, await unlockNest(pid, parseBody(event)));
             }
             return json(404, { error: 'not found' });
         } catch (e) {

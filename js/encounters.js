@@ -24,9 +24,10 @@ extendGame({
     startLevel() {
         this.markLevelStart();
         this.phase = 'intro';
-        this.introT = this.level > 1 ? 50 : 10;
+        this.introT = this.level > 1 ? Math.round(50 / this.levelSpeed) : 10;
         this.progress = 0;
-        this.target = U.levelDamage(this.level);
+        // class mastery: a mastered level's bar fills 2–3× faster (same monsters, same danger)
+        this.target = Math.round(U.levelDamage(this.level) / this.levelSpeed);
         this.biome = this.biomeFor(this.level);
         this.encounter = null;
         this.clearT = 0;
@@ -55,7 +56,7 @@ extendGame({
         if (this.phase === 'clear') {
             this.clearT++;
             const left = this.monsters.filter(m => !m.dead && !m.dying);
-            if (this.clearT === Math.round(10 * 60 * GAME_SPEED)) left.forEach(m => { m.behavior = 'flee'; m.ai = null; });
+            if (this.clearT === Math.round((10 / this.levelSpeed) * 60 * GAME_SPEED)) left.forEach(m => { m.behavior = 'flee'; m.ai = null; });
             if (!left.length && this.clearT > 40) this.startEncounter();
         } else if (this.phase === 'encounter') {
             this.updateEncounter();
@@ -84,7 +85,8 @@ extendGame({
             }
             if (--this.introT <= 0 && d < 30) {
                 this.phase = 'fight';
-                if (this.level > 1) this.banner(`LEVEL ${this.level}`, this.biome.name);
+                const fast = this.levelSpeed;
+                if (this.level > 1) this.banner(`LEVEL ${this.level}`, `${this.biome.name}${fast > 1 ? ` · ⚡ mastery ×${fast}` : ''}`);
             }
         }
     },
@@ -115,6 +117,14 @@ extendGame({
         if (this.statsLog) this.statsLog.endLevel(this);
         this.pendingLevels = 1;
         this.phase = 'shop';
+        // the boss of a tenth level fell: a new mastery tier for this class
+        const before = U.masteryTier(this.classBest(this.cls));
+        this.noteClassBest(this.cls, this.level);
+        const tier = U.masteryTier(this.level);
+        if (tier > before) {
+            this.banner(`${CLASSES[this.cls].name.toUpperCase()} MASTERY ${Game.roman(tier)}!`, `next hunt: ${this.masteryText(this.level)}`, 'super');
+            Sfx.arpeggio([523, 659, 784, 1046, 1318], 0.07, { type: 'triangle', volume: 0.13 });
+        }
     },
 
     // ------------------------------------------------------------------ encounter selection
@@ -180,7 +190,9 @@ extendGame({
         if (!enc || enc.done) return;
         enc.done = true;
         this.phase = 'loot';
-        this.lootT = Math.round(4.5 * 60 * GAME_SPEED);
+        // a mastered level's gatekeeper/wave loot is picked up quicker (boss loot keeps its time)
+        const quick = enc.kind === 'gatekeeper' || enc.kind === 'wave' ? this.levelSpeed : 1;
+        this.lootT = Math.round((4.5 / quick) * 60 * GAME_SPEED);
         this.bossLootPhase = enc.kind === 'bigBoss' || enc.kind === 'smallBoss'; // all its loot flies to you
         this.hazards = this.hazards.filter(h => h.type === 'scorch');
         if (enc.kind === 'gatekeeper' || enc.kind === 'wave') {
@@ -200,7 +212,8 @@ extendGame({
     },
 
     gkHp(base) {
-        return Math.round(base * U.hpStep(this.level) * (1 + 0.12 * (this.level - 1)));
+        // mastered levels: an encounter you have beaten before goes down quicker (×0.71 at ×2, ×0.58 at ×3)
+        return Math.round(base * U.hpStep(this.level) * (1 + 0.12 * (this.level - 1)) / Math.sqrt(this.levelSpeed));
     },
 
     makeGatekeeper(id, x, y, extra = {}) {

@@ -10,9 +10,17 @@ export const MAX_SLOTS = 4;
 export const SLOT_UNLOCK = [null, null, { gold: 1000 }, { gems: 100 }, { gems: 1000 }]; // price of slot n
 export const petKey = (id, tier) => `${id}_${tier}`;
 
-// Eggs: one hatchery warms one egg at a time. Hatching takes a night; gems can hurry it.
+// Pet levels (v3.7): feed gold to a kind of pet (all its tiers) for +5% a level, up to level 10.
+// FEED_COST[n] = gold to go from level n to n + 1.
+export const PET_LEVEL_MAX = 10;
+export const PET_LEVEL_BONUS = 0.05;
+export const FEED_COST = [500, 900, 1600, 2900, 5200, 9400, 17000, 30000, 55000, 100000];
+
+// Eggs: the hatchery warms one egg per nest. Hatching takes a night; gems can hurry it.
 export const EGG_PRICE = 1000; // gold
-export const NESTS = 1;
+export const NESTS = 1; // nests everyone has
+export const MAX_NESTS = 2;
+export const NEST_UNLOCK = [null, null, { gold: 15000 }]; // price of nest n
 export const HATCH_MS = 6 * 3600 * 1000;
 export const HURRY_GEMS_PER_HOUR = 1;
 // tier odds in % (basic, rare, legendary, mythic)
@@ -41,4 +49,8 @@ export const SKINS = {
 };
 
 export const CLASSES = ['wizard', 'barbarian', 'goblin'];
+
+// Class mastery (v3.7): beating the boss of level 10, 20, 30 … with a class (= reaching level 11,
+// 21, 31 …) gives that class a mastery tier. Must match GameUtils.masteryTier.
+export const masteryTier = best => Math.max(0, Math.floor(((best || 0) - 1) / 10));
 export const WHEEL_WIN = 0.5; // chance to double the pot; at 0.5 average gold is unchanged
