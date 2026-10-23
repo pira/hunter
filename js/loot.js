@@ -166,7 +166,8 @@ extendGame({
         const magnet = this.pickupRadius;
         for (const pu of this.powerups) {
             pu.t++;
-            if (!frozen) pu.life--;
+            // Coins ×2/×3 look (and count) as coins: like coins they never expire, only the road takes them
+            if (!frozen && !POWERUPS[pu.type].pouch) pu.life--;
             if (pu.vx || pu.vy || pu.z > 0 || pu.vz) {
                 pu.x = U.clamp(pu.x + pu.vx, 20, this.W - 20);
                 pu.y = Math.max(20, pu.y + pu.vy);
