@@ -69,6 +69,14 @@ const TIER_UNLOCK = { elite: 6, legendary: 11, mythic: 16, ancient: 22, ultimate
 const DROP_CHANCE = { small: 0.004, medium: 0.01, large: 0.03, elite: 0.06, legendary: 0.1, mythic: 0.14, ancient: 0.2, ultimate: 0.4 };
 const DROP_COOLDOWN = 480;         // frames between powerup drops from kills
 const MAX_FIELD_POWERUPS = 4;      // never more than this many lying around (boss loot excepted)
+// Loot vs the road (v3.3.1): drops from low kills pop up-screen, the bottom strip is sticky, and
+// coins/gems/eggs that still fall off are kept by the next boss and dropped when it dies.
+const LOOT_POP_ZONE = 0.66;   // kills below this share of the screen height launch their loot upwards
+const STICKY_STRIP = 70;      // px above the bottom edge where loot grips the ground…
+const STICKY_ROAD = 0.25;     // …and the road moves it at this fraction of its speed
+const POWERUP_LIFE = 990;     // steps a dropped powerup lasts (coins never expire)
+const CHASE_ROAD_GRIP = 0.2;  // chasers walk against the road: they cancel this share of its drift
+const WANDER_UP_BIAS = 0.01;  // wanderers turn up-screen this much more often than down
 const TIMER_CAP = Math.round(30 * 60 * GAME_SPEED); // a powerup can never stack past 30 real seconds
 // Coins per kill: [chance, tierBase]; amount = tierBase × hpScale(L) × rand(0.8–1.2) × coin multipliers.
 const COIN_DROPS = {
@@ -86,9 +94,9 @@ const POWERUPS = {
     invincible: { emoji: '🛡️', name: 'Invincible', color: '#7CFC00', timed: true, secs: 10, weight: 0.35 },
     freeze: { emoji: '❄️', name: 'Freeze', color: '#87CEEB', timed: true, secs: 12, weight: 0.7 },
     roadBrake: { emoji: '🐢', name: 'Road Brake', color: '#a3a3a3', timed: true, secs: 10, weight: 0.6 },
-    magnet: { emoji: '🧲', name: 'Magnet', color: '#f43f5e', timed: true, secs: 15, weight: 0.7 },
-    coins2: { emoji: '🪙', pouch: true, tag: '×2', name: 'Coins ×2', color: '#FFC300', timed: true, secs: 15, weight: 0.8 },
-    coins3: { emoji: '🪙', pouch: true, tag: '×3', name: 'Coins ×3', color: '#FF8C00', timed: true, secs: 15, weight: 0.4 },
+    magnet: { emoji: '🧲', name: 'Magnet', color: '#f43f5e', timed: true, secs: 30, weight: 0.7 },
+    coins2: { emoji: '🪙', pouch: true, tag: '×2', name: 'Coins ×2', color: '#FFC300', timed: true, secs: 30, weight: 0.8 },
+    coins3: { emoji: '🪙', pouch: true, tag: '×3', name: 'Coins ×3', color: '#FF8C00', timed: true, secs: 30, weight: 0.4 },
     heart: { emoji: '❤️', name: 'Extra Life', color: '#FF1493', weight: 1 },
     quake: { emoji: '🌋', name: 'Earthquake', color: '#FF4500', weight: 0.3 }
 };

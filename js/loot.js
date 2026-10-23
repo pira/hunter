@@ -35,8 +35,17 @@ extendGame({
         }
     },
 
+    /** Extra upward speed for loot dropped low on the screen, so it lands in the play area. */
+    lootPop(y, k = 1) {
+        const top = this.H * LOOT_POP_ZONE;
+        if (y <= top) return 0;
+        const depth = U.clamp((y - top) / (this.H - top), 0, 1);
+        return -(2 + 6 * depth) * k;
+    },
+
     spawnCoins(x, y, amount, speed = 2.5, lift = 3) {
         let left = Math.round(amount);
+        const up = this.lootPop(y);
         while (left > 0) {
             // bigger drops come partly as little pouches worth 5, 3 or 2
             const value = left >= 10 ? 5 : left >= 6 ? 3 : left >= 4 ? 2 : 1;
@@ -44,8 +53,8 @@ extendGame({
             const a = Math.random() * TAU;
             const v = speed * (0.35 + Math.random() * 0.75);
             this.coinDrops.push({
-                x, y, z: 4, vx: Math.cos(a) * v, vy: Math.sin(a) * v, vz: lift * (0.7 + Math.random() * 0.6),
-                value, life: 780, t: 0, spin: Math.random() * TAU
+                x, y, z: 4, vx: Math.cos(a) * v, vy: Math.sin(a) * v + up * (0.8 + Math.random() * 0.4), vz: (lift + (up ? 2 : 0)) * (0.7 + Math.random() * 0.6),
+                value, life: 1, t: 0, spin: Math.random() * TAU
             });
         }
     },
@@ -53,7 +62,7 @@ extendGame({
     /** A boss egg: picked up like a gem, hatches in the profile. */
     spawnEgg(x, y) {
         const a = Math.random() * TAU;
-        this.coinDrops.push({ x, y, z: 8, vx: Math.cos(a) * 1.5, vy: Math.sin(a) * 1.5, vz: 6, egg: true, value: 1, life: 2400, t: 0, spin: 0 });
+        this.coinDrops.push({ x, y, z: 8, vx: Math.cos(a) * 1.5, vy: Math.sin(a) * 1.5 + this.lootPop(y), vz: 6, egg: true, value: 1, life: 1, t: 0, spin: 0 });
         this.floater(x, y - 44, '🥚 BOSS EGG!', '#fdba74', 22);
     },
 
@@ -62,7 +71,7 @@ extendGame({
         for (let i = 0; i < n; i++) {
             const a = Math.random() * TAU;
             const v = 1.5 + Math.random() * 1.5;
-            this.coinDrops.push({ x, y, z: 6, vx: Math.cos(a) * v, vy: Math.sin(a) * v, vz: 5 + Math.random() * 2, gem: true, value: 1, life: 1500, t: 0, spin: Math.random() * TAU });
+            this.coinDrops.push({ x, y, z: 6, vx: Math.cos(a) * v, vy: Math.sin(a) * v + this.lootPop(y), vz: 5 + Math.random() * 2, gem: true, value: 1, life: 1, t: 0, spin: Math.random() * TAU });
         }
         this.floater(x, y - 30, n > 1 ? `💎 ×${n}` : '💎', '#7dd3fc', 20);
     },
@@ -72,8 +81,7 @@ extendGame({
         const magnet = this.magnetRadius;
         const frozen = this.lootFrozen;
         for (const c of this.coinDrops) {
-            c.t++;
-            if (!frozen) c.life--;
+            c.t++; // coins, gems and eggs never expire: only the road can take them
             c.spin += 0.18;
             c.x += c.vx;
             c.y += c.vy;
@@ -139,8 +147,8 @@ extendGame({
         if (!type) type = U.pickWeighted(Object.entries(POWERUPS).map(([k, d]) => ({ k, weight: d.weight }))).k;
         const a = Math.random() * TAU;
         this.powerups.push({
-            x: U.clamp(x, 20, this.W - 20), y: U.clamp(y, 20, this.H - 20), type, life: 720, t: 0, loot,
-            vx: pop ? Math.cos(a) * speed : 0, vy: pop ? Math.sin(a) * speed : 0, z: pop ? 4 : 0, vz: pop ? 4.5 : 0
+            x: U.clamp(x, 20, this.W - 20), y: U.clamp(y, 20, this.H - 20), type, life: POWERUP_LIFE, t: 0, loot,
+            vx: pop ? Math.cos(a) * speed : 0, vy: pop ? Math.sin(a) * speed + this.lootPop(y, 0.9) : 0, z: pop ? 4 : 0, vz: pop ? 4.5 : 0
         });
     },
 

@@ -193,6 +193,7 @@
         #coins, #gems { font-family: var(--display); font-size: 1.1em; color: var(--gold); text-shadow: 0 2px 0 rgba(0,0,0,.55); }
         .purse { display: flex; gap: 10px; align-items: baseline; }
         #gems { color: #7dd3fc; }
+        #sack { font-size: .78em; color: #fde68a; opacity: .85; font-family: var(--display); }
         #shopCoins { font-family: var(--display); font-size: 1.6em; color: var(--gold); text-shadow: 0 3px 0 rgba(0,0,0,.5); margin: -.4em 0 .6em; }
         #levelupSub .gold { color: var(--gold); font-weight: normal; font-family: var(--display); }
         #continueBtn { margin-top: 1.1em; }
@@ -433,7 +434,7 @@
             <div class="hud-left">
                 <div id="hearts"></div>
                 <div class="lvl"><span id="levelLabel">LV 1</span><div class="xpbar"><div id="xpFill"></div></div></div>
-                <div class="purse"><span id="coins"><i class="i-coin"></i> 0</span><span id="gems" hidden><i class="i-gem"></i> 0</span></div>
+                <div class="purse"><span id="coins"><i class="i-coin"></i> 0</span><span id="gems" hidden><i class="i-gem"></i> 0</span><span id="sack" hidden title="The road took these: the next boss holds them, beat it to get them back"></span></div>
             </div>
             <div class="hud-center"><div id="score">0</div></div>
             <div class="hud-right">

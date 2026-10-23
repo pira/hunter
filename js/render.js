@@ -128,7 +128,7 @@ extendGame({
     },
 
     drawCoin(ctx, c) {
-        if ((c.life < 180 || c.y > this.H - 80) && Math.floor(c.t / 6) % 2 === 0) return;
+        if (c.y > this.H - STICKY_STRIP && Math.floor(c.t / 6) % 2 === 0) return; // last chance: blink
         if (c.egg) {
             this.drawEggAt(ctx, c.x, c.y - c.z, 1.2, c.t, c.y, '#fb923c');
             return;
@@ -344,7 +344,7 @@ extendGame({
 
     drawPowerup(ctx, pu) {
         const def = POWERUPS[pu.type];
-        if ((pu.life < 180 || pu.y > this.H - 80) && Math.floor(pu.t / 8) % 2 === 0) return;
+        if ((pu.life < 180 || pu.y > this.H - STICKY_STRIP) && Math.floor(pu.t / 8) % 2 === 0) return;
         const bob = Math.sin(pu.t * 0.08) * 3 - (pu.z || 0);
         const pulse = 1 + Math.sin(pu.t * 0.15) * 0.1;
         this.drawShadow(ctx, pu.x, pu.y + 14, 10);

@@ -3,7 +3,7 @@
 class Game {
     constructor() {
         // Version system (bumped by the pre-commit hook, see VERSION-README.md)
-        this.version = "3.3.0";
+        this.version = "3.3.1";
         this.buildDate = "2026-10-23";
 
         this.canvas = document.getElementById('gameCanvas');
@@ -64,7 +64,7 @@ class Game {
             killedBy: $('killedBy'), finalStats: $('finalStats'),
             submitStatus: $('submitStatus'), finalBoard: $('finalBoard'), finalBoardTitle: $('finalBoardTitle'),
             againBtn: $('againBtn'), pauseBtn: $('pauseBtn'), muteBtn: $('muteBtn'),
-            version: $('version'), newBest: $('newBest'), coins: $('coins'), gems: $('gems'), shopCoins: $('shopCoins'),
+            version: $('version'), newBest: $('newBest'), coins: $('coins'), gems: $('gems'), sack: $('sack'), shopCoins: $('shopCoins'),
             continueBtn: $('continueBtn'), fsBtn: $('fsBtn'), menuFsBtn: $('menuFsBtn'), soundChip: $('soundChip'),
             iosHint: $('iosHint'), iosHintClose: $('iosHintClose'), bankBox: $('bankBox'), wheel: $('wheel'), potText: $('potText'),
             spinBtn: $('spinBtn'), keepBtn: $('keepBtn'), profileShop: $('profileShop')
@@ -508,6 +508,7 @@ class Game {
         this.coinsSpent = 0;
         this.coinFrac = 0;
         this.gems = 0;
+        this.roadSack = { coins: 0, gems: 0, eggs: 0 };
         this.eggCards = 0;
         this.bossEggs = 0;
         this.petList = [];

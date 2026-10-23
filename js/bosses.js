@@ -43,7 +43,8 @@ extendGame({
         this.bossCount++;
         this.pendingBoss = def;
         this.bossWarning = 150;
-        this.banner(`⚠ ${def.name.toUpperCase()} ⚠`, def.title, 'danger');
+        const s = this.roadSack || {};
+        this.banner(`⚠ ${def.name.toUpperCase()} ⚠`, s.coins ? `${def.title} · holds the ${s.coins} coins the road took!` : def.title, 'danger');
     },
 
     updateBossWarning() {
@@ -806,11 +807,23 @@ extendGame({
         this.floater(b.x, b.y - b.size - 10, `BOSS SLAIN +${bonus}`, '#ffd60a', 30);
         // gems: small bosses 1–2, big bosses 3–5
         this.spawnGems(b.x, b.y, b.boss.big ? 3 + Math.floor(Math.random() * 3) : 1 + (Math.random() < 0.5 ? 1 : 0));
+        this.dropRoadSack(b);
         // a pet egg: always from big bosses, sometimes from small ones (only kept with a profile)
         if (Leaderboard.identity() && (b.boss.big || Math.random() < 0.35)) this.spawnEgg(b.x, b.y);
         Sfx.arpeggio([523, 659, 784, 1046, 1318], 0.09, { type: 'triangle', volume: 0.12 });
         this.monsters.forEach(m => { if (m.minion || m.lichAdd || m.body === b) m.behavior = 'flee'; });
         this.encounterWon();
+    },
+
+    /** Everything the road took since the last boss bursts out of this one. */
+    dropRoadSack(b) {
+        const s = this.roadSack;
+        if (!s || !(s.coins + s.gems + s.eggs)) return;
+        if (s.coins) this.spawnCoins(b.x, b.y, s.coins, 5, 7);
+        if (s.gems) this.spawnGems(b.x, b.y, s.gems);
+        for (let i = 0; i < s.eggs; i++) this.spawnEgg(b.x, b.y);
+        this.floater(b.x, b.y - b.size - 44, `👑 ROAD TROPHIES +${s.coins} 🪙`, '#fde68a', 22);
+        this.roadSack = { coins: 0, gems: 0, eggs: 0 };
     },
 
     /** Boss bar: combined HP of all boss bodies (both lich halves; the hydra's body). */

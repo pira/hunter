@@ -77,6 +77,14 @@ extendGame({
             shown.map(u => `<span class="up" title="${u.name}">${u.icon}<sup>${this.stack(u.id)}</sup></span>`).join('') +
             (hidden > 0 ? `<button class="up more" data-more="1" aria-label="All upgrades">+${hidden}</button>` : ''));
         this.setHtml('coins', this.el.coins, `${COIN} ${this.coins}`);
+        const sack = this.roadSack || {};
+        const sackTxt = sack.coins || sack.gems || sack.eggs
+            ? `👑 ${sack.coins ? `${COIN}${sack.coins}` : ''}${sack.gems ? ` ${GEM}${sack.gems}` : ''}${sack.eggs ? ` 🥚${sack.eggs}` : ''}` : '';
+        if (this.hud.sack !== sackTxt) {
+            this.hud.sack = sackTxt;
+            this.el.sack.hidden = !sackTxt;
+            this.el.sack.innerHTML = sackTxt;
+        }
         if (this.gems > 0) {
             this.el.gems.hidden = false;
             this.setHtml('gems', this.el.gems, `${GEM} ${this.gems}`);

@@ -54,6 +54,19 @@ extendGame({
         return this.H - 90;
     },
 
+    /** The boss keeps what the road took: it drops it all when it dies. */
+    toRoadSack(c) {
+        const s = this.roadSack || (this.roadSack = { coins: 0, gems: 0, eggs: 0 });
+        if (c.egg) s.eggs++;
+        else if (c.gem) s.gems++;
+        else s.coins += c.value;
+        c.life = 0;
+        if (this.frameNo - (this.sackFloatAt || 0) > 30) {
+            this.sackFloatAt = this.frameNo;
+            this.floater(U.clamp(c.x, 40, this.W - 40), this.H - 26, '→ 👑', '#fde68a', 14, true);
+        }
+    },
+
     get roadMult() {
         return (this.artefactMult ? this.artefactMult('road') : 1) * (this.buffs.brake ? 0.6 : 1) * (this.timers.roadBrake > 0 ? 0.5 : 1);
     },
@@ -67,9 +80,15 @@ extendGame({
     updateRoad() {
         const v = this.roadSpeed;
         this.roadY += v;
-        for (const m of this.monsters) if (!m.anchored && !m.boss) m.y += v;
-        for (const c of this.coinDrops) c.y += v;
-        for (const pu of this.powerups) pu.y += v;
+        for (const m of this.monsters) {
+            if (m.anchored || m.boss) continue;
+            // chasers walk on the road, so they hold their ground a little against it
+            m.y += m.behavior === 'chase' && !m.dying ? v * (1 - CHASE_ROAD_GRIP) : v;
+        }
+        // loot in the bottom strip grips the ground: the road only slowly drags it off
+        const sticky = this.H - STICKY_STRIP;
+        for (const c of this.coinDrops) c.y += c.y > sticky ? v * STICKY_ROAD : v;
+        for (const pu of this.powerups) pu.y += pu.y > sticky ? v * STICKY_ROAD : v;
         for (const g of this.grenades) {
             g.y += v;
             g.sy += v;
@@ -82,7 +101,8 @@ extendGame({
             this.seam.y += v;
             if (this.seam.y > this.H + 60) this.finishTravel();
         }
-        // Loot that drifts off the bottom is gone.
+        // Powerups that drift off the bottom are gone; coins, gems and eggs go to the next boss.
+        for (const c of this.coinDrops) if (c.life > 0 && c.y >= this.H + 12) this.toRoadSack(c);
         this.coinDrops = this.coinDrops.filter(c => c.y < this.H + 12);
         this.powerups = this.powerups.filter(pu => pu.y < this.H + 20);
         this.decals = this.decals.filter(d => d.y < this.H + 40);

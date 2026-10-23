@@ -215,6 +215,8 @@ extendGame({
         } else {
             if (++m.dirT >= m.dirRate) {
                 m.dir = Math.random() * TAU;
+                // a slight up-screen lean: down-turns flip up a little more often (WANDER_UP_BIAS)
+                if (Math.sin(m.dir) > 0 && Math.random() < 2 * WANDER_UP_BIAS) m.dir = -m.dir;
                 m.dirT = 0;
                 m.dirRate = 60 + Math.random() * 120;
             }
