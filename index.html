@@ -69,6 +69,11 @@
         .icon-btn { pointer-events: auto; width: 2.3em; height: 2.3em; border-radius: 50%; border: 1px solid var(--line); background: rgba(0,0,0,.4); font-size: 1em; display: grid; place-items: center; padding: 0; }
         #combo { top: calc(52px * var(--ui) + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); text-align: center; opacity: 0; transition: opacity .2s; min-width: 11em; }
         #combo.show { opacity: 1; }
+        #goldMult { font-family: var(--display); font-size: 1.35em; color: var(--gold); text-shadow: 0 0 10px rgba(250,204,21,.8), 0 2px 0 rgba(0,0,0,.5); }
+        #goldMult[hidden] { display: none; }
+        #combo.gold-only #comboMult, #combo.gold-only #comboCount { display: none; }
+        .mults { display: flex; gap: .55em; font-family: var(--display); font-size: .78em; color: #e2e8f0; text-shadow: 0 1px 2px #000; min-height: 1em; }
+        .mults span { white-space: nowrap; }
         #combo .row { display: flex; align-items: baseline; justify-content: center; gap: 8px; }
         #comboMult { font-family: var(--display); font-size: 1.7em; color: #fff; text-shadow: 0 2px 0 rgba(0,0,0,.5); }
         #combo[data-tier="2"] #comboMult { color: #7CFC00; }
@@ -175,6 +180,13 @@
         #levelupSub { margin: .3em 0 1.2em; color: #e2e8f0; }
         @keyframes pop { from { transform: scale(.5); opacity: 0; } }
         #cards { display: flex; gap: 14px; justify-content: center; }
+        .core-title { margin: .2em 0 .35em; font-size: .72em; letter-spacing: 1px; text-transform: uppercase; color: #c4b5fd; }
+        .core-row { display: flex; gap: 8px; justify-content: center; margin-bottom: 14px; }
+        .card.core { flex: 1 1 0; max-width: 10.5em; padding: .5em .5em .55em; gap: .15em; font-size: .78em; border-radius: 14px; }
+        .card.core .num { top: 4px; left: 7px; }
+        .card.core .cicon { font-size: 1.5em; }
+        .card.core .cdesc { font-size: .85em; }
+        #levelup.intro .core-row, #levelup.intro .core-title { visibility: hidden; }
         .card { position: relative; flex: 1 1 0; max-width: 14em; display: flex; flex-direction: column; align-items: center; gap: .35em; padding: 1.2em .9em 1em; border-radius: 18px; border: 2px solid rgba(255,255,255,.18); background: linear-gradient(180deg, #1e293b, #0f172a); box-shadow: 0 8px 0 rgba(0,0,0,.35); transition: transform .12s, border-color .12s; }
         #levelup:not(.intro) .card { animation: deal .35s ease-out backwards; animation-delay: var(--d); }
         .card:hover { transform: translateY(-6px); border-color: var(--gold); }
@@ -236,6 +248,13 @@
         .killer { display: flex; align-items: center; justify-content: center; gap: .4em; color: #cbd5e1; margin: .2em 0 .6em; }
         #newBest { display: inline-block; background: linear-gradient(90deg, #facc15, #f97316); color: #3b1d00; font-family: var(--display); padding: .15em .7em; border-radius: 999px; margin-bottom: .6em; animation: throb .5s infinite alternate; }
         /* boss summary: shown when a boss's loot is in */
+        .btn.resume { display: flex; flex-direction: column; align-items: center; width: fit-content; margin: 0 auto .6em; background: linear-gradient(180deg, #86efac, #16a34a); color: #052e16; box-shadow: 0 5px 0 #14532d; }
+        .btn.resume small { font-family: inherit; font-size: .55em; letter-spacing: 0; opacity: .85; }
+        .btn.resume[hidden] { display: none; }
+        .level-pop { position: absolute; left: 50%; top: 34%; transform: translate(-50%, -50%) scale(.9); z-index: 2; pointer-events: none; opacity: 0; transition: opacity .25s, transform .25s; padding: .6em 1.1em .7em; border-radius: 16px; background: rgba(15,23,42,.82); border: 2px solid rgba(250,204,21,.45); text-align: center; color: #e2e8f0; white-space: nowrap; }
+        .level-pop.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+        .level-pop b { display: block; font-family: var(--display); font-weight: normal; font-size: 1.3em; color: var(--gold); letter-spacing: 1px; margin-bottom: .2em; }
+        .level-pop .lp-row { display: flex; gap: .9em; justify-content: center; flex-wrap: wrap; font-size: .95em; }
         .bs-panel { max-width: 30em; width: 100%; text-align: center; }
         #bsTitle { font-size: 2.1em; color: var(--gold); text-shadow: 0 4px 0 #3b1d00; }
         .bs-sub { margin: .2em 0 .7em; color: var(--muted); }
@@ -431,6 +450,8 @@
             #comboCount { display: none; }
             .pu { font-size: 1.05em; padding: 1px 4px; }
             #cards { flex-direction: column; align-items: stretch; gap: 10px; }
+            .core-row { display: grid; grid-template-columns: 1fr 1fr; }
+            .card.core { max-width: none; flex-direction: column; text-align: center; }
             .card { max-width: none; flex-direction: row; text-align: left; padding: .8em 1em; flex-wrap: wrap; column-gap: .8em; }
             .cicon { font-size: 2em; }
             .cdesc { flex-basis: 100%; }
@@ -454,6 +475,7 @@
         <div id="hud" class="hidden">
             <div class="hud-left">
                 <div id="hearts"></div>
+                <div id="mults" class="mults"></div>
                 <div class="lvl"><span id="levelLabel">LV 1</span><div class="xpbar"><div id="xpFill"></div></div></div>
                 <div class="purse"><span id="coins"><i class="i-coin"></i> 0</span><span id="gems" hidden><i class="i-gem"></i> 0</span><span id="sack" hidden title="The road took these: the next boss holds them, beat it to get them back"></span></div>
             </div>
@@ -464,7 +486,8 @@
                 <button id="muteBtn" class="icon-btn" aria-label="Toggle sound">🔊</button>
                 <button id="pauseBtn" class="icon-btn" aria-label="Pause">⏸</button>
             </div>
-            <div id="combo"><div class="row"><span id="comboMult">×1</span><span id="comboCount"></span></div><div class="combobar"><div id="comboFill"></div></div></div>
+            <div id="combo"><div class="row"><span id="comboMult">×1</span><span id="comboCount"></span><span id="goldMult" hidden></span></div><div class="combobar"><div id="comboFill"></div></div></div>
+            <div id="levelPop" class="level-pop"></div>
             <button id="superBtn" aria-label="Super"><span>⚡</span><b>SUPER</b><small>SPACE</small></button>
         </div>
 
@@ -500,6 +523,7 @@
                 </div>
                 <div id="classPicker" class="class-picker"></div>
                 <p id="classInfo" class="class-info"></p>
+                <button id="resumeBtn" class="btn primary resume" hidden>⏯ RESUME</button>
                 <button id="playBtn" class="btn primary">▶ PLAY</button>
                 <div class="howto desktop-only">
                     <kbd>WASD</kbd> move · you attack on your own · hold <kbd>click</kbd> to aim<br>
@@ -520,9 +544,11 @@
                 <h2 id="levelupTitle">LEVEL 2!</h2>
                 <p id="levelupSub">Spend coins on upgrades</p>
                 <div id="shopCoins"><i class="i-coin"></i> 0</div>
+                <p class="core-title">Whole-run upgrades — always on offer</p>
+                <div id="coreCards" class="core-row"></div>
                 <div id="cards"></div>
                 <button id="continueBtn" class="btn primary">CONTINUE ▶</button>
-                <p class="shop-hint desktop-only"><kbd>1</kbd>–<kbd>4</kbd> buy · <kbd>Enter</kbd> continue</p>
+                <p class="shop-hint desktop-only"><kbd>1</kbd>–<kbd>7</kbd> buy · <kbd>Enter</kbd> continue</p>
             </div>
         </div>
 
@@ -621,5 +647,6 @@
     <script src="js/profile.js"></script>
     <script src="js/meta.js"></script>
     <script src="js/pets.js"></script>
+    <script src="js/save.js"></script>
 </body>
 </html>

@@ -129,7 +129,6 @@ extendGame({
 
     updateMonsters(dying) {
         const p = this.player;
-        const freeze = this.mobSpeedMult;
         for (const m of this.monsters) {
             if (m.dead) continue;
             if (m.spawnT > 0) m.spawnT--;
@@ -138,6 +137,9 @@ extendGame({
             if (m.stun > 0) m.stun--;
             m.phase += 0.12;
 
+            const ice = this.iceMult(m.x, m.y, m.size);
+            m.iced = ice < 1;
+            const freeze = this.mobSpeedMult * ice;
             if (m.dying) {
                 this.updateBossDeath(m);
                 continue;

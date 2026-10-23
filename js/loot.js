@@ -11,25 +11,45 @@ extendGame({
         }
     },
 
+    /** How many drops a chance gives: above 100% the rest is the chance of one more (200% = two). */
+    dropRolls(chance) {
+        return Math.floor(chance) + (Math.random() < chance % 1 ? 1 : 0);
+    },
+
+    /** Mythic skins: every drop chance ×2. */
+    get dropsMult() {
+        return this.artefactMult('drops');
+    },
+
+    /** Gold Rush (+15% a rank) and rare skins (+5%) raise the chance a monster drops coins. */
+    get coinDropMult() {
+        return (1 + 0.15 * this.stack('goldrush')) * this.artefactMult('coinDrop') * this.dropsMult;
+    },
+
     dropLootOnce(m, twice = false) {
         const luck = this.luckMult * (twice ? 2 : 1);
         const [chance, base] = m.minion ? [0.15, 1] : COIN_DROPS[m.tier] || [0, 0];
         // Coins scale with monster HP (unlike v2), so late levels pay more.
-        if (Math.random() < chance) this.spawnCoins(m.x, m.y, U.coinDrop(base, this.level, 0.8 + Math.random() * 0.4), 2.2);
+        const coinDrops = this.dropRolls(chance * this.coinDropMult);
+        for (let i = 0; i < coinDrops; i++) this.spawnCoins(m.x, m.y, U.coinDrop(base, this.level, 0.8 + Math.random() * 0.4), 2.2);
         if (m.minion) return;
-        if (!m.boss && Math.random() < (GEM_CHANCE[m.gk ? 'gatekeeper' : m.tier] || 0) * Math.sqrt(luck)) this.spawnGems(m.x, m.y, 1);
+        if (!m.boss) {
+            const gems = this.dropRolls((GEM_CHANCE[m.gk ? 'gatekeeper' : m.tier] || 0) * Math.sqrt(luck) * this.dropsMult);
+            if (gems) this.spawnGems(m.x, m.y, gems);
+        }
 
         // Powerups are throttled: one per DROP_COOLDOWN and never more than a few on the floor.
         const onField = this.powerups.filter(pu => !pu.loot).length;
-        if (this.dropCd <= 0 && onField < MAX_FIELD_POWERUPS && Math.random() < (DROP_CHANCE[m.tier] || (m.gk ? 0.5 : 0)) * luck) {
-            this.spawnPowerup(m.x, m.y, null, { pop: true });
+        const pus = this.dropRolls((DROP_CHANCE[m.tier] || (m.gk ? 0.5 : 0)) * luck * this.dropsMult);
+        if (this.dropCd <= 0 && onField < MAX_FIELD_POWERUPS && pus > 0) {
+            for (let i = 0; i < Math.min(pus, MAX_FIELD_POWERUPS - onField); i++) this.spawnPowerup(m.x, m.y, null, { pop: true });
             this.dropCd = DROP_COOLDOWN;
             return;
         }
         if (m.gk && (m.gen || 0) === 0) this.spawnCoins(m.x, m.y, 6 + this.level, 3.5, 5);
         // Hearts have their own, more generous roll while you're hurt.
         const p = this.player;
-        if (p.hp < p.maxHp && this.heartCd <= 0 && Math.random() < (m.size > 14 ? 0.05 : 0.01) * luck) {
+        if (p.hp < p.maxHp && this.heartCd <= 0 && Math.random() < (m.size > 14 ? 0.05 : 0.01) * luck * this.dropsMult) {
             this.spawnPowerup(m.x, m.y, 'heart', { pop: true });
             this.heartCd = 600;
         }
@@ -146,7 +166,7 @@ extendGame({
     spawnPowerup(x, y, type, { pop = false, loot = false, speed = 2.5 } = {}) {
         if (!type) {
             const pets = Boolean(this.petList && this.petList.length);
-            type = U.pickWeighted(Object.entries(POWERUPS).filter(([, d]) => !d.needsPets || pets).map(([k, d]) => ({ k, weight: d.weight }))).k;
+            type = U.pickWeighted(Object.entries(POWERUPS).filter(([, d]) => (!d.needsPets || pets) && !(loot && d.instant)).map(([k, d]) => ({ k, weight: d.weight }))).k;
         }
         const a = Math.random() * TAU;
         this.powerups.push({
@@ -204,12 +224,13 @@ extendGame({
         this.burst(pu.x, pu.y, def.color, 14, 4);
         if (pu.type === 'storm') {
             // Storm runs a fixed 15 s and strikes immediately, then every 3 s.
-            this.timers.storm = Math.min(TIMER_CAP, this.timers.storm + this.powerupDuration('storm'));
+            this.timers.storm = Math.max(this.timers.storm, this.powerupDuration('storm')); // refill, don't stack
             this.stormClock = 1;
             this.floater(p.x, p.y - 36, 'STORM!', def.color, 24);
             Sfx.play('powerup', { volume: 0.32, rate: 0.9 });
         } else if (def.timed) {
-            this.timers[pu.type] = Math.min(TIMER_CAP, this.timers[pu.type] + this.powerupDuration(pu.type));
+            this.timers[pu.type] = Math.max(this.timers[pu.type], this.powerupDuration(pu.type)); // refill, don't stack
+            if (pu.type === 'kickback') this.kickClock = 1;
             this.floater(p.x, p.y - 36, def.name.toUpperCase(), def.color, 22);
             Sfx.play('powerup', { volume: 0.32 });
         } else if (pu.type === 'heart') {
@@ -283,12 +304,12 @@ extendGame({
             const r = Math.random() * POISON_RADIUS;
             this.particle({ x: p.x + Math.cos(a) * r, y: p.y + Math.sin(a) * r * 0.7, vx: (Math.random() - 0.5) * 0.4, vy: -0.25, life: 40, size: 8 + Math.random() * 12, grow: 0.3, color: 'rgba(132,204,22,0.16)', kind: 'smoke' });
         }
-        if (this.poisonT % 54 !== 0) return; // 1 HP per second
+        if (this.poisonT % 54 !== 0) return; // a tick per second
         for (const m of this.monsters) {
             if (m.dead || m.dying) continue;
             if (U.distanceSquared(m.x, m.y, p.x, p.y) < (POISON_RADIUS + m.size * 0.5) ** 2) {
                 m.poison = 30;
-                this.damageMonster(m, 1, { sound: false, aoe: true, dot: true, numColor: '#bef264' });
+                this.damageMonster(m, this.stack('toxin') ? 2 : 1, { sound: false, aoe: true, dot: true, numColor: '#bef264' });
             }
         }
     },

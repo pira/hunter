@@ -77,29 +77,32 @@ const STICKY_ROAD = 0.25;     // …and the road moves it at this fraction of it
 const POWERUP_LIFE = 990;     // steps a dropped powerup lasts (coins never expire)
 const CHASE_ROAD_GRIP = 0.2;  // chasers walk against the road: they cancel this share of its drift
 const WANDER_UP_BIAS = 0.01;  // wanderers turn up-screen this much more often than down
-const TIMER_CAP = Math.round(30 * 60 * GAME_SPEED); // a powerup can never stack past 30 real seconds
+// Picking up a powerup that is already running refills its timer (no stacking, no cap: Overtime counts).
+const KICK = { every: Math.round(2 * 60 * GAME_SPEED), radius: 140, push: 70 }; // Kickback powerup
 // Coins per kill: [chance, tierBase]; amount = tierBase × hpScale(L) × rand(0.8–1.2) × coin multipliers.
 const COIN_DROPS = {
     small: [0.35, 1], medium: [0.5, 2], large: [0.85, 4], elite: [1, 6],
     legendary: [1, 8], mythic: [1, 11], ancient: [1, 15], ultimate: [1, 25]
 };
 
-// Pickups. Timed ones last `secs` (× Overtime, × Hourglass), capped at 30 real seconds.
+// Pickups. `instant` ones hit monsters right away, so end-of-level loot (nobody left to hit) never has them.
+// Timed ones last `secs` (× Overtime, × Hourglass), capped at 30 real seconds.
 const POWERUPS = {
     storm: { emoji: '🌩️', name: 'Storm', color: '#7dd3fc', timed: true, secs: 15, weight: 0.8 },
     overcharge: { emoji: '🔋', name: 'Overcharge', color: '#facc15', weight: 0.5 },
     poison: { emoji: '🧪', name: 'Poison Cloud', color: '#84cc16', timed: true, secs: 20, weight: 0.7 },
-    stun: { emoji: '💫', name: 'Stun', color: '#fde047', weight: 0.25 },
+    stun: { emoji: '💫', name: 'Stun', color: '#fde047', weight: 0.25, instant: true },
     rapidFire: { emoji: '⚡', name: 'Rapid Fire', color: '#00CED1', timed: true, secs: 10, weight: 0.9 },
     invincible: { emoji: '🛡️', name: 'Invincible', color: '#7CFC00', timed: true, secs: 10, weight: 0.35 },
-    freeze: { emoji: '❄️', name: 'Freeze', color: '#87CEEB', timed: true, secs: 12, weight: 0.7 },
+    freeze: { emoji: '❄️', name: 'Ice Cloud', color: '#87CEEB', timed: true, secs: 12, weight: 0.7 },
+    kickback: { emoji: '💨', name: 'Kickback', color: '#e2e8f0', timed: true, secs: 30, weight: 0.6 },
     roadBrake: { emoji: '🐢', name: 'Road Brake', color: '#a3a3a3', timed: true, secs: 10, weight: 0.6 },
     magnet: { emoji: '🧲', name: 'Magnet', color: '#f43f5e', timed: true, secs: 30, weight: 0.7 },
     coins2: { emoji: '🪙', pouch: true, tag: '×2', name: 'Coins ×2', color: '#FFC300', timed: true, secs: 30, weight: 0.8 },
     coins3: { emoji: '🪙', pouch: true, tag: '×3', name: 'Coins ×3', color: '#FF8C00', timed: true, secs: 30, weight: 0.4 },
     heart: { emoji: '❤️', name: 'Extra Life', color: '#FF1493', weight: 1 },
     petBoost: { emoji: '🦴', name: 'Pet Treat', color: '#f59e0b', timed: true, secs: 30, weight: 0.6, needsPets: true },
-    quake: { emoji: '🌋', name: 'Earthquake', color: '#FF4500', weight: 0.3 }
+    quake: { emoji: '🌋', name: 'Earthquake', color: '#FF4500', weight: 0.3, instant: true }
 };
 const TIMED_POWERUPS = Object.keys(POWERUPS).filter(k => POWERUPS[k].timed);
 const POISON_RADIUS = 140;
@@ -117,10 +120,14 @@ const UPGRADES = [
     { id: 'crit', icon: '🎯', name: 'Keen Eye', max: 4, cost: 30, desc: '+8% chance to crit for 2.5× damage' },
     { id: 'streak', icon: '🔥', name: 'Hot Streak', max: 3, cost: 8, desc: 'Combo timer lasts 1s longer' },
     { id: 'luck', icon: '🍀', name: 'Lucky Charm', max: 3, cost: 20, desc: '+30% powerup drops' },
-    { id: 'goldrush', icon: '💰', name: 'Gold Rush', max: 4, cost: 20, desc: '+25% coins' },
+    { id: 'goldrush', icon: '💰', name: 'Gold Rush', max: 4, cost: 20, desc: '+15% chance that monsters drop coins' },
     { id: 'goldrun', icon: '🏦', name: 'Double Gold', max: 1, cost: 80, desc: '×2 coins (stacks with Triple Gold for ×6)' },
     { id: 'magnet', icon: '🧲', name: 'Magnet', max: 3, cost: 9, desc: 'Pull coins from further away' },
-    { id: 'overtime', icon: '⌛', name: 'Overtime', max: 3, cost: 15, desc: 'Powerups last 30% longer (cap 30s)' },
+    { id: 'overtime', icon: '⌛', name: 'Overtime', max: 3, cost: 15, desc: 'Powerups last 30% longer' },
+    { id: 'toxin', icon: '☠️', name: 'Toxic Cloud', max: 1, cost: 20, desc: 'Whole run: Poison Cloud does ×2 damage' },
+    { id: 'frost', icon: '🧊', name: 'Deep Freeze', max: 3, cost: 15, desc: 'Whole run: Ice Cloud slows 10% more' },
+    { id: 'thunder', icon: '⛈️', name: 'Thunder God', max: 1, cost: 20, desc: 'Whole run: Storm’s first strike hits ×2' },
+    { id: 'recoil', icon: '🌪️', name: 'Big Kick', max: 1, cost: 20, desc: 'Whole run: Kickback reaches ×2 as far' },
     { id: 'regen', icon: '🌿', name: 'Regeneration', max: 2, cost: 60, desc: 'Regrow a heart every 40s (25s at rank 2)' },
     { id: 'nova', icon: '💫', name: 'Static Nova', max: 2, cost: 35, desc: 'Taking a hit blasts nearby monsters' },
     { id: 'impact', icon: '💥', name: 'Impact', max: 3, cost: 30, desc: '+15% bolt size, cleave reach and blast radius' },
@@ -131,6 +138,9 @@ const UPGRADES = [
     { id: 'cluster', icon: '🧨', name: 'Cluster Bombs', max: 3, cost: 30, cls: 'goblin', desc: '+1 grenade per throw' },
     { id: 'fuse', icon: '⏲️', name: 'Short Fuse', max: 3, cost: 30, cls: 'goblin', desc: 'Grenades burst 20% sooner and throw 10% faster' }
 ];
+// Core upgrades: always on offer in their own row above the three dealt cards —
+// attack speed, more projectiles (or reach, for the axe), damage and move speed.
+const CORE_CARDS = { wizard: ['haste', 'split', 'power', 'boots'], barbarian: ['haste', 'impact', 'power', 'boots'], goblin: ['haste', 'cluster', 'power', 'boots'] };
 // One-level cards: last until the next level. `cost` = price on the first levels; it grows slowly with
 // the level (×5 by level 52, then flat — U.cardPrice). Cheap = nice to have, pricier = strong.
 const LEVEL_BUFFS = [
@@ -198,12 +208,16 @@ const PETS = {
     bunny: { icon: '🐇', name: 'Bunny', what: 'chance to drop a heart when you get hit', values: [0, 5, 10, 15, 20], label: v => `${v}% heart on a hit` }
 };
 const SKIN_PRICES = { basic: { gold: 300 }, rare: { gold: 2000 }, legendary: { gems: 25 }, mythic: { gems: 60 } };
-// What a skin adds in runs (rare and up): a small themed bonus, same stat keys as artefacts.
-const SKIN_PERKS = {
-    flame: { stat: 'damage', pct: 3 }, shadow: { stat: 'rate', pct: 5 }, celestial: { stat: 'charge', pct: 8 },
-    warlord: { stat: 'gold', pct: 3 }, lava: { stat: 'damage', pct: 5 }, titan: { stat: 'luck', pct: 8 },
-    pirate: { stat: 'gold', pct: 3 }, toxic: { stat: 'timed', pct: 5 }, king: { stat: 'gold', pct: 8 }
+// What a skin adds in runs, by rarity (the same for every class):
+//   basic +5% damage · rare +5% gold drop chance · legendary +10% attack speed and damage ·
+//   mythic ×2 every drop chance (above 100% the rest is a chance of a second drop)
+const RARITY_PERKS = {
+    basic: { bonus: { damage: 0.05 }, text: '+5% damage' },
+    rare: { bonus: { coinDrop: 0.05 }, text: '+5% gold drop chance' },
+    legendary: { bonus: { rate: 0.1, damage: 0.1 }, text: '+10% attack speed & damage' },
+    mythic: { bonus: { drops: 1 }, text: '×2 all drop chances' }
 };
+const skinPerk = id => (SKINS[id] ? RARITY_PERKS[SKINS[id].rarity] : null);
 const STAT_NAMES = { gold: 'gold', damage: 'damage', rate: 'attack speed', charge: 'super charge', speed: 'move speed', luck: 'drop chance', road: 'road speed', timed: 'timed effects', guard: 'dodge' };
 // Gems: very rare drops, likelier from harder monsters; bosses always drop some.
 const GEM_CHANCE = { small: 0.0005, medium: 0.001, large: 0.003, elite: 0.006, legendary: 0.01, mythic: 0.015, ancient: 0.025, ultimate: 0.06, gatekeeper: 0.25 };

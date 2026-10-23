@@ -26,7 +26,9 @@ extendGame({
 
     availableCards() {
         const pets = Boolean(this.petList && this.petList.length);
+        const core = CORE_CARDS[this.cls] || [];
         const permanent = UPGRADES.filter(u => this.stack(u.id) < u.max)
+            .filter(u => !core.includes(u.id)) // those have their own row
             .filter(u => !u.needsPets || pets)
             .filter(u => !u.cls || u.cls === this.cls)
             .filter(u => !u.minLevel || this.level >= u.minLevel)
@@ -37,6 +39,7 @@ extendGame({
     },
 
     cardHeader() {
+        this.el.levelupTitle.textContent = `LEVEL ${this.level - this.pendingLevels + 1}!`;
         if (this.headerShown) return;
         this.headerShown = true;
         const bonus = this.levelBonus(this.level - this.pendingLevels + 1);
@@ -191,6 +194,7 @@ extendGame({
         this.state = 'levelup';
         this.cardsReadyAt = performance.now() + 450;
         this.headerShown = false;
+        this.saveRun();
     },
 
     /** Once the run has earned 1000 coins, the shop rarely (~6%) also offers a pet egg for the profile. */
@@ -206,47 +210,53 @@ extendGame({
 
     prepareCards(mode) {
         const { permanent, buffs } = this.availableCards();
-        const cards = U.dealCards(permanent, buffs, 3);
-        this.cardChoices = cards.map(c => ({ ...c, price: this.cardPrice(c), sold: false }));
-        const art = this.artefactCard();
-        if (art) this.cardChoices.push({ ...art, sold: false });
+        const cards = U.dealCards(permanent, buffs, 3).map(c => ({ ...c, price: this.cardPrice(c), sold: false }));
+        // a pet egg, when it shows up, takes the place of the third card (never a fourth)
+        const egg = this.artefactCard();
+        if (egg) cards.splice(Math.min(2, cards.length), 1, { ...egg, sold: false });
+        // the core row: always there (maxed ones stay, greyed out)
+        const core = (CORE_CARDS[this.cls] || []).map(id => UPGRADES.find(u => u.id === id)).filter(Boolean)
+            .map(u => ({ ...u, core: true, price: this.cardPrice(u), sold: false, maxed: this.stack(u.id) >= u.max }));
+        this.cardChoices = [...cards, ...core];
         this.cardMode = mode;
         this.cardHeader();
-
-        this.el.cards.innerHTML = this.cardChoices.map((c, i) => {
+        const card = (c, i) => {
             const rank = this.stack(c.id);
             const pips = Number.isFinite(c.max) && c.max > 1
                 ? `<div class="pips">${Array.from({ length: c.max }, (_, k) => `<i class="${k < rank ? 'on' : k === rank ? 'next' : ''}"></i>`).join('')}</div>`
                 : '';
             const kind = c.artefact ? 'art' : c.oneLevel ? 'lvl' : 'perm';
-            const tag = c.artefact ? '<span class="tag art">✨ PERMANENT</span>'
+            const tag = c.core ? '' : c.artefact ? '<span class="tag art">✨ PERMANENT</span>'
                 : c.oneLevel ? `<span class="tag lvl">${c.buff ? 'THIS LEVEL' : 'NOW'}</span>`
                     : `<span class="tag perm">WHOLE RUN${c.cls ? ` · ${CLASSES[c.cls].icon}` : ''}</span>`;
-            return `<button class="card ${kind}" data-i="${i}" style="--d:${i * 70}ms"><span class="num">${i + 1}</span>` +
+            return `<button class="card ${kind}${c.core ? ' core' : ''}" data-i="${i}" style="--d:${i * 70}ms"><span class="num">${i + 1}</span>` +
                 `<span class="cicon">${c.icon}</span><span class="cname">${c.name}</span>${tag}` +
                 `<span class="cdesc">${c.desc}</span>${pips}<span class="price">${COIN} ${c.price}</span></button>`;
-        }).join('');
-        this.el.cards.querySelectorAll('.card').forEach(btn =>
+        };
+        this.el.coreCards.innerHTML = this.cardChoices.map((c, i) => (c.core ? card(c, i) : '')).join('');
+        this.el.cards.innerHTML = this.cardChoices.map((c, i) => (c.core ? '' : card(c, i))).join('');
+        this.el.levelup.querySelectorAll('.card').forEach(btn =>
             btn.addEventListener('click', () => this.buyCard(Number(btn.dataset.i))));
         this.refreshShop();
     },
 
     refreshShop() {
         this.el.shopCoins.innerHTML = `${COIN} ${this.coins}<span class="g">${GEM} ${this.gems || 0}</span>`;
-        this.el.cards.querySelectorAll('.card').forEach(btn => {
+        this.el.levelup.querySelectorAll('.card').forEach(btn => {
             const c = this.cardChoices[Number(btn.dataset.i)];
-            btn.classList.toggle('sold', c.sold);
-            btn.classList.toggle('afford', !c.sold && c.price <= this.coins);
-            btn.classList.toggle('poor', !c.sold && c.price > this.coins);
-            btn.querySelector('.price').innerHTML = c.sold ? '✓ BOUGHT' : `${COIN} ${c.price}`;
+            const done = Boolean(c.sold || c.maxed);
+            btn.classList.toggle('sold', done);
+            btn.classList.toggle('afford', !done && c.price <= this.coins);
+            btn.classList.toggle('poor', !done && c.price > this.coins);
+            btn.querySelector('.price').innerHTML = c.maxed ? 'MAX' : c.sold ? '✓ BOUGHT' : `${COIN} ${c.price}`;
         });
     },
 
     buyCard(i) {
         if (this.state !== 'levelup' || performance.now() < this.cardsReadyAt) return;
         const card = this.cardChoices[i];
-        const btn = this.el.cards.querySelector(`.card[data-i="${i}"]`);
-        if (!card || card.sold) return;
+        const btn = this.el.levelup.querySelector(`.card[data-i="${i}"]`);
+        if (!card || card.sold || card.maxed) return;
         if (card.price > this.coins) {
             Sfx.tone(160, { duration: 0.15, type: 'square', volume: 0.08 });
             if (btn) {

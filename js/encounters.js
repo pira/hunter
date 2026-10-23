@@ -22,6 +22,7 @@ extendGame({
     // ------------------------------------------------------------------ level flow
 
     startLevel() {
+        this.markLevelStart();
         this.phase = 'intro';
         this.introT = this.level > 1 ? 50 : 10;
         this.progress = 0;
@@ -89,8 +90,10 @@ extendGame({
     },
 
     startTravel() {
+        const bossLevel = this.bossLootPhase || (this.encounter && (this.encounter.kind === 'bigBoss' || this.encounter.kind === 'smallBoss'));
         this.bossLootPhase = false;
         this.phase = 'travel';
+        this.showLevelPop(bossLevel);
         this.seam = { y: -130, biome: this.biomeFor(this.level + 1) };
         this.biomeTile(this.seam.biome); // render the next tile now, before it scrolls in
         Sfx.fx('whoosh', 0.9, (d, rate, len, k) => {

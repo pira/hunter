@@ -40,7 +40,8 @@ export const BOARD_V3 = 'board#v3';
 export const CLASSES = ['wizard', 'barbarian', 'goblin'];
 export const MIN_LEVEL_SECONDS = 12; // no level (fight + encounter + travel) is faster than this
 export const MAX_SCORE = 50_000_000;
-export const MAX_RUN_MS = 6 * 3600 * 1000;
+export const MAX_RUN_MS = 6 * 3600 * 1000; // longest playing time a run may claim
+export const MAX_TOKEN_MS = 7 * 24 * 3600 * 1000; // a run may be paused (and saved/restored) for up to a week
 export const SUBMITS_PER_MINUTE = 6;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const SECRET_RE = /^[A-Za-z0-9_-]{32,128}$/;
@@ -313,7 +314,7 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
         if (!token) throw new HttpError(403, 'invalid run token');
         const elapsed = now() - token.issuedAt;
         // The claimed run length must fit in the real time since the run started (pause time only adds slack).
-        if (elapsed > MAX_RUN_MS || run.duration * 1000 > elapsed + 15000) throw new HttpError(403, 'run timing mismatch');
+        if (elapsed > MAX_TOKEN_MS || run.duration * 1000 > elapsed + 15000) throw new HttpError(403, 'run timing mismatch');
         const v3 = body.board === 'v3';
         if (v3) checkPlausibleV3(run);
         else checkPlausible(run);
@@ -328,7 +329,7 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
         const id = random(6).toString('base64url');
         const board = v3 ? BOARD_V3 : BOARD;
         const sk = `${pad(MAX_SCORE - run.score, 9)}#${pad(ts, 14)}#${id}`;
-        const nonceItem = { pk: 'nonce', sk: token.nonce, ttl: Math.floor(ts / 1000) + 8 * 3600 };
+        const nonceItem = { pk: 'nonce', sk: token.nonce, ttl: Math.floor((token.issuedAt + MAX_TOKEN_MS) / 1000) + 3600 };
         const { coins: unspent, gems: _gems, eggCards: _cards, bossEggs: _boss, ...shown } = run;
         const boardItem = { pk: board, sk, id, ...shown, ts };
         if (pid) boardItem.playerId = pid;
@@ -690,7 +691,40 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
             ExpressionAttributeValues: { ':n': name, ':t': ts, ':one': 1, ':h': sha256(body.secret) },
             ReturnValues: 'ALL_NEW'
         });
+        await renameBoardRows(pid, name);
         return { player: publicMeta(pid, out.Attributes) };
+    }
+
+    /** The name on the leaderboards follows the profile: every board row of this player's runs. */
+    async function renameBoardRows(pid, name) {
+        let ExclusiveStartKey;
+        let done = 0;
+        do {
+            const out = await send('Query', {
+                KeyConditionExpression: 'pk = :pk AND begins_with(sk, :run)',
+                ExpressionAttributeValues: { ':pk': `player#${pid}`, ':run': 'run#' },
+                Limit: 100,
+                ExclusiveStartKey
+            });
+            for (const r of out.Items || []) {
+                const id = String(r.sk).split('#')[2];
+                if (!id || !isInt(r.score, 1, MAX_SCORE)) continue;
+                const board = r.board === 'v3' || r.cls ? BOARD_V3 : BOARD;
+                try {
+                    await send('Update', {
+                        Key: { pk: board, sk: `${pad(MAX_SCORE - r.score, 9)}#${pad(r.ts, 14)}#${id}` },
+                        UpdateExpression: 'SET #n = :n',
+                        ConditionExpression: 'attribute_exists(pk) AND playerId = :pid',
+                        ExpressionAttributeNames: { '#n': 'name' },
+                        ExpressionAttributeValues: { ':n': name, ':pid': pid }
+                    });
+                } catch (e) {
+                    if (e.name !== 'ConditionalCheckFailedException') throw e;
+                }
+                done++;
+            }
+            ExclusiveStartKey = out.LastEvaluatedKey;
+        } while (ExclusiveStartKey && done < 1000);
     }
 
     function parseBody(event) {

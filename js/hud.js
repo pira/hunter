@@ -36,7 +36,15 @@ extendGame({
         this.setText('score', this.el.score, this.score.toLocaleString());
 
         const mult = U.comboMultiplier(this.combo);
-        this.el.combo.classList.toggle('show', this.combo >= 2);
+        // coin multiplier next to the combo while a gold boost runs
+        const gold = this.goldBoost >= 2 ? Math.round(this.coinMult * 10) / 10 : 0;
+        this.setText('goldMult', this.el.goldMult, gold ? `🪙×${gold}` : '');
+        this.el.goldMult.hidden = !gold;
+        this.el.combo.classList.toggle('gold-only', Boolean(gold) && this.combo < 2);
+        this.el.combo.classList.toggle('show', this.combo >= 2 || Boolean(gold));
+        // attack rate, damage and move speed multipliers under the hearts (only the ones that changed)
+        const fx = (icon, v, title) => (Math.abs(v - 1) >= 0.05 ? `<span title="${title}">${icon}×${Math.round(v * 10) / 10}</span>` : '');
+        this.setHtml('mults', this.el.mults, fx('⚔️', this.rateMult, 'attack speed') + fx('💪', this.damageMult * this.powerMult, 'damage') + fx('👟', this.moveMult, 'move speed'));
         this.el.combo.dataset.tier = mult;
         this.setText('comboMult', this.el.comboMult, `×${mult}`);
         const next = U.nextComboTier(this.combo);
@@ -140,6 +148,7 @@ extendGame({
 
     showGameOver() {
         this.state = 'gameover';
+        this.clearSavedRun();
         this.releaseWakeLock();
         Sfx.setActive(false);
         this.timeScale = 1;
@@ -206,6 +215,28 @@ extendGame({
             level: this.level, time: this.time, coins: this.coinsEarned || 0, kills: this.kills || 0, hits: this.hits || 0,
             hearts: this.heartsLost || 0, green: this.greenLost || 0, gems: this.gems || 0, eggs: (this.eggCards || 0) + (this.bossEggs || 0), score: this.score
         };
+    },
+
+    /** A 3 s card while the road carries you to the next level: what this level brought. */
+    showLevelPop(bossLevel) {
+        const el = document.getElementById('levelPop');
+        if (!el) return;
+        const now = this.stageSnapshot();
+        const was = this.levelSnap || now;
+        const d = k => now[k] - was[k];
+        const lost = d('hearts') + d('green');
+        const r = bossLevel && this.lastSackReturn ? this.lastSackReturn.coins : 0;
+        el.innerHTML = `<b>LEVEL ${this.level} DONE</b><div class="lp-row">` +
+            `<span>${COIN} ${d('coins').toLocaleString()}</span>` +
+            (d('gems') ? `<span>${GEM} ${d('gems')}</span>` : '') +
+            (r ? `<span>👑 ${COIN} ${r.toLocaleString()} boss gold</span>` : '') +
+            `<span>💀 ${d('kills')}</span>` +
+            `<span>${lost ? `💔 ${lost}` : '❤️ no hearts lost'}</span></div>`;
+        el.classList.remove('show');
+        void el.offsetWidth;
+        el.classList.add('show');
+        clearTimeout(this.levelPopTimer);
+        this.levelPopTimer = setTimeout(() => el.classList.remove('show'), 3000);
     },
 
     showBossStats() {

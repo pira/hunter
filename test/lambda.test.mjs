@@ -120,6 +120,25 @@ describe('lambda: player profiles', () => {
         assert.equal(res.body.player.runs, 3);
     });
 
+    it('renaming also renames the player on the leaderboards', async () => {
+        await submitAs(PID, SECRET);
+        await submitAs(PID, SECRET, { score: 2000 });
+        const res = await t.call('POST', `/player/${PID}/name`, { secret: SECRET, name: 'Renamed' });
+        assert.equal(res.status, 200);
+        const board = await t.call('GET', '/scores');
+        assert.deepEqual(board.body.scores.filter(s => s.playerId === PID).map(s => s.name), ['Renamed', 'Renamed']);
+    });
+
+    it('accepts a run that was paused for a long time (up to a week)', async () => {
+        const token = await t.startRun();
+        t.advance(3 * 24 * 3600 * 1000);
+        const res = await t.call('POST', '/scores', { ...run(), token, playerId: PID, secret: SECRET });
+        assert.equal(res.status, 200);
+        const late = await t.startRun();
+        t.advance(8 * 24 * 3600 * 1000);
+        assert.equal((await t.call('POST', '/scores', { ...run(), token: late })).status, 403);
+    });
+
     it('renames with the right secret only', async () => {
         await submitAs(PID, SECRET);
         assert.equal((await t.call('POST', `/player/${PID}/name`, { secret: 'c'.repeat(43), name: 'Hacker' })).status, 403);

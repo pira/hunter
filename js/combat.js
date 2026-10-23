@@ -480,6 +480,38 @@ extendGame({
         }
     },
 
+    /** Kickback powerup: every 2 s a shockwave rolls out from you and shoves monsters away. */
+    updateKickback() {
+        if (this.timers.kickback > 0 && !this.lootFrozen && --this.kickClock <= 0) {
+            this.kickClock = KICK.every;
+            const p = this.player;
+            this.kickWaves = this.kickWaves || [];
+            this.kickWaves.push({ x: p.x, y: p.y, r: 10, max: KICK.radius * (this.stack('recoil') ? 2 : 1), hit: new Set() });
+            Sfx.fx('kick', 0.35, (d, rate, len, k) => {
+                const r = k.rng(5);
+                for (let i = 0; i < len; i++) d[i] = (r() * 2 - 1) * Math.pow(1 - i / len, 2);
+                k.biquad(d, rate, 'lowpass', t => 900 * (1 - t) + 120, 0.9);
+                k.normalize(d, 0.7);
+            }, { volume: 0.25 });
+        }
+        if (!this.kickWaves || !this.kickWaves.length) return;
+        const kb = KICK.push / 5.5; // knockback decays ×0.82 a step: total shove ≈ 5.5 × kb
+        for (const w of this.kickWaves) {
+            w.r += 8;
+            for (const m of this.monsters) {
+                if (m.dead || m.dying || m.boss || w.hit.has(m)) continue;
+                const d = Math.hypot(m.x - w.x, m.y - w.y);
+                if (d > w.r + m.size) continue;
+                w.hit.add(m);
+                const n = U.normalizeVector(m.x - w.x, m.y - w.y);
+                const weight = m.gk || m.heavy ? 0.4 : 1 / Math.max(1, m.size / 16);
+                m.kbx += n.x * kb * weight;
+                m.kby += n.y * kb * weight;
+            }
+        }
+        this.kickWaves = this.kickWaves.filter(w => w.r < w.max);
+    },
+
     stormStrike() {
         const p = this.player;
         const first = this.nearestMonster(p.x, p.y, null, STORM.range, 1);
@@ -498,7 +530,7 @@ extendGame({
         const points = [{ x: first.x + (Math.random() - 0.5) * 60, y: Math.max(-20, first.y - 170) }];
         chain.forEach((m, j) => {
             points.push({ x: m.x, y: m.y });
-            const dmg = U.stormDamage(this.level, j, STORM.damage, STORM.falloff, this.damageMult);
+            const dmg = U.stormDamage(this.level, j, STORM.damage, STORM.falloff, this.damageMult) * (j === 0 && this.stack('thunder') ? 2 : 1);
             this.damageMonster(m, dmg, { kx: (Math.random() - 0.5) * 4, ky: -2, sound: false, aoe: true });
             this.spark(m.x, m.y, '#e0f2fe', 8);
             this.spark(m.x, m.y, '#38bdf8', 6);

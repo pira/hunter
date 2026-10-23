@@ -19,14 +19,27 @@ extendGame({
         return 1 + 0.2 * this.stack('power');
     },
 
-    get coinMult() {
-        const timed = this.timers.coins3 > 0 ? 3 : this.timers.coins2 > 0 ? 2 : 1;
-        return timed * (this.buffs.gold3 ? 3 : 1) * (this.stack('goldrun') ? 2 : 1) * (1 + 0.25 * this.stack('goldrush')) * this.artefactMult('gold');
+    /** Gold boost from the ×2/×3 pickups and the Triple Gold card (the screen edges glow while ≥ 2). */
+    get goldBoost() {
+        return (this.timers.coins3 > 0 ? 3 : this.timers.coins2 > 0 ? 2 : 1) * (this.buffs.gold3 ? 3 : 1);
     },
 
+    get coinMult() {
+        const timed = this.timers.coins3 > 0 ? 3 : this.timers.coins2 > 0 ? 2 : 1;
+        return timed * (this.buffs.gold3 ? 3 : 1) * (this.stack('goldrun') ? 2 : 1) * this.artefactMult('gold');
+    },
+
+    /** Freeze cards slow every monster for the level. */
     get mobSpeedMult() {
-        const card = this.buffs.freeze2 ? 0.5 : this.buffs.freeze1 ? 0.75 : 1;
-        return Math.min(card, this.timers.freeze > 0 ? 0.5 : 1);
+        return this.buffs.freeze2 ? 0.5 : this.buffs.freeze1 ? 0.75 : 1;
+    },
+
+    /** Ice Cloud powerup: monsters inside the cloud around you move at 50% (Deep Freeze: 40/30/20%). */
+    iceMult(x, y, size = 0) {
+        if (!(this.timers.freeze > 0)) return 1;
+        const p = this.player;
+        if (U.distanceSquared(x, y, p.x, p.y) > (POISON_RADIUS + size * 0.5) ** 2) return 1;
+        return Math.max(0.1, 0.5 - 0.1 * this.stack('frost'));
     },
 
     /** Coins (and gems): the Magnet powerup and the Coin Magnet card pull them from the whole map. */

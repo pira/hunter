@@ -3,7 +3,7 @@
 class Game {
     constructor() {
         // Version system (bumped by the pre-commit hook, see VERSION-README.md)
-        this.version = "3.3.6";
+        this.version = "3.4.0";
         this.buildDate = "2026-10-23";
 
         this.canvas = document.getElementById('gameCanvas');
@@ -35,7 +35,11 @@ class Game {
         window.addEventListener('orientationchange', () => setTimeout(() => this.resize(), 150));
         document.addEventListener('visibilitychange', () => {
             if (document.hidden && this.state === 'playing') this.pause();
+            if (document.hidden) this.saveRun();
         });
+        // keep a fresh save of the run in progress (a frozen or reloaded tab can resume it)
+        window.addEventListener('pagehide', () => this.saveRun());
+        setInterval(() => { if (this.state === 'playing') this.saveRun(); }, 5000);
 
         this.resetRun();
         this.showMenu();
@@ -55,12 +59,12 @@ class Game {
         this.el = {
             hud: $('hud'), hearts: $('hearts'), level: $('levelLabel'), xpFill: $('xpFill'),
             score: $('score'), combo: $('combo'), comboMult: $('comboMult'), comboCount: $('comboCount'),
-            comboFill: $('comboFill'), powerups: $('powerups'), superBtn: $('superBtn'),
+            comboFill: $('comboFill'), goldMult: $('goldMult'), mults: $('mults'), powerups: $('powerups'), superBtn: $('superBtn'),
             classPicker: $('classPicker'),
             bossBar: $('bossBar'), bossName: $('bossName'), bossFill: $('bossFill'), bossTrail: $('bossTrail'),
             banner: $('banner'), menu: $('menu'), menuBoard: $('menuBoard'), menuBoardTitle: $('menuBoardTitle'),
             playBtn: $('playBtn'), levelup: $('levelup'), levelupTitle: $('levelupTitle'), levelupSub: $('levelupSub'),
-            cards: $('cards'), pauseOverlay: $('pause'), gameover: $('gameover'), killerIcon: $('killerIcon'),
+            cards: $('cards'), coreCards: $('coreCards'), pauseOverlay: $('pause'), gameover: $('gameover'), killerIcon: $('killerIcon'),
             killedBy: $('killedBy'), finalStats: $('finalStats'),
             submitStatus: $('submitStatus'), finalBoard: $('finalBoard'), finalBoardTitle: $('finalBoardTitle'),
             againBtn: $('againBtn'), pauseBtn: $('pauseBtn'), muteBtn: $('muteBtn'),
@@ -77,6 +81,7 @@ class Game {
 
         this.el.version.textContent = `v${this.version} · ${this.buildDate}`;
         this.el.playBtn.addEventListener('click', () => this.startRun());
+        document.getElementById('resumeBtn').addEventListener('click', () => this.resumeRun());
         this.el.againBtn.addEventListener('click', () => this.startRun());
         $('menuBtn').addEventListener('click', () => this.showMenu());
         $('resumeBtn').addEventListener('click', () => this.resume());
@@ -184,7 +189,7 @@ class Game {
                 return;
             }
             if (this.state === 'levelup') {
-                const idx = ['1', '2', '3', '4'].indexOf(key);
+                const idx = ['1', '2', '3', '4', '5', '6', '7'].indexOf(key);
                 if (idx >= 0) this.buyCard(idx);
                 else if (key === 'enter' || key === ' ' || key === 'c') this.closeShop();
                 return;
@@ -553,6 +558,8 @@ class Game {
         this.whirlVoice = null;
         this.barrage = null;
         this.bombRain = null;
+        this.kickWaves = [];
+        this.kickClock = 0;
         this.stormClock = 0;
         this.timers = Object.fromEntries(TIMED_POWERUPS.map(t => [t, 0]));
         this.stacks = {};
@@ -592,6 +599,7 @@ class Game {
         this.showBoardTabs();
         this.loadBoard(this.el.menuBoard, this.el.menuBoardTitle, this.boardSel.board, this.boardSel.cls);
         this.refreshWho();
+        this.showResume();
     }
 
     startRun() {
@@ -603,6 +611,7 @@ class Game {
         }
         Sfx.unlock();
         Sfx.stopMusic();
+        this.clearSavedRun(); // a new hunt replaces any saved one
         this.resetRun();
         this.releaseStick();
         const runId = (this.runId = (this.runId || 0) + 1);
@@ -631,6 +640,7 @@ class Game {
         this.keys = {};
         this.state = 'paused';
         this.setOverlay('pause');
+        this.saveRun();
         const owned = UPGRADES.filter(u => this.stack(u.id) > 0);
         document.getElementById('pauseUps').innerHTML = owned.length
             ? owned.map(u => `<span class="up">${u.icon} ${u.name}<sup>${this.stack(u.id)}/${u.max}</sup></span>`).join('')
@@ -668,7 +678,16 @@ class Game {
             this.acc += dt * this.timeScale * GAME_SPEED;
             let steps = 0;
             while (this.acc >= STEP && steps < 6) {
-                this.step();
+                try {
+                    this.step();
+                } catch (e) {
+                    // never let one bad step freeze the game: report it once and carry on
+                    if (!this.stepErrors) this.stepErrors = new Set();
+                    if (!this.stepErrors.has(String(e))) {
+                        this.stepErrors.add(String(e));
+                        console.error('step failed', e);
+                    }
+                }
                 this.acc -= STEP;
                 steps++;
                 if (this.state !== 'playing' && this.state !== 'dying') break;
@@ -724,6 +743,7 @@ class Game {
         this.updateGrenades();
         this.updateStorm();
         this.updatePoisonCloud();
+        this.updateKickback();
         this.updateLightning();
         this.updateDecals();
         this.updateMonsters(false);

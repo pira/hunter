@@ -100,8 +100,10 @@ extendGame({
         });
         this.monsters.forEach(m => { if (m.boss && m.bubble) this.drawBubble(ctx, m); });
         const alive = this.state !== 'dying' && this.state !== 'gameover';
+        this.drawKickWaves(ctx);
         if (alive) this.drawPets(ctx);
         if (alive) this.drawPlayer(ctx);
+        if (alive) this.drawStormCloud(ctx);
         if (alive) this.drawCleaves(ctx);
         this.drawProjectiles(ctx);
         this.drawLightning(ctx);
@@ -160,6 +162,49 @@ extendGame({
         ctx.beginPath();
         ctx.ellipse(c.x - r * 0.3 * sx, y - r * 0.3, r * 0.3 * sx, r * 0.3, 0, 0, TAU);
         ctx.fill();
+    },
+
+    drawKickWaves(ctx) {
+        for (const w of this.kickWaves || []) {
+            const k = w.r / w.max;
+            ctx.strokeStyle = `rgba(226,232,240,${0.7 * (1 - k)})`;
+            ctx.lineWidth = 6 * (1 - k) + 1;
+            ctx.beginPath();
+            ctx.ellipse(w.x, w.y, w.r, w.r * 0.85, 0, 0, TAU);
+            ctx.stroke();
+        }
+    },
+
+    /** A little storm cloud over the hero while Storm is active (flickers before a strike). */
+    drawStormCloud(ctx) {
+        if (!(this.timers.storm > 0)) return;
+        const p = this.player;
+        const x = p.x + Math.sin(this.frameNo * 0.05) * 4;
+        const y = p.y - 52;
+        const charge = this.stormClock < 10;
+        ctx.save();
+        ctx.globalAlpha = 0.95;
+        ctx.fillStyle = charge ? '#cbd5e1' : '#94a3b8';
+        for (const [dx, dy, r] of [[-10, 2, 8], [0, -3, 10], [11, 1, 8], [4, 5, 7], [-4, 5, 7]]) {
+            ctx.beginPath();
+            ctx.arc(x + dx, y + dy, r, 0, TAU);
+            ctx.fill();
+        }
+        ctx.fillStyle = 'rgba(255,255,255,0.35)';
+        ctx.beginPath();
+        ctx.arc(x - 3, y - 6, 5, 0, TAU);
+        ctx.fill();
+        if (charge || this.frameNo % 40 < 3) {
+            ctx.strokeStyle = '#fde047';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(x + 2, y + 9);
+            ctx.lineTo(x - 2, y + 15);
+            ctx.lineTo(x + 3, y + 15);
+            ctx.lineTo(x - 1, y + 22);
+            ctx.stroke();
+        }
+        ctx.restore();
     },
 
     /** A speckled pet egg with a soft glow (boss eggs glow orange). */
@@ -465,7 +510,7 @@ extendGame({
                 ctx.fill();
             }
         }
-        if (this.timers && (this.timers.freeze > 0 || this.mobSpeedMult < 1) && !m.boss) {
+        if (this.timers && (m.iced || this.mobSpeedMult < 1) && !m.boss) {
             ctx.globalAlpha = 0.35;
             ctx.fillStyle = '#bfefff';
             ctx.beginPath();
@@ -704,6 +749,24 @@ extendGame({
         const breathe = moving ? 0 : Math.sin(this.frameNo * 0.06) * 0.6;
         const feetY = p.y + 14 * scale;
         this.drawShadow(ctx, p.x, feetY, 12 * scale);
+        if (this.timers.freeze > 0) {
+            // the ice cloud you carry around: monsters inside move slowly
+            const r = POISON_RADIUS;
+            const wob = Math.sin(this.frameNo * 0.04 + 1) * 4;
+            const g = ctx.createRadialGradient(p.x, p.y, 8, p.x, p.y, r + wob);
+            g.addColorStop(0, 'rgba(224,242,254,0.06)');
+            g.addColorStop(0.7, 'rgba(125,211,252,0.22)');
+            g.addColorStop(1, 'rgba(56,189,248,0)');
+            ctx.fillStyle = g;
+            ctx.beginPath();
+            ctx.ellipse(p.x, p.y, r + wob, (r + wob) * 0.85, 0, 0, TAU);
+            ctx.fill();
+            if (this.frameNo % 3 === 0) {
+                const a = Math.random() * TAU;
+                const rr = Math.random() * r;
+                this.particle({ x: p.x + Math.cos(a) * rr, y: p.y + Math.sin(a) * rr * 0.8, vx: 0, vy: 0.2, life: 30, size: 1.6, color: '#e0f2fe', kind: 'spark' });
+            }
+        }
         if (this.timers.poison > 0) {
             // the poison cloud you carry around
             const r = POISON_RADIUS;
@@ -1025,9 +1088,16 @@ extendGame({
 
     drawScreenFx(ctx) {
         const pad = 40;
-        if (this.timers.freeze > 0) {
-            ctx.fillStyle = 'rgba(180,230,255,0.12)';
-            ctx.fillRect(-pad, -pad, this.W + pad * 2, this.H + pad * 2);
+        // gold boost (×2 / ×3 pickups, Triple Gold card): the screen edges glow gold
+        if (this.goldBoost >= 2) {
+            const a = 0.3 + 0.1 * Math.sin(this.frameNo * 0.12) + (this.goldBoost >= 3 ? 0.12 : 0);
+            for (const [x0, x1] of [[-pad, 70], [this.W + pad, this.W - 70]]) {
+                const g = ctx.createLinearGradient(x0, 0, x1, 0);
+                g.addColorStop(0, `rgba(250,204,21,${a})`);
+                g.addColorStop(1, 'rgba(250,204,21,0)');
+                ctx.fillStyle = g;
+                ctx.fillRect(Math.min(x0, x1), -pad, Math.abs(x1 - x0), this.H + pad * 2);
+            }
         }
         if (this.flash.t > 0) {
             ctx.fillStyle = `rgba(${this.flash.color},${(this.flash.t / this.flash.max) * 0.35})`;

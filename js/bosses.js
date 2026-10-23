@@ -710,8 +710,9 @@ extendGame({
         const p = this.player;
         const freeze = this.mobSpeedMult;
         for (const s of this.enemyShots) {
-            s.x += s.vx * freeze;
-            s.y += s.vy * freeze;
+            const ice = this.iceMult(s.x, s.y); // shots crawl through the ice cloud too
+            s.x += s.vx * freeze * ice;
+            s.y += s.vy * freeze * ice;
             s.life--;
             if (s.x < -30 || s.x > this.W + 30 || s.y < -40 || s.y > this.H + 30) s.life = 0;
             if (s.life > 0 && U.distanceSquared(s.x, s.y, p.x, p.y) < (s.r + p.r * 0.7) ** 2) {

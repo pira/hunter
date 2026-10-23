@@ -3,11 +3,11 @@
    (hunter.profileCache) so artefacts and skins also apply offline. Extends Game (js/core.js). */
 
 extendGame({
-    /** Bonuses for this run: the worn skin's perk (rare and better skins). */
+    /** Bonuses for this run: the worn skin's perk (by rarity, see RARITY_PERKS). */
     loadArtefacts() {
         const bonus = {};
-        const perk = this.skin && SKIN_PERKS[this.skin];
-        if (perk) bonus[perk.stat] = (bonus[perk.stat] || 0) + perk.pct / 100;
+        const perk = this.skin && skinPerk(this.skin);
+        if (perk) for (const [k, v] of Object.entries(perk.bonus)) bonus[k] = (bonus[k] || 0) + v;
         this.artefacts = { mult: key => 1 + (bonus[key] || 0) };
         if (this.loadPets) this.loadPets();
     },
@@ -321,7 +321,7 @@ extendGame({
                 const on = equipped[cls] === id;
                 const isIcon = icon && icon.skin === id;
                 const price = SKIN_PRICES[s.rarity];
-                const perk = SKIN_PERKS[id];
+                const perk = skinPerk(id);
                 let btn = '';
                 if (mine) {
                     btn = on ? `<button class="buy on" data-equip="${cls}" data-skin="">Wearing ✓</button>`
@@ -332,7 +332,7 @@ extendGame({
                 }
                 return `<div class="skin ${s.rarity} ${on ? 'on' : ''}"><canvas data-cls="${cls}" data-skin="${id}" width="96" height="96"></canvas>` +
                     `<b>${s.name}</b><small style="color:${TIERS[RARITY[s.rarity]].color}">${TIERS[RARITY[s.rarity]].label}</small>` +
-                    (perk ? `<small class="perk">${pct(perk.pct)} ${STAT_NAMES[perk.stat]}</small>` : '') + `${btn}</div>`;
+                    (perk ? `<small class="perk">${perk.text}</small>` : '') + `${btn}</div>`;
             }).join('');
             return cards ? `<div class="skin-row"><span class="skin-cls">${CLASSES[cls].icon}</span>${cards}</div>` : '';
         }).join('');
@@ -343,7 +343,7 @@ extendGame({
             `<h3>🐾 Pets on the hunt <small>${slots.length}/${slotCount}${mine ? ' · they follow you and help' : ''}</small></h3><div class="slots">${slotBoxes}</div>` +
             (mine ? `<h3>🥚 Hatchery <small>an egg hatches in ${HATCH_MS / 3600000} hours — leave it overnight</small></h3><div class="nests">${nestBoxes}</div>${eggLine}` : '') +
             (petRows ? `<h3>📖 Pet collection${mine ? ' <small>merge 3 of a kind into the next tier</small>' : ''}</h3><ul class="arts">${petRows}</ul>` : '') +
-            (skinCards ? `<h3>🎨 Skins${mine ? ' <small>rare and better skins give a small bonus</small>' : ''}</h3>${skinCards}` : '') +
+            (skinCards ? `<h3>🎨 Skins${mine ? ' <small>every skin gives a bonus by rarity</small>' : ''}</h3>${skinCards}` : '') +
             (mine && !online ? '<p class="since">The shop needs the online leaderboard.</p>' : '');
         el.querySelectorAll('canvas[data-skin]').forEach(cv => this.drawPortrait(cv, cv.dataset.cls, cv.dataset.skin));
         const act = (sel, fn) => el.querySelectorAll(sel).forEach(btn => btn.addEventListener('click', () => this.shopAction(btn, fn)));

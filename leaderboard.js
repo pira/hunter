@@ -6,7 +6,7 @@
     const ID_KEY = 'hunter.identity';
     const PENDING_KEY = 'hunter.pendingSubmit';
     const HISTORY_KEY = 'hunter.history';
-    const TOKEN_MAX_AGE = 6 * 3600 * 1000;
+    const TOKEN_MAX_AGE = 7 * 24 * 3600 * 1000; // matches the server: runs may be paused for a week
     const TIMEOUT_MS = 6000;
 
     function apiUrl() {
