@@ -314,13 +314,10 @@ const MobSprites = {
         for (const fam of MOB_FAMILY_ORDER) {
             for (let r = 1; r <= 8; r++) {
                 jobs.push(new Promise(resolve => {
-                    const img = new Image();
-                    img.onload = () => {
-                        this.list[`${fam}_${r}`] = { img, w: img.naturalWidth, h: img.naturalHeight, tints: {} };
+                    loadImage(`${base}${fam}_${r}.webp`, img => {
+                        if (img) this.list[`${fam}_${r}`] = { img, w: img.naturalWidth, h: img.naturalHeight, tints: {} };
                         resolve();
-                    };
-                    img.onerror = () => resolve();
-                    img.src = `${base}${fam}_${r}.webp`;
+                    });
                 }));
             }
         }
@@ -330,20 +327,24 @@ const MobSprites = {
     get(family, rank) {
         return this.list[`${family}_${U.clamp(rank || 1, 1, 8)}`] || null;
     },
-    /** The sprite's silhouette in one colour (made on first use). */
+    /** The sprite's silhouette in one colour (made on first use; null if there's no canvas memory). */
     tint(sp, color) {
-        let cv = sp.tints[color];
-        if (cv) return cv;
-        cv = document.createElement('canvas');
-        cv.width = sp.w;
-        cv.height = sp.h;
-        const g = cv.getContext('2d');
-        g.drawImage(sp.img, 0, 0);
-        g.globalCompositeOperation = 'source-in';
-        g.fillStyle = color;
-        g.fillRect(0, 0, cv.width, cv.height);
-        sp.tints[color] = cv;
-        return cv;
+        if (sp.tints[color]) return sp.tints[color];
+        const c = newCanvas(sp.w, sp.h);
+        if (!c) return null;
+        c.g.drawImage(sp.img, 0, 0);
+        c.g.globalCompositeOperation = 'source-in';
+        c.g.fillStyle = color;
+        c.g.fillRect(0, 0, sp.w, sp.h);
+        sp.tints[color] = c.cv;
+        return c.cv;
+    },
+    /** Drop the made-on-demand tints (after the GPU lost the canvases they can come back blank). */
+    dropTints() {
+        for (const sp of Object.values(this.list)) {
+            for (const cv of Object.values(sp.tints)) freeCanvas(cv);
+            sp.tints = {};
+        }
     }
 };
 MobSprites.load();
@@ -364,6 +365,7 @@ extendGame({
     mobSprite(family, rank, size, frame, flash) {
         const k = this.dpr * this.scale;
         if (this.mobCacheK !== k) {
+            if (this.mobCache) this.mobCache.forEach(freeCanvas);
             this.mobCache = new Map();
             this.mobCacheK = k;
         }
@@ -372,9 +374,10 @@ extendGame({
         let cv = this.mobCache.get(key);
         if (cv) return cv;
         const box = s * 3.4;
-        cv = document.createElement('canvas');
-        cv.width = cv.height = Math.max(8, Math.ceil(box * k));
-        const g = cv.getContext('2d');
+        const c = newCanvas(Math.max(8, Math.ceil(box * k)), Math.max(8, Math.ceil(box * k)));
+        if (!c) return null;
+        cv = c.cv;
+        const g = c.g;
         g.scale(k, k);
         g.translate(box / 2, box / 2);
         g.lineJoin = 'round';
@@ -414,6 +417,7 @@ extendGame({
         m.art = null;
         const frame = Math.floor(m.phase * 0.55) % 2;
         const cv = this.mobSprite(m.family, m.rank, s, frame, m.flash > 0);
+        if (!cv) return;
         const box = Math.round(s) * 3.4;
         const bob = Math.abs(Math.sin(m.phase * 0.55 * Math.PI)) * s * 0.06;
         ctx.save();
@@ -437,7 +441,8 @@ extendGame({
         const sq = 1 + (1 - up) * gait.squash; // a little squash on landing
         const art = (m.art = { x: m.x, y: m.y + s * MOB_BOX.foot - lift, tilt, face, W, H, sq, sp });
         this.blitMob(ctx, art, sp.img, ctx.globalAlpha);
-        if (m.flash > 0) this.blitMob(ctx, art, MobSprites.tint(sp, '#ffffff'), ctx.globalAlpha * 0.85);
+        const white = m.flash > 0 && MobSprites.tint(sp, '#ffffff');
+        if (white) this.blitMob(ctx, art, white, ctx.globalAlpha * 0.85);
     },
 
     /** One image at the monster's current pose (feet at art.y). */
@@ -456,7 +461,8 @@ extendGame({
     /** Poison / ice colour over the sprite's own shape (false: no sprite, use the old blob). */
     tintMob(ctx, m, color, alpha) {
         if (!m.art) return false;
-        this.blitMob(ctx, m.art, MobSprites.tint(m.art.sp, color), alpha);
+        const cv = MobSprites.tint(m.art.sp, color);
+        if (cv) this.blitMob(ctx, m.art, cv, alpha);
         return true;
     },
 

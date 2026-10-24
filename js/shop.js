@@ -53,7 +53,16 @@ extendGame({
     beginCards(mode) {
         // Back-to-back level-ups skip the transition; the first one already set the scene.
         if (performance.now() - (this.cardsClosedAt || 0) < 400) this.openCards(mode);
-        else this.startBurn(mode);
+        else {
+            try {
+                this.startBurn(mode);
+            } catch (e) {
+                // no canvas memory for the effect: skip it
+                this.releaseBurn(this.burn);
+                this.burn = null;
+                this.openCards(mode);
+            }
+        }
     },
 
     // ---- burning-film transition: the last frame burns away and reveals the new level underneath
@@ -63,11 +72,9 @@ extendGame({
         const mw = Math.ceil(c.width / k);
         const mh = Math.ceil(c.height / k);
         const mk = () => {
-            const cv = document.createElement('canvas');
-            cv.width = mw;
-            cv.height = mh;
-            const cx = cv.getContext('2d');
-            return { cv, cx, img: cx.createImageData(mw, mh) };
+            const c = newCanvas(mw, mh);
+            if (!c) throw new Error('no canvas memory');
+            return { cv: c.cv, cx: c.g, img: c.g.createImageData(mw, mh) };
         };
         const b = this.burn = { mode, t0: performance.now(), mw, mh, k, mask: mk(), char: mk(), glow: mk(), embers: [], intro: false };
         for (let i = 0; i < mw * mh; i++) {
@@ -78,13 +85,12 @@ extendGame({
         const rs = Math.min(1, 1280 / c.width, Math.sqrt(750000 / (c.width * c.height)));
         const rw = Math.round(c.width * rs);
         const rh = Math.round(c.height * rs);
-        b.snap = document.createElement('canvas');
-        b.snap.width = rw;
-        b.snap.height = rh;
-        b.snap.getContext('2d').drawImage(c, 0, 0, rw, rh); // canvas still shows the last frame of the old level
-        b.film = document.createElement('canvas');
-        b.film.width = rw;
-        b.film.height = rh;
+        const snap = newCanvas(rw, rh);
+        const film = snap && newCanvas(rw, rh);
+        if (!film) throw new Error('no canvas memory');
+        b.snap = snap.cv;
+        snap.g.drawImage(c, 0, 0, rw, rh); // canvas still shows the last frame of the old level
+        b.film = film.cv;
         b.field = Game.burnField(mw, mh);
         this.headerShown = false;
         this.state = 'transition';
@@ -174,10 +180,19 @@ extendGame({
         if (p >= 1) this.finishBurn();
     },
 
+    /** Frees the transition's five canvases (mobile Safari only gets the memory back this way). */
+    releaseBurn(b) {
+        if (!b) return;
+        for (const c of [b.mask, b.char, b.glow]) if (c) freeCanvas(c.cv);
+        freeCanvas(b.snap);
+        freeCanvas(b.film);
+    },
+
     finishBurn() {
         const b = this.burn;
         if (!b) return;
         this.burn = null;
+        this.releaseBurn(b);
         if (!b.intro) this.prepareCards(b.mode);
         this.revealCards();
     },

@@ -30,30 +30,34 @@ const BossSprites = {
     load(base = (typeof window !== 'undefined' && window.BOSS_SPRITE_BASE) || 'img/bosses/') {
         if (typeof Image === 'undefined' || typeof document === 'undefined') return Promise.resolve();
         const jobs = Object.keys(BOSS_SPRITES).map(key => new Promise(resolve => {
-            const img = new Image();
-            img.onload = () => {
-                const tint = color => {
-                    const cv = document.createElement('canvas');
-                    cv.width = img.naturalWidth;
-                    cv.height = img.naturalHeight;
-                    const g = cv.getContext('2d');
-                    g.drawImage(img, 0, 0);
-                    g.globalCompositeOperation = 'source-in';
-                    g.fillStyle = color;
-                    g.fillRect(0, 0, cv.width, cv.height);
-                    return cv;
-                };
-                this.list[key] = { img, w: img.naturalWidth, h: img.naturalHeight, white: tint('#ffffff'), red: tint('#ff2a2a'), black: tint('#140800') };
-                resolve();
-            };
-            img.onerror = () => resolve(); // the vector look stays
-            img.src = `${base}${key}.webp`;
+            loadImage(`${base}${key}.webp`, img => {
+                if (img) this.list[key] = { img, w: img.naturalWidth, h: img.naturalHeight, tints: {} };
+                resolve(); // without it the vector look stays
+            });
         }));
         this.ready = Promise.all(jobs);
         return this.ready;
     },
     get(key) {
         return this.list[key] || null;
+    },
+    /** White (hit), red (enraged) or black (dying) silhouette, made on first use (null: no canvas memory). */
+    tint(sp, color) {
+        if (sp.tints[color]) return sp.tints[color];
+        const c = newCanvas(sp.w, sp.h);
+        if (!c) return null;
+        c.g.drawImage(sp.img, 0, 0);
+        c.g.globalCompositeOperation = 'source-in';
+        c.g.fillStyle = color;
+        c.g.fillRect(0, 0, sp.w, sp.h);
+        sp.tints[color] = c.cv;
+        return c.cv;
+    },
+    dropTints() {
+        for (const sp of Object.values(this.list)) {
+            for (const cv of Object.values(sp.tints)) freeCanvas(cv);
+            sp.tints = {};
+        }
     }
 };
 BossSprites.load();
@@ -431,14 +435,15 @@ extendGame({
         if (cfg.flip && !opts.noFlip && p && p.x < m.x - 4) ctx.scale(-1, 1);
         ctx.scale(1 / Math.sqrt(breathe), breathe);
         const draw = (img, alpha) => {
+            if (!img) return;
             ctx.globalAlpha = alpha;
             ctx.drawImage(img, -W / 2, -H / 2, W, H);
         };
         const base = ctx.globalAlpha;
         draw(sp.img, base);
-        if (m.flash > 0) draw(sp.white, base * 0.8);
-        else if (m.enraged && !m.dying) draw(sp.red, base * (0.14 + 0.1 * Math.sin(t * 0.3)));
-        if (m.dying) draw(sp.black, base * 0.6 * U.clamp((m.deathT || 0) / (m.deathMax || 1), 0, 1));
+        if (m.flash > 0) draw(BossSprites.tint(sp, '#ffffff'), base * 0.8);
+        else if (m.enraged && !m.dying) draw(BossSprites.tint(sp, '#ff2a2a'), base * (0.14 + 0.1 * Math.sin(t * 0.3)));
+        if (m.dying) draw(BossSprites.tint(sp, '#140800'), base * 0.6 * U.clamp((m.deathT || 0) / (m.deathMax || 1), 0, 1));
         ctx.restore();
         return true;
     },

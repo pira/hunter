@@ -3,11 +3,13 @@
 class Game {
     constructor() {
         // Version system (bumped by the pre-commit hook, see VERSION-README.md)
-        this.version = "3.11.2";
+        this.version = "3.11.3";
         this.buildDate = "2026-10-24";
 
         this.canvas = document.getElementById('gameCanvas');
         this.ctx = this.canvas.getContext('2d');
+        // the GPU can drop canvases (backgrounded tab, low memory): rebuild the cached art when it's back
+        this.canvas.addEventListener('contextrestored', () => this.dropArtCaches());
         this.stage = document.getElementById('stage');
         this.isTouch = window.matchMedia('(pointer: coarse)').matches;
         document.body.classList.toggle('touch', this.isTouch);
@@ -321,7 +323,11 @@ class Game {
         }, { passive: false });
 
         document.addEventListener('visibilitychange', () => {
-            if (document.hidden) return;
+            if (document.hidden) {
+                this.hiddenAt = performance.now();
+                return;
+            }
+            if (performance.now() - (this.hiddenAt || 0) > 20000) this.dropArtCaches(); // a while away: redraw fresh
             this.releaseInput();
             this.settleResize();
             if (this.runActive()) this.acquireWakeLock();
@@ -600,6 +606,7 @@ class Game {
         this.edgeWarn = null;
         this.comboPop = 0;
         this.submitting = false;
+        if (this.burn) this.releaseBurn(this.burn);
         this.burn = null;
         if (this.el) this.el.levelup.classList.remove('intro');
     }
@@ -719,8 +726,17 @@ class Game {
             }
         }
 
-        this.render();
-        if (this.state === 'transition') this.drawBurn(now, dt);
+        try {
+            this.render();
+            if (this.state === 'transition') this.drawBurn(now, dt);
+        } catch (e) {
+            this.ctxDirty = true;
+            if (!this.stepErrors) this.stepErrors = new Set();
+            if (!this.stepErrors.has(String(e))) {
+                this.stepErrors.add(String(e));
+                console.error('render failed', e);
+            }
+        }
         this.updateHud();
     }
 

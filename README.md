@@ -53,6 +53,8 @@ js/                 the game, as classic scripts mixed into one Game class (no b
   hud.js            DOM HUD, game over, board     render.js   canvas drawing and particles
   profile.js        identity and profile overlay  road.js     scrolling, biomes, background tiles
   encounters.js     level flow, gatekeepers, waves, hazards
+  gfx.js            canvas/image helpers: offscreen canvases are freed explicitly (mobile Safari caps canvas
+                    memory), images retry on a flaky connection
   sprites.js        heroes: illustrated sprites from img/heroes/ (every class and skin) brought to life in code
                     (hop, sway, breath, facing); the vector characters remain as stand-ins and for tools/icons
   mobs.js           monster families: illustrated sprites from img/mobs/ that hop, gallop or scuttle in code,

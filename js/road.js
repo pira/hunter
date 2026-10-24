@@ -176,11 +176,14 @@ extendGame({
         const key = `${biome.id}:${w}x${h}`;
         this.tiles = this.tiles || new Map();
         if (this.tiles.has(key)) return this.tiles.get(key);
-        if (this.tiles.size > 3) this.tiles.delete(this.tiles.keys().next().value);
-        const cv = document.createElement('canvas');
-        cv.width = w;
-        cv.height = h;
-        const g = cv.getContext('2d');
+        if (this.tiles.size > 3) {
+            const old = this.tiles.keys().next().value;
+            freeCanvas(this.tiles.get(old).cv); // give the memory back now (mobile Safari)
+            this.tiles.delete(old);
+        }
+        const c = newCanvas(w, h);
+        if (!c) return this.tiles.values().next().value || null;
+        const { cv, g } = c;
         g.scale(k, k);
         Game.paintBiome(g, biome, this.W, this.H * 1.5, this.roadLeft, this.roadRight);
         const tile = { cv, h: this.H * 1.5 };
@@ -189,6 +192,7 @@ extendGame({
     },
 
     drawRoadTile(ctx, tile, clipTop = -Infinity, clipBottom = Infinity) {
+        if (!tile) return;
         const k = this.dpr * this.scale;
         const off = ((this.roadY % tile.h) + tile.h) % tile.h;
         const top = Math.max(0, clipTop);
@@ -218,10 +222,14 @@ extendGame({
         }
         const k = this.dpr * this.scale;
         // soft vignette
-        if (!this.vignette || this.vignette.width !== this.canvas.width || this.vignette.height !== this.canvas.height) {
-            const v = this.vignette = document.createElement('canvas');
-            v.width = this.canvas.width;
-            v.height = this.canvas.height;
+        if (this.vignette === undefined || (this.vignette && (this.vignette.width !== this.canvas.width || this.vignette.height !== this.canvas.height))) {
+            freeCanvas(this.vignette);
+            const c = newCanvas(this.canvas.width, this.canvas.height);
+            this.vignette = c ? c.cv : null;
+        }
+        if (this.vignette && !this.vignette.ready) {
+            const v = this.vignette;
+            v.ready = true;
             const g = v.getContext('2d');
             const vg = g.createRadialGradient(v.width / 2, v.height / 2, Math.min(v.width, v.height) * 0.35, v.width / 2, v.height / 2, Math.hypot(v.width, v.height) * 0.6);
             vg.addColorStop(0, 'rgba(0,0,0,0)');
@@ -229,7 +237,7 @@ extendGame({
             g.fillStyle = vg;
             g.fillRect(0, 0, v.width, v.height);
         }
-        ctx.drawImage(this.vignette, 0, 0);
+        if (this.vignette) ctx.drawImage(this.vignette, 0, 0);
         if (this.seam) {
             ctx.save();
             ctx.setTransform(k, 0, 0, k, 0, 0);

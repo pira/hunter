@@ -35,13 +35,10 @@ const HeroSprites = {
         const keys = Object.keys(HERO_SPRITES);
         if (typeof SKINS !== 'undefined') for (const id of Object.keys(SKINS)) keys.push(`${SKINS[id].cls}_${id}`);
         this.ready = Promise.all(keys.map(key => new Promise(resolve => {
-            const img = new Image();
-            img.onload = () => {
-                this.list[key] = img;
+            loadImage(`${base}${key}.webp`, img => {
+                if (img) this.list[key] = img; // else the vector hero stays
                 resolve();
-            };
-            img.onerror = () => resolve(); // the vector hero stays
-            img.src = `${base}${key}.webp`;
+            });
         })));
         return this.ready;
     },
@@ -55,23 +52,22 @@ const HeroSprites = {
         const w = img.naturalWidth;
         const h = img.naturalHeight;
         const pad = Math.max(2, Math.round(h * HERO_HALO.width));
-        const sil = document.createElement('canvas');
-        sil.width = w;
-        sil.height = h;
-        const s = sil.getContext('2d');
-        s.drawImage(img, 0, 0);
-        s.globalCompositeOperation = 'source-in';
-        s.fillStyle = HERO_HALO.color;
-        s.fillRect(0, 0, w, h);
-        const cv = document.createElement('canvas');
-        cv.width = w + pad * 2;
-        cv.height = h + pad * 2;
-        const g = cv.getContext('2d');
+        const sil = newCanvas(w, h);
+        const out = sil && newCanvas(w + pad * 2, h + pad * 2);
+        if (!out) {
+            if (sil) freeCanvas(sil.cv);
+            return null; // no canvas memory left: just no rim this frame
+        }
+        sil.g.drawImage(img, 0, 0);
+        sil.g.globalCompositeOperation = 'source-in';
+        sil.g.fillStyle = HERO_HALO.color;
+        sil.g.fillRect(0, 0, w, h);
         for (let i = 0; i < 16; i++) {
             const a = (i / 16) * Math.PI * 2;
-            g.drawImage(sil, pad + Math.cos(a) * pad, pad + Math.sin(a) * pad);
+            out.g.drawImage(sil.cv, pad + Math.cos(a) * pad, pad + Math.sin(a) * pad);
         }
-        img.halo = { cv, pad };
+        freeCanvas(sil.cv);
+        img.halo = { cv: out.cv, pad };
         return img.halo;
     }
 };
@@ -94,9 +90,10 @@ extendGame({
         const key = `${cls}|${skin}|${frame}|${variant}`;
         let cv = cache.get(key);
         if (!cv) {
-            cv = document.createElement('canvas');
-            cv.width = cv.height = SPRITE_BOX * SPRITE_RES;
-            const g = cv.getContext('2d');
+            const c = newCanvas(SPRITE_BOX * SPRITE_RES, SPRITE_BOX * SPRITE_RES);
+            if (!c) return null;
+            cv = c.cv;
+            const g = c.g;
             g.scale(SPRITE_RES, SPRITE_RES);
             g.translate(SPRITE_ORIGIN.x, SPRITE_ORIGIN.y);
             Game.drawCharacter(g, cls, this.palette(cls, skin), frame, { noWeapon: variant === 'noweapon' });
@@ -109,6 +106,7 @@ extendGame({
     blitSprite(ctx, cls, skin, frame, x, y, scale = 1, facing = 1, variant = '', halo = false) {
         if (this.blitHero(ctx, cls, skin, frame, x, y, scale, facing, variant, halo)) return;
         const cv = this.sprite(cls, skin, frame, variant);
+        if (!cv) return;
         ctx.save();
         ctx.translate(x, y);
         ctx.scale(scale * facing, scale);
@@ -137,8 +135,8 @@ extendGame({
         ctx.translate(0, -hop);
         ctx.rotate(sway);
         ctx.scale(1 / Math.sqrt(squash), squash);
-        if (halo) {
-            const hl = HeroSprites.halo(img);
+        const hl = halo && HeroSprites.halo(img);
+        if (hl) {
             const k = H / img.naturalHeight;
             const a = ctx.globalAlpha;
             ctx.globalAlpha = a * HERO_HALO.alpha;

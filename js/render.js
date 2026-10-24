@@ -74,6 +74,14 @@ extendGame({
     render() {
         const ctx = this.ctx;
         const k = this.dpr * this.scale;
+        if (this.ctxDirty) {
+            // after a failed draw: drop any leftover clip, alpha or saved states
+            this.ctxDirty = false;
+            if (ctx.reset) ctx.reset();
+            else this.canvas.width = this.canvas.width; // eslint-disable-line no-self-assign
+        }
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = 'source-over';
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         this.drawBackground(ctx);
         ctx.setTransform(k, 0, 0, k, 0, 0);
@@ -94,15 +102,18 @@ extendGame({
         this.monsters.forEach(m => { if (!m.hidden && !m.gk && !m.boss) this.drawShadow(ctx, m.x, m.y + m.size * 0.85, m.size); });
         this.monsters.forEach(m => {
             if (m.hidden) return;
-            if (m.boss) this.drawBoss(ctx, m);
-            else if (m.gk) this.drawGatekeeper(ctx, m);
-            else this.drawMonster(ctx, m);
+            // one monster failing to draw must not take the rest (and the hero) with it
+            this.guardDraw(ctx, () => {
+                if (m.boss) this.drawBoss(ctx, m);
+                else if (m.gk) this.drawGatekeeper(ctx, m);
+                else this.drawMonster(ctx, m);
+            });
         });
         this.monsters.forEach(m => { if (m.boss && m.bubble) this.drawBubble(ctx, m); });
         const alive = this.state !== 'dying' && this.state !== 'gameover';
         this.drawKickWaves(ctx);
-        if (alive) this.drawPets(ctx);
-        if (alive) this.drawPlayer(ctx);
+        if (alive) this.guardDraw(ctx, () => this.drawPets(ctx));
+        if (alive) this.guardDraw(ctx, () => this.drawPlayer(ctx));
         if (alive) this.drawStormCloud(ctx);
         if (alive) this.drawCleaves(ctx);
         this.drawProjectiles(ctx);
@@ -114,6 +125,45 @@ extendGame({
         this.drawStick(ctx);
     },
 
+
+    /** Throws away every cached drawing (they are rebuilt on demand). After the tab was in the
+     *  background the browser may have wiped offscreen canvases, which then draw as nothing. */
+    dropArtCaches() {
+        if (this.tiles) {
+            this.tiles.forEach(t => freeCanvas(t.cv));
+            this.tiles.clear();
+        }
+        freeCanvas(this.vignette);
+        this.vignette = undefined;
+        if (this.mobCache) this.mobCache.forEach(freeCanvas);
+        this.mobCache = null;
+        this.mobCacheK = null;
+        if (this.spriteCache) this.spriteCache.forEach(freeCanvas);
+        this.spriteCache = null;
+        MobSprites.dropTints();
+        BossSprites.dropTints();
+        for (const img of Object.values(HeroSprites.list)) {
+            if (img.halo) freeCanvas(img.halo.cv);
+            img.halo = null;
+        }
+        this.ctxDirty = true;
+    },
+
+    /** Runs a draw call; on an error restores the canvas state, reports it once and carries on. */
+    guardDraw(ctx, fn) {
+        ctx.save();
+        try {
+            fn();
+        } catch (e) {
+            this.ctxDirty = true; // a save() inside may never have been restored: reset before the next frame
+            if (!this.drawErrors) this.drawErrors = new Set();
+            if (!this.drawErrors.has(String(e))) {
+                this.drawErrors.add(String(e));
+                console.error('draw failed', e);
+            }
+        }
+        ctx.restore();
+    },
 
     drawShadow(ctx, x, y, size) {
         ctx.fillStyle = 'rgba(0,0,0,0.18)';
