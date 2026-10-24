@@ -779,10 +779,10 @@ extendGame({
             this.spawnCoins(b.x, b.y, due - b.coinsOut, 4.5, 6);
             b.coinsOut = due;
         }
-        // Powerups pop out at fixed beats: a heart first, then two random ones
+        // Powerups pop out at fixed beats: three random ones (a heart only if the draw gives one)
         const beats = [0.3, 0.6, 0.85];
         while (b.lootOut < beats.length && q >= beats[b.lootOut]) {
-            this.spawnPowerup(b.x, b.y, b.lootOut === 0 ? 'heart' : null, { pop: true, loot: true, speed: 3.5 });
+            this.spawnPowerup(b.x, b.y, null, { pop: true, loot: true, speed: 3.5 });
             b.lootOut++;
         }
         if (q >= 1) {
