@@ -346,6 +346,7 @@ extendGame({
         this.ring(p.x, p.y, 120, cls.color, 24);
         this.burst(p.x, p.y, cls.color, 24, 6);
         this.superSting(this.cls);
+        this.superGuard = WHIRLWIND_STEPS; // every super makes you invincible while it runs (up to 5 s, the whirlwind's length)
         if (this.cls === 'wizard') {
             // Arcane Barrage: 10× the bolts of a normal cast, two per second, each at the nearest enemy
             const shots = 10 * (1 + this.stack('split'));
@@ -406,6 +407,7 @@ extendGame({
 
     updateSuper() {
         const p = this.player;
+        if (this.superGuard > 0) this.superGuard = this.superRunning ? this.superGuard - 1 : 0;
         const br = this.barrage;
         if (br && br.left > 0) {
             br.t += this.rateMult; // Rapid Fire, Haste and Fury speed the barrage up too

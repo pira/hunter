@@ -19,15 +19,15 @@ const DISPLAY_FONT = '"Lilita One","Arial Rounded MT Bold",system-ui,sans-serif'
 const CLASSES = {
     wizard: {
         name: 'Wizard', icon: '🧙', hearts: 2, speed: 2.86, power: 2, primary: 'bolt', color: '#8b5cf6',
-        weapon: 'Magic Bolt', blurb: 'Auto-aiming magic bolts', superName: 'Arcane Barrage', superBlurb: 'A stream of fireballs at the nearest monsters'
+        weapon: 'Magic Bolt', blurb: 'Auto-aiming magic bolts', superName: 'Arcane Barrage', superBlurb: 'A stream of fireballs at the nearest monsters — invincible while it lasts'
     },
     barbarian: {
         name: 'Barbarian', icon: '🪓', hearts: 4, speed: 4.2, power: 5, primary: 'cleave', color: '#f97316',
-        weapon: 'Cleave', blurb: 'Huge axe swings hit everything in front', superName: 'Whirlwind', superBlurb: '10 s of invincible spinning havoc'
+        weapon: 'Cleave', blurb: 'Huge axe swings hit everything in front', superName: 'Whirlwind', superBlurb: '5 s of invincible spinning havoc'
     },
     goblin: {
         name: 'Goblin', icon: '💣', hearts: 3, speed: 5.2, power: 4, primary: 'grenade', color: '#22c55e',
-        weapon: 'Grenades', blurb: 'Lobbed bombs with a big boom', superName: 'Bombardment', superBlurb: "It's raining bombs!"
+        weapon: 'Grenades', blurb: 'Lobbed bombs with a big boom', superName: 'Bombardment', superBlurb: "It's raining bombs — invincible while they fall!"
     }
 };
 const CLASS_ORDER = ['wizard', 'barbarian', 'goblin'];

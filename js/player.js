@@ -85,9 +85,14 @@ extendGame({
         return Math.round(secs * 60 * GAME_SPEED * over * this.artefactMult('timed'));
     },
 
-    /** True while nothing can hurt the player (Invincible powerup or the barbarian's Whirlwind). */
+    /** True while nothing can hurt the player: the Invincible powerup, or any class's super while it
+     *  runs (v3.11.2 — at most 5 s, so a barrage waiting for a target can't keep you safe forever). */
     get untouchable() {
-        return this.timers.invincible > 0 || this.whirl > 0;
+        return this.timers.invincible > 0 || this.whirl > 0 || this.superShielded;
+    },
+
+    get superShielded() {
+        return this.superGuard > 0 && this.superRunning;
     },
 
     rollDamage(base) {

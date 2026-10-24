@@ -3,7 +3,7 @@
 class Game {
     constructor() {
         // Version system (bumped by the pre-commit hook, see VERSION-README.md)
-        this.version = "3.11.1";
+        this.version = "3.11.2";
         this.buildDate = "2026-10-24";
 
         this.canvas = document.getElementById('gameCanvas');
@@ -570,6 +570,7 @@ class Game {
         this.superMeter = 0;
         this.chargeMult = 1;
         this.whirl = 0;
+        this.superGuard = 0;
         this.whirlT = 0;
         if (this.whirlVoice) Sfx.fadeOut(this.whirlVoice, 0.1);
         this.whirlVoice = null;

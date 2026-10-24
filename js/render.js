@@ -771,6 +771,30 @@ extendGame({
         // While swinging, the barbarian's axe is drawn separately along the arc.
         const swinging = this.cls === 'barbarian' && this.cleaves.some(c => !c.whirl);
         this.blitSprite(ctx, this.cls, this.skin, frame, p.x, feetY + breathe, scale, p.facing, swinging ? 'noweapon' : '', true);
+        if (this.superShielded && !(this.whirl > 0)) {
+            // super running: a shimmering shield bubble (nothing can hurt you)
+            const a = this.frameNo * 0.12;
+            const r = 30 * scale + Math.sin(a) * 1.5;
+            const col = CLASSES[this.cls].color;
+            const fade = Math.min(1, this.superGuard / 30);
+            ctx.save();
+            ctx.globalAlpha = fade * 0.18;
+            ctx.fillStyle = col;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y - 4, r, 0, TAU);
+            ctx.fill();
+            ctx.globalAlpha = fade * (0.6 + 0.25 * Math.sin(a * 2));
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y - 4, r, a, a + Math.PI * 1.3);
+            ctx.stroke();
+            ctx.strokeStyle = col;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y - 4, r - 3, -a * 1.3, -a * 1.3 + Math.PI);
+            ctx.stroke();
+            ctx.restore();
+        }
         if (this.superMeter >= 100) {
             // a little crackle around the hero when the super is ready
             const a = this.frameNo * 0.2;
