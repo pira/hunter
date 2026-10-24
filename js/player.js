@@ -43,10 +43,13 @@ extendGame({
         return Math.max(0.1, 0.5 - 0.1 * this.stack('frost'));
     },
 
-    /** Coins (and gems): the Magnet powerup and the Coin Magnet card pull them from the whole map. */
+    /** Coins (and gems): the Magnet powerup and the Coin Magnet card each double the pickup range
+     *  (v3.8), together never more than a circle the size of half the screen. Between levels and
+     *  after a boss everything still flies to you. */
     get magnetRadius() {
-        if (this.timers.magnet > 0 || this.buffs.magnetAll || this.phase === 'travel' || this.bossLootPhase) return 2000;
-        return this.pickupRadius;
+        if (this.phase === 'travel' || this.bossLootPhase) return 2000;
+        const k = (this.timers.magnet > 0 ? 2 : 1) * (this.buffs.magnetAll ? 2 : 1);
+        return Math.min(MAGNET_MAX, this.pickupRadius * k);
     },
 
     /** Powerups only come from the Magnet upgrade's radius (and everything glides in during travel). */

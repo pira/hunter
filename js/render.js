@@ -636,82 +636,28 @@ extendGame({
         ctx.strokeStyle = 'rgba(0,0,0,0.8)';
         ctx.lineWidth = 3;
 
-        if (def.pattern === 'charge') {
-            ctx.fillStyle = def.accent;
-            for (let i = 0; i < 10; i++) {
-                const a = (i * TAU) / 10 + b.t * 0.01;
-                ctx.beginPath();
-                ctx.moveTo(Math.cos(a - 0.22) * s, Math.sin(a - 0.22) * s);
-                ctx.lineTo(Math.cos(a) * (s + 14), Math.sin(a) * (s + 14));
-                ctx.lineTo(Math.cos(a + 0.22) * s, Math.sin(a + 0.22) * s);
-                ctx.closePath();
-                ctx.fill();
-                ctx.stroke();
-            }
-            Game.drawShape(ctx, 'circle', s, fill);
-        } else if (def.pattern === 'rings') {
-            ctx.save();
-            ctx.rotate(b.t * 0.02);
-            Game.drawShape(ctx, 'hexagon', s, fill);
-            ctx.restore();
+        // v3.8: the small bosses are characters (js/bossart.js); their orbs and void rings stay around them
+        if (def.pattern === 'rings') {
             ctx.fillStyle = def.accent;
             for (let i = 0; i < 5; i++) {
                 const a = (i * TAU) / 5 - b.t * 0.04;
                 ctx.beginPath();
-                ctx.arc(Math.cos(a) * (s + 16), Math.sin(a) * (s + 16), 5, 0, TAU);
+                ctx.arc(Math.cos(a) * (s + 22), Math.sin(a) * (s + 22) * 0.8, 5, 0, TAU);
                 ctx.fill();
             }
-            // Witch hat
-            ctx.fillStyle = '#2c2c54';
-            ctx.beginPath();
-            ctx.moveTo(-s * 0.8, -s * 0.55);
-            ctx.lineTo(s * 0.8, -s * 0.55);
-            ctx.lineTo(s * 0.15, -s * 1.7);
-            ctx.closePath();
-            ctx.fill();
-            ctx.stroke();
-        } else if (def.pattern === 'summon') {
-            ctx.strokeStyle = '#0b3d20';
-            ctx.lineWidth = 4;
-            for (let i = 0; i < 8; i++) {
-                const a = (i * TAU) / 8 + Math.sin(b.t * 0.15 + i) * 0.15;
-                ctx.beginPath();
-                ctx.moveTo(Math.cos(a) * s * 0.8, Math.sin(a) * s * 0.8);
-                ctx.quadraticCurveTo(Math.cos(a + 0.3) * s * 1.5, Math.sin(a + 0.3) * s * 1.5, Math.cos(a) * s * 1.7, Math.sin(a) * s * 1.7);
-                ctx.stroke();
-            }
-            Game.drawShape(ctx, 'circle', s, fill);
-            ctx.fillStyle = def.accent;
-            ctx.beginPath();
-            ctx.ellipse(0, s * 0.35, s * 0.55, s * 0.3, 0, 0, TAU);
-            ctx.fill();
-        } else {
+        } else if (def.pattern === 'chaos') {
             for (let i = 0; i < 3; i++) {
                 ctx.strokeStyle = `rgba(231,76,60,${0.6 - i * 0.15})`;
                 ctx.lineWidth = 3;
                 ctx.beginPath();
-                ctx.arc(0, 0, s + 6 + i * 7, b.t * 0.05 * (i + 1), b.t * 0.05 * (i + 1) + Math.PI * 1.2);
+                ctx.arc(0, 0, s + 12 + i * 7, b.t * 0.05 * (i + 1), b.t * 0.05 * (i + 1) + Math.PI * 1.2);
                 ctx.stroke();
             }
-            Game.drawShape(ctx, 'circle', s, fill);
-            // Maw
-            ctx.fillStyle = '#000';
-            ctx.beginPath();
-            ctx.arc(0, s * 0.25, s * 0.55, 0, Math.PI);
-            ctx.fill();
-            ctx.fillStyle = '#fff';
-            for (let i = 0; i < 6; i++) {
-                const x = -s * 0.45 + i * s * 0.18;
-                ctx.beginPath();
-                ctx.moveTo(x, s * 0.25);
-                ctx.lineTo(x + s * 0.09, s * 0.42);
-                ctx.lineTo(x + s * 0.18, s * 0.25);
-                ctx.fill();
-            }
         }
+        if (!this.drawBossArt(ctx, b, def.voice)) Game.drawShape(ctx, 'circle', s, fill);
 
         if (b.dying) {
-            // Darkening body, glowing cracks spreading, X-ed out eyes
+            // Darkening body, glowing cracks spreading (the art crosses out its own eyes)
             ctx.globalAlpha = 0.6 * q;
             ctx.fillStyle = '#140800';
             ctx.beginPath();
@@ -728,46 +674,11 @@ extendGame({
                 ctx.quadraticCurveTo(Math.cos(c.a + c.bend) * len * 0.6, Math.sin(c.a + c.bend) * len * 0.6, Math.cos(c.a) * len, Math.sin(c.a) * len);
                 ctx.stroke();
             }
-            ctx.strokeStyle = '#000';
-            ctx.lineWidth = 4;
-            const ex = s * 0.36;
-            const ey = -s * 0.18;
-            const k = s * 0.13;
-            ctx.beginPath();
-            for (const x of [-ex, ex]) {
-                ctx.moveTo(x - k, ey - k);
-                ctx.lineTo(x + k, ey + k);
-                ctx.moveTo(x + k, ey - k);
-                ctx.lineTo(x - k, ey + k);
-            }
-            ctx.stroke();
             ctx.lineCap = 'butt';
             ctx.restore();
             return;
         }
 
-        // Angry eyes
-        const look = U.normalizeVector(this.player.x - b.x, this.player.y - b.y);
-        const ex = s * 0.36;
-        const ey = -s * 0.18;
-        ctx.fillStyle = b.enraged ? '#ff3b30' : '#fff';
-        ctx.beginPath();
-        ctx.arc(-ex, ey, s * 0.17, 0, TAU);
-        ctx.arc(ex, ey, s * 0.17, 0, TAU);
-        ctx.fill();
-        ctx.fillStyle = '#000';
-        ctx.beginPath();
-        ctx.arc(-ex + look.x * 3, ey + look.y * 3, s * 0.08, 0, TAU);
-        ctx.arc(ex + look.x * 3, ey + look.y * 3, s * 0.08, 0, TAU);
-        ctx.fill();
-        ctx.strokeStyle = '#000';
-        ctx.lineWidth = 4;
-        ctx.beginPath();
-        ctx.moveTo(-ex - s * 0.2, ey - s * 0.3);
-        ctx.lineTo(-ex + s * 0.15, ey - s * 0.15);
-        ctx.moveTo(ex + s * 0.2, ey - s * 0.3);
-        ctx.lineTo(ex - s * 0.15, ey - s * 0.15);
-        ctx.stroke();
         ctx.restore();
     },
 
@@ -784,6 +695,18 @@ extendGame({
         const breathe = moving ? 0 : Math.sin(this.frameNo * 0.06) * 0.6;
         const feetY = p.y + 14 * scale;
         this.drawShadow(ctx, p.x, feetY, 12 * scale);
+        if ((this.timers.magnet > 0 || this.buffs.magnetAll) && this.phase !== 'travel' && !this.bossLootPhase) {
+            // how far the magnet reaches (v3.8: a bigger circle, never the whole map)
+            ctx.save();
+            ctx.strokeStyle = 'rgba(244,63,94,0.28)';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([6, 8]);
+            ctx.lineDashOffset = -this.frameNo * 0.4;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, this.magnetRadius, 0, TAU);
+            ctx.stroke();
+            ctx.restore();
+        }
         if (this.timers.freeze > 0) {
             // the ice cloud you carry around: monsters inside move slowly
             const r = POISON_RADIUS;

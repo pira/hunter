@@ -433,7 +433,10 @@ extendGame({
     startWave(id, variant) {
         const enc = this.encounter;
         const hard = variant === 'B';
-        const tier = hard ? 'medium' : 'small';
+        // v3.8: waves are a real test — soldiers (hard: officers) instead of grunts, about 2.4× the HP,
+        // and every formation has leaders a rank or two above (elites from level 6, champions from 11)
+        const tier = hard ? 'large' : 'medium';
+        const lead = this.level >= TIER_UNLOCK.legendary ? 'legendary' : this.level >= TIER_UNLOCK.elite ? 'elite' : 'large';
         const L = this.roadLeft;
         const R = this.roadRight;
         const cx = (L + R) / 2;
@@ -442,14 +445,14 @@ extendGame({
             const x0 = L + (R - L) * (0.3 + Math.random() * 0.4);
             for (let i = 0; i < n; i++) {
                 const k = Math.ceil(i / 2) * (i % 2 ? -1 : 1);
-                this.waveMob(tier, x0 + k * 28, -40 - Math.abs(k) * 24, { kind: 'vee', vy: 1.6 });
+                this.waveMob(i === 0 ? lead : tier, x0 + k * 32, -40 - Math.abs(k) * 28, { kind: 'vee', vy: 1.6 });
             }
         } else if (id === 'pincer') {
             const n = hard ? 8 : 6;
             for (const side of [-1, 1]) {
                 for (let i = 0; i < n; i++) {
                     const x = side < 0 ? -20 - (i % 2) * 22 : this.W + 20 + (i % 2) * 22;
-                    this.waveMob(tier, x, this.H * 0.15 + i * (this.H * 0.4 / n), { kind: 'pincer', vx: -side * 2.1 });
+                    this.waveMob(i === Math.floor(n / 2) ? lead : tier, x, this.H * 0.15 + i * (this.H * 0.4 / n), { kind: 'pincer', vx: -side * 2.1 });
                 }
             }
         } else if (id === 'ring') {
@@ -460,7 +463,7 @@ extendGame({
             enc.queue.push({ at: 75, fn: () => {
                 for (let i = 0; i < n; i++) {
                     const a = (i / n) * TAU;
-                    this.waveMob(tier, p.x + Math.cos(a) * r, p.y + Math.sin(a) * r, { kind: 'ring', cx: p.x, cy: p.y, life: 110, spawnT: 12 });
+                    this.waveMob(i % 5 === 0 ? lead : tier, p.x + Math.cos(a) * r, p.y + Math.sin(a) * r, { kind: 'ring', cx: p.x, cy: p.y, life: 110, spawnT: 12 });
                 }
             } });
         } else if (id === 'stampede') {
@@ -473,15 +476,15 @@ extendGame({
                     this.hazards.push({ type: 'laneWarn', x: x0, w, t: 0, life: 60 });
                     enc.queue.push({ at: enc.t + 60, fn: () => {
                         const n = hard ? 14 : 10;
-                        for (let i = 0; i < n; i++) this.waveMob(tier, x0 + w * (0.2 + 0.6 * ((i % 3) / 2)), -30 - Math.floor(i / 3) * 34, { kind: 'stampede', vy: 4.5 });
+                        for (let i = 0; i < n; i++) this.waveMob(i === 1 ? lead : tier, x0 + w * (0.2 + 0.6 * ((i % 3) / 2)), -30 - Math.floor(i / 3) * 40, { kind: 'stampede', vy: 4.5 });
                         Sfx.play('boom', { volume: 0.25, rate: 0.6 });
                     } });
                 } });
             }
         } else if (id === 'conga') {
             const n = hard ? 24 : 16;
-            const head = this.waveMob(hard ? 'large' : 'medium', cx, -30, { kind: 'congaHead', trail: [] });
-            for (let i = 1; i <= n; i++) this.waveMob(tier, cx, -30 - i * 14, { kind: 'conga', leader: head, slot: i * 8 });
+            const head = this.waveMob(lead, cx, -30, { kind: 'congaHead', trail: [] });
+            for (let i = 1; i <= n; i++) this.waveMob(tier, cx, -30 - i * 18, { kind: 'conga', leader: head, slot: i * 10 });
         } else if (id === 'rain') {
             const cols = 6;
             const w = (R - L) / cols;
@@ -492,7 +495,7 @@ extendGame({
                     const x = L + w * (col + 0.5);
                     this.hazards.push({ type: 'laneWarn', x: x - w / 2, w, t: 0, life: 30, thin: true });
                     enc.queue.push({ at: enc.t + 30, fn: () => {
-                        for (let j = 0; j < 3; j++) this.waveMob(tier, x + (j - 1) * 10, -30 - j * 26, { kind: 'rain', vy: 3 });
+                        for (let j = 0; j < 3; j++) this.waveMob(i % 4 === 0 && j === 0 ? lead : tier, x + (j - 1) * 10, -30 - j * 32, { kind: 'rain', vy: 3 });
                     } });
                 } });
             }
@@ -696,77 +699,12 @@ extendGame({
         ctx.arc(0, 0, s * 1.35, 0, TAU);
         ctx.stroke();
         ctx.globalAlpha = 1;
-        if (m.ai === 'shield') {
-            Game.drawShape(ctx, 'circle', s, fill);
-            this.drawEyes(ctx, m, s);
-            ctx.fillStyle = '#475569';
-            ctx.beginPath();
-            ctx.ellipse(0, -s * 0.55, s * 0.8, s * 0.45, 0, Math.PI, 0);
-            ctx.fill();
-            ctx.rotate(m.facing);
-            ctx.fillStyle = '#cbd5e1';
-            ctx.strokeStyle = '#1e293b';
-            ctx.lineWidth = 3;
-            ctx.beginPath();
-            ctx.arc(0, 0, s * 1.15, -Math.PI / 3, Math.PI / 3);
-            ctx.arc(0, 0, s * 0.85, Math.PI / 3, -Math.PI / 3, true);
-            ctx.closePath();
-            ctx.fill();
-            ctx.stroke();
-            ctx.fillStyle = '#facc15';
-            ctx.beginPath();
-            ctx.arc(s, 0, s * 0.12, 0, TAU);
-            ctx.fill();
-        } else if (m.ai === 'splitter') {
-            const sq = 1 + (m.squash || 0) * 0.15;
-            ctx.scale(sq, 1 / sq);
-            Game.drawShape(ctx, 'circle', s, fill);
-            ctx.fillStyle = 'rgba(255,255,255,0.35)';
-            ctx.beginPath();
-            ctx.ellipse(-s * 0.35, -s * 0.4, s * 0.3, s * 0.18, -0.5, 0, TAU);
-            ctx.fill();
-            ctx.strokeStyle = 'rgba(0,0,0,0.35)';
-            ctx.lineWidth = 2;
-            ctx.setLineDash([4, 4]);
-            ctx.beginPath();
-            ctx.moveTo(0, -s);
-            ctx.lineTo(0, s);
-            ctx.stroke();
-            ctx.setLineDash([]);
-            this.drawEyes(ctx, m, s);
-        } else if (m.ai === 'bomber') {
-            // bat-winged bomb carrier
-            const flap = Math.sin(m.t * 0.3) * 0.4;
-            ctx.fillStyle = '#44403c';
-            for (const side of [-1, 1]) {
-                ctx.beginPath();
-                ctx.moveTo(side * s * 0.6, 0);
-                ctx.quadraticCurveTo(side * s * 1.8, -s * (0.9 + flap), side * s * 2.1, s * 0.2);
-                ctx.quadraticCurveTo(side * s * 1.4, 0, side * s * 0.6, s * 0.4);
-                ctx.fill();
-            }
-            Game.drawShape(ctx, 'circle', s, fill);
-            this.drawEyes(ctx, m, s);
-            ctx.fillStyle = '#1f2937';
-            ctx.beginPath();
-            ctx.arc(0, s * 0.9, s * 0.4, 0, TAU);
-            ctx.fill();
-        } else if (m.ai === 'charger') {
+        if (m.ai === 'charger') {
+            // v3.8: drawn head first along its charge
             ctx.rotate((m.mode === 'charge' ? 0 : Math.sin(m.t * 0.5) * 0.08) + (m.dir || Math.PI / 2) - Math.PI / 2);
-            Game.drawShape(ctx, 'circle', s, fill);
-            ctx.fillStyle = '#fef3c7';
-            ctx.strokeStyle = '#000';
-            ctx.lineWidth = 2;
-            for (const side of [-1, 1]) {
-                ctx.beginPath();
-                ctx.moveTo(side * s * 0.5, s * 0.5);
-                ctx.quadraticCurveTo(side * s * 1.2, s * 0.9, side * s * 0.9, s * 1.5);
-                ctx.lineTo(side * s * 0.4, s * 0.8);
-                ctx.closePath();
-                ctx.fill();
-                ctx.stroke();
-            }
-            this.drawEyes(ctx, m, s);
+            this.drawBossArt(ctx, m, 'charger');
+        } else if (m.ai === 'shield' || m.ai === 'splitter' || m.ai === 'bomber' || m.ai === 'archers') {
+            this.drawBossArt(ctx, m, m.ai);
         } else if (m.ai === 'totem') {
             const h = s * 2.2;
             for (let i = 0; i < 3; i++) {
@@ -791,31 +729,6 @@ extendGame({
             ctx.lineTo(s, -h);
             ctx.closePath();
             ctx.fill();
-            ctx.stroke();
-        } else if (m.ai === 'archers') {
-            Game.drawShape(ctx, 'triangle', s, fill);
-            ctx.fillStyle = '#14532d';
-            ctx.beginPath();
-            ctx.moveTo(-s * 0.9, -s * 0.5);
-            ctx.lineTo(0, -s * 1.6);
-            ctx.lineTo(s * 0.9, -s * 0.5);
-            ctx.closePath();
-            ctx.fill();
-            this.drawEyes(ctx, m, s);
-            const a = Math.atan2(this.player.y - m.y, this.player.x - m.x);
-            ctx.rotate(a);
-            ctx.strokeStyle = '#78350f';
-            ctx.lineWidth = 2.5;
-            ctx.beginPath();
-            ctx.arc(s * 0.6, 0, s * 0.9, -1.1, 1.1);
-            ctx.stroke();
-            ctx.strokeStyle = '#e5e7eb';
-            ctx.lineWidth = 1;
-            const pull = m.drawT > 0 ? 0 : s * 0.5;
-            ctx.beginPath();
-            ctx.moveTo(s * 0.6 + Math.cos(-1.1) * s * 0.9, Math.sin(-1.1) * s * 0.9);
-            ctx.lineTo(s * 0.6 - pull, 0);
-            ctx.lineTo(s * 0.6 + Math.cos(1.1) * s * 0.9, Math.sin(1.1) * s * 0.9);
             ctx.stroke();
         }
         ctx.restore();

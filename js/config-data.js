@@ -145,6 +145,9 @@ const POWERUPS = {
 };
 const TIMED_POWERUPS = Object.keys(POWERUPS).filter(k => POWERUPS[k].timed);
 const POISON_RADIUS = 140;
+// Coin pickup range: 70 px + 45 per Magnet rank; the Magnet powerup and Coin Magnet card double it,
+// but it never covers more than half the screen (a circle of half the play area).
+const MAGNET_MAX = Math.round(Math.sqrt(WORLD_AREA / 2 / Math.PI));
 // UI icons (CSS-drawn, match the canvas drops): a coin, a pouch = a pile of coins, a gem
 const COIN = '<i class="i-coin"></i>';
 const POUCH = '<i class="i-pouch"></i>';
@@ -184,7 +187,7 @@ const CORE_CARDS = { wizard: ['haste', 'split', 'power', 'boots'], barbarian: ['
 // the level (×5 by level 52, then flat — U.cardPrice). Cheap = nice to have, pricier = strong.
 const LEVEL_BUFFS = [
     { id: 'brake', icon: '🐢', name: 'Road Brake', buff: true, cost: 5, weight: 0.5, desc: 'This level: the road moves at 60%' },
-    { id: 'magnetAll', icon: '🧲', name: 'Coin Magnet', buff: true, cost: 10, weight: 0.5, desc: 'This level: pull coins from the whole map' },
+    { id: 'magnetAll', icon: '🧲', name: 'Coin Magnet', buff: true, cost: 10, weight: 0.5, desc: 'This level: pull coins from twice as far' },
     { id: 'fleet1', group: 'fleet', icon: '🏃', name: 'Fleet Foot I', buff: true, cost: 10, weight: 0.5, desc: 'This level: you run 150% fast' },
     { id: 'fleet2', group: 'fleet', icon: '🐆', name: 'Fleet Foot II', buff: true, cost: 13, weight: 0.35, desc: 'This level: you run 200% fast' },
     { id: 'feast', icon: '🍖', name: 'Feast', cost: 5, weight: 0.4, desc: 'Fully heal' },
