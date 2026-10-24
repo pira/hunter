@@ -5,22 +5,24 @@
    the v3.8 vector characters below stand in. Extends Game (js/core.js). */
 
 // Display size of each sprite: height in boss sizes (s), vertical offset in s; flip = may mirror to face the hero.
+// v3.12: poses = extra pictures (img/bosses/<key>_<pose>.webp) swapped in while it winds up or attacks;
+// they are saved at the idle picture's scale and stand on the same feet (float: centred instead).
 const BOSS_SPRITES = {
-    bonecrusher: { h: 2.7, dy: -0.1, flip: true },
-    hexweaver: { h: 3.0, dy: -0.3, flip: true },
-    broodmother: { h: 2.6, dy: -0.1 },
-    voidmaw: { h: 2.7, dy: 0 },
-    gravelord: { h: 2.7, dy: -0.1, flip: true },
-    stormcaller: { h: 3.1, dy: -0.2, flip: true },
+    bonecrusher: { h: 2.7, dy: -0.1, flip: true, poses: ['windup', 'attack'] },
+    hexweaver: { h: 3.0, dy: -0.3, flip: true, poses: ['attack'] },
+    broodmother: { h: 2.6, dy: -0.1, poses: ['attack'] },
+    voidmaw: { h: 2.7, dy: 0, float: true, poses: ['windup', 'attack'] },
+    gravelord: { h: 2.7, dy: -0.1, flip: true, poses: ['windup', 'attack'] },
+    stormcaller: { h: 3.1, dy: -0.2, flip: true, poses: ['attack'] },
     hydra: { h: 2.3, dy: 0.05 },
-    hydraHead: { h: 2.6, dy: 0 },
-    lich: { h: 3.1, dy: -0.2, flip: true },
+    hydraHead: { h: 2.6, dy: 0, float: true, poses: ['attack'] },
+    lich: { h: 3.1, dy: -0.2, flip: true, poses: ['attack'] },
     shield: { h: 2.6, dy: -0.1, flip: true },
     splitter: { h: 2.3, dy: 0 },
-    bomber: { h: 2.3, dy: 0.1 },
-    charger: { h: 2.7, dy: -0.05 },
-    totem: { h: 4.0, dy: -1.1 },
-    archers: { h: 2.8, dy: -0.15, flip: true }
+    bomber: { h: 2.3, dy: 0.1, float: true, poses: ['attack'] },
+    charger: { h: 2.7, dy: -0.05, poses: ['windup', 'attack'] },
+    totem: { h: 4.0, dy: -1.1, poses: ['attack'] },
+    archers: { h: 2.8, dy: -0.15, flip: true, poses: ['attack'] }
 };
 
 /** Loads the sprites in the background and keeps a white, a red and a black silhouette of each. */
@@ -29,10 +31,15 @@ const BossSprites = {
     ready: null,
     load(base = (typeof window !== 'undefined' && window.BOSS_SPRITE_BASE) || 'img/bosses/') {
         if (typeof Image === 'undefined' || typeof document === 'undefined') return Promise.resolve();
-        const jobs = Object.keys(BOSS_SPRITES).map(key => new Promise(resolve => {
+        const keys = [];
+        for (const [key, cfg] of Object.entries(BOSS_SPRITES)) {
+            keys.push(key);
+            for (const pose of cfg.poses || []) keys.push(`${key}_${pose}`);
+        }
+        const jobs = keys.map(key => new Promise(resolve => {
             loadImage(`${base}${key}.webp`, img => {
                 if (img) this.list[key] = { img, w: img.naturalWidth, h: img.naturalHeight, tints: {} };
-                resolve(); // without it the vector look stays
+                resolve(); // without it the vector look (or the idle pose) stays
             });
         }));
         this.ready = Promise.all(jobs);
@@ -420,24 +427,52 @@ extendGame({
      * Draws a boss sprite centred on the current origin. Returns false when it isn't loaded.
      * `opts.noFlip` keeps it unmirrored; `opts.t` is the animation clock (defaults to m.t).
      */
+    /** Which pose a boss or gatekeeper strikes right now: 'windup', 'attack' or null (idle). */
+    bossPoseOf(m) {
+        if (m.dying) return null;
+        if (m.mode === 'windup' || m.slamT > 0 || (m.ai === 'charger' && m.mode === 'aim' && m.lane)) return 'windup';
+        if (m.mode === 'dash' || (m.ai === 'charger' && m.mode === 'charge') || m.lunge > 0 || m.mouth > 0 || m.vortex > 0 || m.drawT > 0 || (m.beamT > 0 && m.beams && m.beams.length)) return 'attack';
+        if ((m.poseUntil || 0) > (this.frameNo || 0)) return 'attack';
+        return null;
+    },
+
+    /** Strike the attack pose for a moment (a volley, a summon, a slam…). */
+    bossPose(m, steps = 30) {
+        m.poseUntil = Math.max(m.poseUntil || 0, (this.frameNo || 0) + steps);
+    },
+
     drawBossSprite(ctx, m, key, opts = {}) {
-        const sp = BossSprites.get(key);
+        const idle = BossSprites.get(key);
         const cfg = BOSS_SPRITES[key];
-        if (!sp || !cfg) return false;
+        if (!idle || !cfg) return false;
+        const pose = opts.pose !== undefined ? opts.pose : this.bossPoseOf(m);
+        const posed = pose && cfg.poses && cfg.poses.includes(pose) ? BossSprites.get(`${key}_${pose}`) : null;
+        const sp = posed || idle;
         const s = m.size;
         const t = opts.t ?? m.t ?? this.frameNo ?? 0;
-        const H = s * cfg.h;
+        const H0 = s * cfg.h;
+        const H = (H0 * sp.h) / idle.h; // poses are saved at the idle picture's scale
         const W = (H * sp.w) / sp.h;
+        const top = cfg.float ? -H / 2 : H0 / 2 - H; // same feet (or the same middle for floaters)
+        // a quick pop when the pose changes sells the motion
+        const shown = posed ? pose : '';
+        if (m.poseShown !== shown) {
+            m.poseShown = shown;
+            m.poseAt = this.frameNo || 0;
+        }
+        const pop = 1 + 0.08 * Math.max(0, 1 - ((this.frameNo || 0) - (m.poseAt || 0)) / 7);
         const p = this.player;
         const breathe = 1 + Math.sin(t * 0.08) * 0.025;
         ctx.save();
         ctx.translate(0, s * cfg.dy + Math.sin(t * 0.05) * s * 0.04);
         if (cfg.flip && !opts.noFlip && p && p.x < m.x - 4) ctx.scale(-1, 1);
-        ctx.scale(1 / Math.sqrt(breathe), breathe);
+        ctx.translate(0, H0 / 2);
+        ctx.scale(pop / Math.sqrt(breathe), pop * breathe);
+        ctx.translate(0, -H0 / 2);
         const draw = (img, alpha) => {
             if (!img) return;
             ctx.globalAlpha = alpha;
-            ctx.drawImage(img, -W / 2, -H / 2, W, H);
+            ctx.drawImage(img, -W / 2, top, W, H);
         };
         const base = ctx.globalAlpha;
         draw(sp.img, base);

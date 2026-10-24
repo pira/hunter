@@ -69,7 +69,8 @@ audio.js            Web Audio engine: buses + limiter, voice manager, health wat
 img/heroes/         hero sprites per class and skin (WebP, 256 px tall, 16–43 KB each; plain at the free look, richer with each skin rarity)
 img/mobs/           monster sprites, family × rank (WebP, 144–192 px, 5–20 KB; rank 1 is two flat colours, detail grows by rank)
 img/pets/           pet sprites, pet × rarity (WebP, 160 px; basic flat → mythic gold and glow)
-img/bosses/         boss and gatekeeper sprites (WebP, 360 px, ~40 KB each; generated with GPT Image 2.5)
+img/bosses/         boss and gatekeeper sprites (WebP, 360 px, ~40 KB each; generated with GPT Image 2.5), plus
+                    <key>_windup / <key>_attack poses swapped in while they wind up or strike
 manifest.webmanifest, icons/   PWA install (fullscreen on iPhone via Add to Home Screen)
 tools/audio/        prepare.sh rebuilds sfx/ from the originals in tools/audio/src/
 tools/icons/        make-icons.py renders icons/ with headless Chromium

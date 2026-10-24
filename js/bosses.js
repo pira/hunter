@@ -173,6 +173,7 @@ extendGame({
             const every = enraged ? 80 : 120;
             if (b.t % every === 0) {
                 b.volley++;
+                this.bossPose(b);
                 if (b.volley % 3 === 0) {
                     const a = Math.atan2(p.y - b.y, p.x - b.x);
                     for (let i = -2; i <= 2; i++) this.enemyShot(b.x, b.y, a + i * 0.18, 3.4, b.boss.accent);
@@ -185,6 +186,7 @@ extendGame({
             chase(enraged ? 0.9 : 0.6);
             const every = enraged ? 160 : 220;
             if (b.t % every === 0) {
+                this.bossPose(b, 40);
                 const count = enraged ? 6 : 4;
                 for (let i = 0; i < count; i++) {
                     const a = (i / count) * TAU;
@@ -198,6 +200,7 @@ extendGame({
                 this.ring(b.x, b.y, b.size * 2, b.boss.accent, 20);
             }
             if (b.t % 300 === 150) {
+                this.bossPose(b);
                 const a = Math.atan2(p.y - b.y, p.x - b.x);
                 for (let i = -1; i <= 1; i++) this.enemyShot(b.x, b.y, a + i * 0.25, 2.8, b.boss.accent);
             }
@@ -227,6 +230,7 @@ extendGame({
             drift(b.wp.x, b.wp.y, b.speed * (b.slamT > 0 ? 0 : 1));
             if (b.slamT > 0) {
                 if (--b.slamT === 0) {
+                    this.bossPose(b, 36);
                     this.shockwave(b, b.slamPlan);
                     if (b.enraged) {
                         // the second wave's gaps are shown at once and lie within reach of the first
@@ -244,6 +248,7 @@ extendGame({
                     this.shockWarn(b, b.slamPlan, 50);
                     this.floater(b.x, b.y - b.size - 14, 'SLAM!', '#fb923c', 20);
                 } else {
+                    this.bossPose(b, 36);
                     this.boulders(b.enraged ? 3 : 2);
                 }
             }
@@ -274,6 +279,7 @@ extendGame({
             if (b.atkT > (b.enraged ? 130 : 190)) {
                 b.atkT = 0;
                 b.volley++;
+                this.bossPose(b, 40);
                 if (b.volley % 2) this.laser(b);
                 else {
                     this.bulletWall(b);
@@ -295,6 +301,7 @@ extendGame({
             const adds = this.monsters.filter(m => m.lichAdd && !m.dead);
             b.shielded = adds.length > 0;
             if (!adds.length && --b.summonT <= 0) {
+                this.bossPose(b, 40);
                 this.lichAdds(b, b.enraged ? 6 : 4);
                 b.summonT = Math.round((b.enraged ? 8 : 12) * 60 * GAME_SPEED);
             }
@@ -321,6 +328,7 @@ extendGame({
             }
             if (b.atkT > (b.enraged ? 80 : 110)) {
                 b.atkT = 0;
+                this.bossPose(b);
                 const a = Math.atan2(p.y - b.y, p.x - b.x);
                 for (let i = -2; i <= 2; i++) this.enemyShot(b.x, b.y, a + i * 0.2, 3, 'skull');
             }

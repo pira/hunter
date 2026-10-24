@@ -329,6 +329,7 @@ extendGame({
                 if (m.y < m.homeY) m.y += 1.5;
                 m.x = this.W / 2 + Math.sin(m.t * 0.012) * (this.roadRight - this.roadLeft) * 0.42;
                 if (m.t % m.every === 0 && m.y >= m.homeY - 5) {
+                    this.bossPose(m, 24);
                     for (let i = 0; i < m.mines; i++) {
                         this.hazards.push({ type: 'mine', x: m.x + (i - (m.mines - 1) / 2) * 30, y: m.y + 10, r: 9, arm: 40, life: 520, grounded: true, t: 0 });
                     }
@@ -378,6 +379,7 @@ extendGame({
             }
             case 'totem': {
                 if (m.t % 150 === 0) {
+                    this.bossPose(m, 36);
                     const kids = this.monsters.filter(o => o.totemKid === m && !o.dead).length;
                     for (let i = 0; i < 2 && kids + i < 8; i++) {
                         const k = this.escort('small', m.x + (i ? 24 : -24), m.y + 10);
