@@ -921,7 +921,12 @@ extendGame({
         ctx.restore();
         const O = '#111827';
         ctx.lineJoin = 'round';
-        if (def.pattern === 'gravelord') {
+        if (BossSprites.get(def.voice)) {
+            // v3.9: illustrated sprite; the gravelord lifts for its slam, the lich keeps its shield and vortex
+            if (def.pattern === 'gravelord' && b.slamT > 0) ctx.translate(0, -Math.sin((1 - b.slamT / 50) * Math.PI) * 10);
+            this.drawBossSprite(ctx, b, def.voice);
+            this.bigBossOverlays(ctx, b);
+        } else if (def.pattern === 'gravelord') {
             const lift = b.slamT > 0 ? -Math.sin((1 - b.slamT / 50) * Math.PI) * 10 : 0;
             ctx.translate(0, lift);
             for (const side of [-1, 1]) {
@@ -1132,11 +1137,13 @@ extendGame({
             }
         }
         if (b.dying) {
-            ctx.globalAlpha = 0.6 * q;
-            ctx.fillStyle = '#140800';
-            ctx.beginPath();
-            ctx.arc(0, 0, s * 1.02, 0, TAU);
-            ctx.fill();
+            if (!BossSprites.get(def.voice)) {
+                ctx.globalAlpha = 0.6 * q;
+                ctx.fillStyle = '#140800';
+                ctx.beginPath();
+                ctx.arc(0, 0, s * 1.02, 0, TAU);
+                ctx.fill();
+            }
             ctx.globalAlpha = 1;
             for (const c of b.cracks || []) {
                 const len = s * c.len * Math.min(1, q * 1.6);
@@ -1150,6 +1157,40 @@ extendGame({
         }
         ctx.restore();
         if (def.pattern === 'hydra') this.drawHydraHeads(ctx, b);
+    },
+
+    /** What a big boss shows over its sprite: the hydra's armour while heads live, the lich's shield and vortex. */
+    bigBossOverlays(ctx, b) {
+        const s = b.size;
+        if (b.boss.pattern === 'hydra' && b.damageScale && b.damageScale() < 1) {
+            ctx.strokeStyle = 'rgba(163,230,53,0.55)';
+            ctx.lineWidth = 3;
+            ctx.setLineDash([6, 6]);
+            ctx.beginPath();
+            ctx.ellipse(0, 0, s * 1.35, s * 1.05, 0, 0, TAU);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+        if (b.boss.pattern === 'lich') {
+            if (b.shielded) {
+                ctx.strokeStyle = `rgba(196,181,253,${0.6 + 0.3 * Math.sin(b.t * 0.2)})`;
+                ctx.fillStyle = 'rgba(167,139,250,0.15)';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(0, 0, s * 1.65, 0, TAU);
+                ctx.fill();
+                ctx.stroke();
+            }
+            if (b.vortex > 0) {
+                ctx.strokeStyle = 'rgba(196,181,253,0.5)';
+                ctx.lineWidth = 2;
+                for (let i = 0; i < 3; i++) {
+                    ctx.beginPath();
+                    ctx.arc(0, 0, s * (2 + i), b.t * 0.15 + i, b.t * 0.15 + i + 2);
+                    ctx.stroke();
+                }
+            }
+        }
     },
 
     drawHydraNecks(ctx, b) {
@@ -1177,6 +1218,22 @@ extendGame({
             ctx.save();
             ctx.translate(h.x, h.y);
             ctx.rotate(a);
+            if (BossSprites.get('hydraHead')) {
+                // the sprite looks right: mirror it when the hero is to the left so it is never upside down
+                if (Math.cos(a) < 0) ctx.scale(1, -1);
+                const lunge = h.lunge > 0 ? h.size * 0.25 : 0;
+                ctx.translate(lunge, 0);
+                this.drawBossSprite(ctx, h, 'hydraHead', { noFlip: true, t: (h.t || 0) * 0.3 });
+                if (h.idx === 0 && h.mouth > 0) {
+                    ctx.fillStyle = 'rgba(255,140,0,0.6)';
+                    ctx.beginPath();
+                    ctx.arc(h.size * 1.3, h.size * 0.15, 6 + Math.random() * 4, 0, TAU);
+                    ctx.fill();
+                }
+                ctx.restore();
+                this.drawHydraHeadBar(ctx, h);
+                continue;
+            }
             const open = h.mouth > 0 || h.lunge > 0 ? 0.5 : 0.12;
             const col = h.flash > 0 ? '#ffffff' : ['#15803d', '#0f766e', '#4d7c0f'][h.idx];
             ctx.fillStyle = col;
@@ -1208,12 +1265,16 @@ extendGame({
                 ctx.fill();
             }
             ctx.restore();
-            const w = 34;
-            const pct = U.clamp(h.hp / h.maxHp, 0, 1);
-            ctx.fillStyle = 'rgba(0,0,0,0.6)';
-            ctx.fillRect(h.x - w / 2 - 1, h.y - h.size - 12, w + 2, 6);
-            ctx.fillStyle = '#a3e635';
-            ctx.fillRect(h.x - w / 2, h.y - h.size - 11, w * pct, 4);
+            this.drawHydraHeadBar(ctx, h);
         }
+    },
+
+    drawHydraHeadBar(ctx, h) {
+        const w = 34;
+        const pct = U.clamp(h.hp / h.maxHp, 0, 1);
+        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+        ctx.fillRect(h.x - w / 2 - 1, h.y - h.size - 12, w + 2, 6);
+        ctx.fillStyle = '#a3e635';
+        ctx.fillRect(h.x - w / 2, h.y - h.size - 11, w * pct, 4);
     }
 });

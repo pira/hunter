@@ -700,11 +700,15 @@ extendGame({
         ctx.stroke();
         ctx.globalAlpha = 1;
         if (m.ai === 'charger') {
-            // v3.8: drawn head first along its charge
-            ctx.rotate((m.mode === 'charge' ? 0 : Math.sin(m.t * 0.5) * 0.08) + (m.dir || Math.PI / 2) - Math.PI / 2);
+            // the sprite faces you and shakes before a charge; the vector look turns head first along it
+            const shake = m.mode === 'charge' ? 0 : Math.sin(m.t * 0.5) * 0.08;
+            if (BossSprites.get('charger')) ctx.rotate(shake);
+            else ctx.rotate(shake + (m.dir || Math.PI / 2) - Math.PI / 2);
             this.drawBossArt(ctx, m, 'charger');
         } else if (m.ai === 'shield' || m.ai === 'splitter' || m.ai === 'bomber' || m.ai === 'archers') {
             this.drawBossArt(ctx, m, m.ai);
+        } else if (m.ai === 'totem' && this.drawBossSprite(ctx, m, 'totem')) {
+            // sprite drawn
         } else if (m.ai === 'totem') {
             const h = s * 2.2;
             for (let i = 0; i < 3; i++) {

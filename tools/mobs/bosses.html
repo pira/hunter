@@ -1,7 +1,7 @@
 <!doctype html>
 <meta charset="utf-8">
 <title>Boss lineup</title>
-<!-- The small bosses and gatekeepers (js/bossart.js) at game size and ×2: normal, hit flash, enraged, dying. -->
+<!-- Every boss and gatekeeper (js/bossart.js): normal, hit flash, enraged, dying. ?vector shows the v3.8 vector looks. -->
 <style>body { margin: 0; background: #222; } canvas { display: block; }</style>
 <canvas id="c"></canvas>
 <script>const extendGame = o => Object.assign(window, o);</script>
@@ -9,37 +9,46 @@
 <script src="../../game-utils.js"></script>
 <script src="../../js/config-data.js"></script>
 <script src="../../js/mobs.js"></script>
+<script>window.BOSS_SPRITE_BASE = '../../img/bosses/';</script>
 <script src="../../js/bossart.js"></script>
 <script src="../../js/encounters.js"></script>
 <script>
+const vector = /vector/.test(location.search);
+if (vector) BossSprites.list = {};
 const zoom = Number(new URLSearchParams(location.search).get('zoom') || 1);
 const rows = [
     ...BOSSES.map(def => ({ label: def.name, kind: def.voice, m: { boss: def, size: def.size, t: 40 } })),
-    ...['shield', 'splitter', 'bomber', 'charger', 'archers'].map(ai => ({ label: GATEKEEPERS[ai].name, kind: ai, m: { ai, gk: true, color: GATEKEEPERS[ai].color, size: GATEKEEPERS[ai].size, t: 40, facing: Math.PI / 2, dir: Math.PI / 2, mode: 'walk' } }))
+    ...BIG_BOSSES.map(def => ({ label: def.name, kind: def.voice, m: { boss: def, size: def.size, t: 40 } })),
+    { label: 'Hydra head', kind: 'hydraHead', m: { size: 17, t: 40 } },
+    ...['shield', 'splitter', 'bomber', 'charger', 'totem', 'archers'].map(ai => ({ label: GATEKEEPERS[ai].name, kind: ai, m: { ai, gk: true, color: GATEKEEPERS[ai].color, size: GATEKEEPERS[ai].size, t: 40, facing: Math.PI / 2, dir: Math.PI / 2, mode: 'walk' } }))
 ];
-const states = [['normal', {}], ['hit', { flash: 3 }], ['enraged', { enraged: true }], ['dying', { dying: true }]];
-const cellW = 150 * zoom, cellH = 150 * zoom;
+const states = [['normal', {}], ['hit', { flash: 3 }], ['enraged', { enraged: true }], ['dying', { dying: true, deathT: 70, deathMax: 100 }]];
+const cellW = 170 * zoom, cellH = 170 * zoom;
 const W = 130 + cellW * states.length, H = 40 + cellH * rows.length;
 const cv = document.getElementById('c');
 const dpr = window.devicePixelRatio || 1;
 cv.width = W * dpr; cv.height = H * dpr; cv.style.width = W + 'px'; cv.style.height = H + 'px';
 const ctx = cv.getContext('2d');
-ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-ctx.fillStyle = '#7cc56b'; ctx.fillRect(0, 0, W, H);
-ctx.fillStyle = '#d9b77e'; ctx.fillRect(130, 0, cellW * 2, H);
-ctx.font = 'bold 13px sans-serif'; ctx.fillStyle = '#111';
-states.forEach(([n], i) => ctx.fillText(n, 140 + cellW * i, 20));
-rows.forEach((r, row) => {
-    ctx.fillStyle = '#111';
-    ctx.fillText(r.label, 8, 40 + cellH * row + cellH / 2);
-    states.forEach(([, extra], col) => {
-        const x = 130 + cellW * col + cellW / 2, y = 40 + cellH * row + cellH / 2;
-        window.player = { x: x + 60, y: y + 120 };
-        const m = { ...r.m, ...extra, x, y };
-        ctx.save();
-        ctx.translate(x, y); ctx.scale(zoom, zoom);
-        drawBossArt(ctx, m, r.kind);
-        ctx.restore();
+function render() {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = '#7cc56b'; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#d9b77e'; ctx.fillRect(130, 0, cellW * 2, H);
+    ctx.font = 'bold 13px sans-serif'; ctx.fillStyle = '#111';
+    states.forEach(([n], i) => ctx.fillText(n, 140 + cellW * i, 20));
+    rows.forEach((r, row) => {
+        ctx.fillStyle = '#111';
+        ctx.fillText(r.label, 8, 40 + cellH * row + cellH / 2);
+        states.forEach(([, extra], col) => {
+            const x = 130 + cellW * col + cellW / 2, y = 40 + cellH * row + cellH / 2;
+            window.player = { x: x + 60, y: y + 120 };
+            const m = { ...r.m, ...extra, x, y };
+            ctx.save();
+            ctx.translate(x, y); ctx.scale(zoom, zoom);
+            if (!drawBossSprite(ctx, m, r.kind)) drawBossArt(ctx, m, r.kind);
+            ctx.restore();
+        });
     });
-});
+    document.title = 'Boss lineup ready';
+}
+(vector ? Promise.resolve() : BossSprites.ready).then(render);
 </script>

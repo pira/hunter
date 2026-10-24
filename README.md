@@ -54,12 +54,14 @@ js/                 the game, as classic scripts mixed into one Game class (no b
   encounters.js     level flow, gatekeepers, waves, hazards
   sprites.js        vector player characters (cached per class × skin × frame)
   mobs.js           monster families drawn as cached vector sprites (tools/mobs/lineup.html shows them all)
-  bossart.js        small bosses and gatekeepers as characters (tools/mobs/bosses.html shows them all)
+  bossart.js        bosses and gatekeepers: illustrated sprites from img/bosses/ animated in code, with vector
+                    stand-ins until they load (tools/mobs/bosses.html shows them all; ?vector for the stand-ins)
   meta.js           banked gold, the wheel, the profile shop (pets, eggs, skins)
   pets.js           pets on the hunt
 game-utils.js       pure helpers shared with tests (level curve, combo tiers, …)
 audio.js            Web Audio engine: buses + limiter, voice manager, health watchdog,
                     synth monster hits/deaths and hero hurt sound (samples in sfx/)
+img/bosses/         boss and gatekeeper sprites (WebP, 360 px, ~40 KB each; generated with GPT Image 2.5)
 manifest.webmanifest, icons/   PWA install (fullscreen on iPhone via Add to Home Screen)
 tools/audio/        prepare.sh rebuilds sfx/ from the originals in tools/audio/src/
 tools/icons/        make-icons.py renders icons/ with headless Chromium

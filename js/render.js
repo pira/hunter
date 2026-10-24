@@ -657,13 +657,15 @@ extendGame({
         if (!this.drawBossArt(ctx, b, def.voice)) Game.drawShape(ctx, 'circle', s, fill);
 
         if (b.dying) {
-            // Darkening body, glowing cracks spreading (the art crosses out its own eyes)
-            ctx.globalAlpha = 0.6 * q;
-            ctx.fillStyle = '#140800';
-            ctx.beginPath();
-            ctx.arc(0, 0, s * 1.02, 0, TAU);
-            ctx.fill();
-            ctx.globalAlpha = 1;
+            // Darkening body (a sprite darkens itself), glowing cracks spreading
+            if (!BossSprites.get(def.voice)) {
+                ctx.globalAlpha = 0.6 * q;
+                ctx.fillStyle = '#140800';
+                ctx.beginPath();
+                ctx.arc(0, 0, s * 1.02, 0, TAU);
+                ctx.fill();
+                ctx.globalAlpha = 1;
+            }
             ctx.lineCap = 'round';
             for (const c of b.cracks || []) {
                 const len = s * c.len * Math.min(1, q * 1.6);

@@ -1,7 +1,62 @@
-/* Monster Hunter — boss and gatekeeper looks (v3.8): the small bosses and the gatekeepers drawn as
-   characters in the monsters' cartoon style (js/mobs.js: dark outline, chunky shapes) instead of
-   circles. Drawn live (they animate and there are only a few), centred on (0, 0), size s.
-   `c(color)` turns every fill white while the boss flashes from a hit. Extends Game (js/core.js). */
+/* Monster Hunter — boss and gatekeeper looks.
+   v3.9: every boss and gatekeeper is an illustrated sprite (img/bosses/*.webp, generated once and
+   trimmed), animated in code: a slow bob and breath, turning to face the hero, a white hit flash,
+   a red pulse when enraged and darkening as it dies. Until a sprite has loaded (or if it fails),
+   the v3.8 vector characters below stand in. Extends Game (js/core.js). */
+
+// Display size of each sprite: height in boss sizes (s), vertical offset in s; flip = may mirror to face the hero.
+const BOSS_SPRITES = {
+    bonecrusher: { h: 2.7, dy: -0.1, flip: true },
+    hexweaver: { h: 3.0, dy: -0.3, flip: true },
+    broodmother: { h: 2.6, dy: -0.1 },
+    voidmaw: { h: 2.7, dy: 0 },
+    gravelord: { h: 2.7, dy: -0.1, flip: true },
+    stormcaller: { h: 3.1, dy: -0.2, flip: true },
+    hydra: { h: 2.3, dy: 0.05 },
+    hydraHead: { h: 2.6, dy: 0 },
+    lich: { h: 3.1, dy: -0.2, flip: true },
+    shield: { h: 2.6, dy: -0.1, flip: true },
+    splitter: { h: 2.3, dy: 0 },
+    bomber: { h: 2.3, dy: 0.1 },
+    charger: { h: 2.7, dy: -0.05 },
+    totem: { h: 4.0, dy: -1.1 },
+    archers: { h: 2.8, dy: -0.15, flip: true }
+};
+
+/** Loads the sprites in the background and keeps a white, a red and a black silhouette of each. */
+const BossSprites = {
+    list: {},
+    ready: null,
+    load(base = (typeof window !== 'undefined' && window.BOSS_SPRITE_BASE) || 'img/bosses/') {
+        if (typeof Image === 'undefined' || typeof document === 'undefined') return Promise.resolve();
+        const jobs = Object.keys(BOSS_SPRITES).map(key => new Promise(resolve => {
+            const img = new Image();
+            img.onload = () => {
+                const tint = color => {
+                    const cv = document.createElement('canvas');
+                    cv.width = img.naturalWidth;
+                    cv.height = img.naturalHeight;
+                    const g = cv.getContext('2d');
+                    g.drawImage(img, 0, 0);
+                    g.globalCompositeOperation = 'source-in';
+                    g.fillStyle = color;
+                    g.fillRect(0, 0, cv.width, cv.height);
+                    return cv;
+                };
+                this.list[key] = { img, w: img.naturalWidth, h: img.naturalHeight, white: tint('#ffffff'), red: tint('#ff2a2a'), black: tint('#140800') };
+                resolve();
+            };
+            img.onerror = () => resolve(); // the vector look stays
+            img.src = `${base}${key}.webp`;
+        }));
+        this.ready = Promise.all(jobs);
+        return this.ready;
+    },
+    get(key) {
+        return this.list[key] || null;
+    }
+};
+BossSprites.load();
 
 const BossArt = {
     /** An eye that looks at the hero, turns red when enraged and becomes an X when the boss dies. */
@@ -198,6 +253,10 @@ const BossArt = {
         if (!o.dying) for (const side of [-1, 1]) MobArt.dot(g, side * s * 0.13, -s * 0.55, s * 0.05, o.enraged ? '#ef4444' : '#fde047');
         MobArt.poly(g, [[-s * 0.06, -s * 0.94], [s * 0.06, -s * 0.94], [s * 0.18, -s * 1.3], [-s * 0.1, -s * 1.22]], c('#dc2626')); // plume
         // the tower shield in front, wherever it faces
+        BossArt.towerShield(g, s, m, c);
+    },
+
+    towerShield(g, s, m, c) {
         g.save();
         g.rotate(m.facing);
         MobArt.shape(g, c('#cbd5e1'), () => {
@@ -353,8 +412,50 @@ extendGame({
         };
     },
 
-    /** Draws a small boss (pattern) or a gatekeeper (ai) at the current origin. Returns false if none. */
+    /**
+     * Draws a boss sprite centred on the current origin. Returns false when it isn't loaded.
+     * `opts.noFlip` keeps it unmirrored; `opts.t` is the animation clock (defaults to m.t).
+     */
+    drawBossSprite(ctx, m, key, opts = {}) {
+        const sp = BossSprites.get(key);
+        const cfg = BOSS_SPRITES[key];
+        if (!sp || !cfg) return false;
+        const s = m.size;
+        const t = opts.t ?? m.t ?? this.frameNo ?? 0;
+        const H = s * cfg.h;
+        const W = (H * sp.w) / sp.h;
+        const p = this.player;
+        const breathe = 1 + Math.sin(t * 0.08) * 0.025;
+        ctx.save();
+        ctx.translate(0, s * cfg.dy + Math.sin(t * 0.05) * s * 0.04);
+        if (cfg.flip && !opts.noFlip && p && p.x < m.x - 4) ctx.scale(-1, 1);
+        ctx.scale(1 / Math.sqrt(breathe), breathe);
+        const draw = (img, alpha) => {
+            ctx.globalAlpha = alpha;
+            ctx.drawImage(img, -W / 2, -H / 2, W, H);
+        };
+        const base = ctx.globalAlpha;
+        draw(sp.img, base);
+        if (m.flash > 0) draw(sp.white, base * 0.8);
+        else if (m.enraged && !m.dying) draw(sp.red, base * (0.14 + 0.1 * Math.sin(t * 0.3)));
+        if (m.dying) draw(sp.black, base * 0.6 * U.clamp((m.deathT || 0) / (m.deathMax || 1), 0, 1));
+        ctx.restore();
+        return true;
+    },
+
+    /** Draws a small boss (by voice) or a gatekeeper (by ai) at the current origin: sprite, else the vector look. */
     drawBossArt(ctx, m, kind) {
+        ctx.save();
+        if (kind === 'splitter') {
+            const sq = 1 + (m.squash || 0) * 0.15;
+            ctx.scale(sq, 1 / sq);
+        }
+        const drawn = this.drawBossSprite(ctx, m, kind);
+        ctx.restore();
+        if (drawn) {
+            if (kind === 'shield') this.drawTowerShield(ctx, m);
+            return true;
+        }
         const fn = BossArt[kind];
         if (!fn) return false;
         const s = m.size;
@@ -364,5 +465,14 @@ extendGame({
         fn(ctx, s, m, this.artOpts(m, s));
         ctx.restore();
         return true;
+    },
+
+    /** The Shieldbearer's tower shield over its sprite (it turns with `facing`). */
+    drawTowerShield(ctx, m) {
+        ctx.save();
+        ctx.lineJoin = 'round';
+        ctx.ow = Math.max(2, m.size * 0.07);
+        BossArt.towerShield(ctx, m.size, m, col => (m.flash > 0 ? '#ffffff' : col));
+        ctx.restore();
     }
 });
