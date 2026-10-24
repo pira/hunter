@@ -18,6 +18,39 @@ const PALETTES = {
     }
 };
 const OUTLINE = '#1a1033';
+
+// v3.10: illustrated hero sprites (img/heroes/<class>[_<skin>].webp, one crop per class so skins line
+// up), feet at the bottom edge.
+// h = height in world units; hand = where the barbarian's axe sits (fraction of the image, from top-left).
+const HERO_SPRITES = {
+    wizard: { h: 50 },
+    barbarian: { h: 50, hand: [0.907, 0.634] },
+    goblin: { h: 48 }
+};
+const HeroSprites = {
+    list: {},
+    ready: null,
+    load(base = (typeof window !== 'undefined' && window.HERO_SPRITE_BASE) || 'img/heroes/') {
+        if (typeof Image === 'undefined' || typeof document === 'undefined') return Promise.resolve();
+        const keys = Object.keys(HERO_SPRITES);
+        if (typeof SKINS !== 'undefined') for (const id of Object.keys(SKINS)) keys.push(`${SKINS[id].cls}_${id}`);
+        this.ready = Promise.all(keys.map(key => new Promise(resolve => {
+            const img = new Image();
+            img.onload = () => {
+                this.list[key] = img;
+                resolve();
+            };
+            img.onerror = () => resolve(); // the vector hero stays
+            img.src = `${base}${key}.webp`;
+        })));
+        return this.ready;
+    },
+    /** The sprite for a class and skin, or null (a skin without its own sprite keeps the vector look). */
+    get(cls, skin = '') {
+        return this.list[skin ? `${cls}_${skin}` : cls] || null;
+    }
+};
+HeroSprites.load();
 const SPRITE_BOX = 72; // world units
 const SPRITE_RES = 3; // cache pixels per world unit
 const SPRITE_ORIGIN = { x: 36, y: 57 }; // character's ground-centre inside the box
@@ -48,6 +81,7 @@ extendGame({
 
     /** Draws the cached sprite centred on (x, y) = the character's feet-ish centre in world space. */
     blitSprite(ctx, cls, skin, frame, x, y, scale = 1, facing = 1, variant = '') {
+        if (this.blitHero(ctx, cls, skin, frame, x, y, scale, facing, variant)) return;
         const cv = this.sprite(cls, skin, frame, variant);
         ctx.save();
         ctx.translate(x, y);
@@ -56,11 +90,57 @@ extendGame({
         ctx.restore();
     },
 
+    /**
+     * Illustrated hero: one picture, brought to life in code — a hop and a sway while walking, a
+     * gentle breath standing still, mirrored to face where it walks. Returns false without a sprite.
+     */
+    blitHero(ctx, cls, skin, frame, x, y, scale, facing, variant) {
+        const img = HeroSprites.get(cls, skin);
+        if (!img) return false;
+        const cfg = HERO_SPRITES[cls];
+        const H = cfg.h;
+        const W = (H * img.naturalWidth) / img.naturalHeight;
+        const t = (this.frameNo || 0) * 0.26;
+        const walking = frame > 0;
+        const hop = walking ? Math.abs(Math.sin(t)) * 3 : 0;
+        const sway = walking ? Math.sin(t) * 0.07 : 0;
+        const squash = walking ? 1 - (1 - Math.abs(Math.sin(t))) * 0.05 : 1;
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.scale(scale * facing, scale);
+        ctx.translate(0, -hop);
+        ctx.rotate(sway);
+        ctx.scale(1 / Math.sqrt(squash), squash);
+        ctx.drawImage(img, -W / 2, -H, W, H);
+        if (cfg.hand && variant !== 'noweapon') {
+            // the axe is drawn on top, in the fist (it swings on its own while cleaving)
+            Game.drawAxe(ctx, this.palette(cls, skin), (cfg.hand[0] - 0.5) * W, -(1 - cfg.hand[1]) * H, 0.32, 0.9);
+        }
+        ctx.restore();
+        return true;
+    },
+
     /** Menu / profile portrait on a square canvas. */
     drawPortrait(canvas, cls, skin = '') {
         const g = canvas.getContext('2d');
         const S = canvas.width;
         g.clearRect(0, 0, S, S);
+        const img = HeroSprites.get(cls, skin);
+        if (img) {
+            const cfg = HERO_SPRITES[cls];
+            const h = S * 0.9;
+            const w = (h * img.naturalWidth) / img.naturalHeight;
+            g.drawImage(img, (S - w) / 2, S * 0.96 - h, w, h);
+            if (cfg.hand) {
+                g.save();
+                g.translate(S / 2, S * 0.96);
+                const k = h / cfg.h;
+                g.scale(k, k);
+                Game.drawAxe(g, this.palette(cls, skin), (cfg.hand[0] - 0.5) * (cfg.h * img.naturalWidth) / img.naturalHeight, -(1 - cfg.hand[1]) * cfg.h, 0.32, 0.9);
+                g.restore();
+            }
+            return;
+        }
         const k = S / 64;
         g.save();
         g.scale(k, k);

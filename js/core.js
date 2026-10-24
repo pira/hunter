@@ -3,7 +3,7 @@
 class Game {
     constructor() {
         // Version system (bumped by the pre-commit hook, see VERSION-README.md)
-        this.version = "3.9.2";
+        this.version = "3.10.0";
         this.buildDate = "2026-10-24";
 
         this.canvas = document.getElementById('gameCanvas');
@@ -147,6 +147,14 @@ class Game {
             this.drawPortrait(cv, btn.dataset.cls);
         });
         this.pickClass(this.cls, true);
+        // the illustrated heroes arrive a moment later: redraw the portraits then
+        if (HeroSprites.ready) HeroSprites.ready.then(() => this.refreshPortraits());
+    }
+
+    refreshPortraits() {
+        this.el.classPicker.querySelectorAll('.cls').forEach(btn => this.drawPortrait(btn.querySelector('canvas'), btn.dataset.cls));
+        this.pickClass(this.cls, true);
+        if (this.refreshWho) this.refreshWho();
     }
 
     pickClass(id, quiet = false) {

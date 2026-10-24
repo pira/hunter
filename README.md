@@ -52,7 +52,8 @@ js/                 the game, as classic scripts mixed into one Game class (no b
   hud.js            DOM HUD, game over, board     render.js   canvas drawing and particles
   profile.js        identity and profile overlay  road.js     scrolling, biomes, background tiles
   encounters.js     level flow, gatekeepers, waves, hazards
-  sprites.js        vector player characters (cached per class × skin × frame)
+  sprites.js        heroes: illustrated sprites from img/heroes/ (every class and skin) brought to life in code
+                    (hop, sway, breath, facing); the vector characters remain as stand-ins and for tools/icons
   mobs.js           monster families drawn as cached vector sprites (tools/mobs/lineup.html shows them all)
   bossart.js        bosses and gatekeepers: illustrated sprites from img/bosses/ animated in code, with vector
                     stand-ins until they load (tools/mobs/bosses.html shows them all; ?vector for the stand-ins)
@@ -61,6 +62,7 @@ js/                 the game, as classic scripts mixed into one Game class (no b
 game-utils.js       pure helpers shared with tests (level curve, combo tiers, …)
 audio.js            Web Audio engine: buses + limiter, voice manager, health watchdog,
                     synth monster hits/deaths and hero hurt sound (samples in sfx/)
+img/heroes/         hero sprites per class and skin (WebP, 256 px tall, ~20–30 KB each)
 img/bosses/         boss and gatekeeper sprites (WebP, 360 px, ~40 KB each; generated with GPT Image 2.5)
 manifest.webmanifest, icons/   PWA install (fullscreen on iPhone via Add to Home Screen)
 tools/audio/        prepare.sh rebuilds sfx/ from the originals in tools/audio/src/
