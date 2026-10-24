@@ -24,7 +24,7 @@ const OUTLINE = '#1a1033';
 // h = height in world units; hand = where the barbarian's axe sits (fraction of the image, from top-left).
 const HERO_SPRITES = {
     wizard: { h: 50 },
-    barbarian: { h: 50, hand: [0.907, 0.634] },
+    barbarian: { h: 50, hand: [0.85, 0.655] },
     goblin: { h: 48 }
 };
 const HeroSprites = {

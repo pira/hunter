@@ -62,7 +62,7 @@ js/                 the game, as classic scripts mixed into one Game class (no b
 game-utils.js       pure helpers shared with tests (level curve, combo tiers, …)
 audio.js            Web Audio engine: buses + limiter, voice manager, health watchdog,
                     synth monster hits/deaths and hero hurt sound (samples in sfx/)
-img/heroes/         hero sprites per class and skin (WebP, 256 px tall, ~20–30 KB each)
+img/heroes/         hero sprites per class and skin (WebP, 256 px tall, 16–43 KB each; plain at the free look, richer with each skin rarity)
 img/bosses/         boss and gatekeeper sprites (WebP, 360 px, ~40 KB each; generated with GPT Image 2.5)
 manifest.webmanifest, icons/   PWA install (fullscreen on iPhone via Add to Home Screen)
 tools/audio/        prepare.sh rebuilds sfx/ from the originals in tools/audio/src/
