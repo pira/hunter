@@ -5,6 +5,29 @@
 const PET_STEP = 60 * GAME_SPEED; // simulation steps per real second
 const PET_SPOTS = [[-30, 20], [30, 20], [-50, -2], [50, -2]];
 
+/* v3.11: pet pictures (img/pets/<id>_<tier>.webp), one look per rarity: basic is two flat colours,
+   rare adds shading and a trinket, legendary gear and highlights, mythic gold, glow and sparkles. */
+const PET_SPRITE_BASE = (typeof window !== 'undefined' && window.PET_SPRITE_BASE) || 'img/pets/';
+// drawn size in the field (fits w × h, feet on the ground)
+const PET_BOX = { any: [32, 28], bees: [28, 26], eagle: [36, 28], donkey: [34, 30], turtle: [34, 22] };
+const PetSprites = {
+    list: {},
+    load(base = PET_SPRITE_BASE) {
+        if (typeof Image === 'undefined') return;
+        for (const id of Object.keys(PETS)) {
+            for (let t = 1; t <= 4; t++) {
+                const img = new Image();
+                img.onload = () => (this.list[`${id}_${t}`] = img);
+                img.src = `${base}${id}_${t}.webp`;
+            }
+        }
+    },
+    get(id, tier) {
+        return this.list[`${id}_${tier}`] || this.list[`${id}_1`] || null;
+    }
+};
+PetSprites.load();
+
 extendGame({
     /** Build the pets for this run from the cached profile (called from loadArtefacts at run start). */
     loadPets() {
@@ -210,6 +233,12 @@ extendGame({
 
     // ------------------------------------------------------------------ drawing
 
+    /** A pet's picture for the profile (its tier's look; the emoji if the image is missing). */
+    petImg(id, tier = 1, cls = 'pimg') {
+        const def = PETS[id];
+        return `<img class="${cls}" src="${PET_SPRITE_BASE}${id}_${U.clamp(tier || 1, 1, 4)}.webp" alt="${def ? this.petEmoji(def) : ''}" draggable="false">`;
+    },
+
     petEmoji(def) {
         if (!def.alt) return def.icon;
         if (Game.emojiOk === undefined) Game.emojiOk = {};
@@ -262,15 +291,26 @@ extendGame({
                 ctx.fillText('💥', pet.act.x, pet.act.y);
                 ctx.globalAlpha = 1;
             }
-            const size = pet.id === 'bees' ? 18 : 24;
-            ctx.font = `${size}px ${EMOJI_FONT}`;
-            ctx.fillStyle = '#000'; // emoji take the fill's alpha: keep it opaque
-            const flip = pet.id !== 'eagle' && (p.facing < 0);
+            const sp = PetSprites.get(pet.id, pet.tier);
             ctx.save();
             ctx.translate(pet.x, pet.y - hop + (flying ? -8 : 0));
-            if (flip) ctx.scale(-1, 1);
             if (pet.id === 'turtle' && !(p.greenHp > 0)) ctx.globalAlpha = 0.45; // hiding in its shell
-            ctx.fillText(pet.id === 'bees' ? '🪺' : this.petEmoji(pet.def), 0, 0);
+            if (sp) {
+                // the art faces right: turn with the hero, lean a little on each hop
+                const box = PET_BOX[pet.id] || PET_BOX.any;
+                const k = Math.min(box[0] / sp.width, box[1] / sp.height);
+                const w = sp.width * k;
+                const h = sp.height * k;
+                if (p.facing < 0) ctx.scale(-1, 1);
+                ctx.rotate(pet.act ? 0 : Math.sin(pet.t * 0.12) * (p.moveT > 0 ? 0.08 : 0.03));
+                ctx.drawImage(sp, -w / 2, 12 - h, w, h);
+            } else {
+                const size = pet.id === 'bees' ? 18 : 24;
+                ctx.font = `${size}px ${EMOJI_FONT}`;
+                ctx.fillStyle = '#000'; // emoji take the fill's alpha: keep it opaque
+                if (pet.id !== 'eagle' && p.facing < 0) ctx.scale(-1, 1);
+                ctx.fillText(pet.id === 'bees' ? '🪺' : this.petEmoji(pet.def), 0, 0);
+            }
             ctx.restore();
             ctx.globalAlpha = 1;
             if (pet.id === 'bees') this.drawBees(ctx, pet);

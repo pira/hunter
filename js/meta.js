@@ -326,7 +326,7 @@ extendGame({
             const a = this.parsePet(slots[i]);
             if (!a) return `<div class="slot empty">${mine ? 'empty<small>pick a pet below</small>' : '—'}</div>`;
             const lv = lvOf(a.id);
-            return `<div class="slot pet" style="--t:${TIERS[a.tier].color}"><span class="si">${this.petEmoji(a.def)}</span><b>${a.def.name}${lv ? ` <em class="plv">Lv ${lv}</em>` : ''}</b><small>${a.def.label(Game.petValue(a.id, a.tier, lv))}</small>` +
+            return `<div class="slot pet" style="--t:${TIERS[a.tier].color}"><span class="si">${this.petImg(a.id, a.tier)}</span><b>${a.def.name}${lv ? ` <em class="plv">Lv ${lv}</em>` : ''}</b><small>${a.def.label(Game.petValue(a.id, a.tier, lv))}</small>` +
                 (mine ? `<button class="x" data-unslot="${a.id}" ${off} aria-label="Leave at home">✕</button>` : '') + '</div>';
         }).join('');
 
@@ -381,7 +381,7 @@ extendGame({
                     actions += `<button class="buy merge" data-merge="${id}" data-tier="${mergeTier + 1}" ${gems < cost || !online ? 'disabled' : ''}>3→1 ${TIERS[mergeTier + 1].label} · ${GEM}${cost}</button>`;
                 }
             }
-            return `<li class="${best ? '' : 'unhatched'}"><span class="ai">${this.petEmoji(def)}</span><span class="an"><b>${def.name}${lv ? ` <em class="plv">Lv ${lv}</em>` : ''}</b><small>${def.what}</small>${pips}<span class="chips">${chips}</span></span><span class="acts">${actions}</span></li>`;
+            return `<li class="${best ? '' : 'unhatched'}"><span class="ai">${this.petImg(id, best)}</span><span class="an"><b>${def.name}${lv ? ` <em class="plv">Lv ${lv}</em>` : ''}</b><small>${def.what}</small>${pips}<span class="chips">${chips}</span></span><span class="acts">${actions}</span></li>`;
         }).join('');
 
         let refund = '';
@@ -470,7 +470,7 @@ extendGame({
         const box = document.createElement('div');
         box.className = 'hatch-reveal';
         box.style.setProperty('--t', t.color);
-        box.innerHTML = `<div class="hr-card"><span class="hr-pet">${this.petEmoji(def)}</span><small style="color:${t.color}">${t.label.toUpperCase()}</small>` +
+        box.innerHTML = `<div class="hr-card"><span class="hr-pet">${this.petImg(h.id, h.tier)}</span><small style="color:${t.color}">${t.label.toUpperCase()}</small>` +
             `<b>${def.name}!</b><p>${def.what}<br><i>${def.label(Game.petValue(h.id, h.tier, Game.petLevel(Leaderboard.cachedProfile(), h.id)))}</i></p><button class="btn primary">Yay!</button></div>`;
         this.el.profile.appendChild(box);
         const close = () => box.remove();

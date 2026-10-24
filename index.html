@@ -427,6 +427,11 @@
         .icon-pick.on { background: rgba(250,204,21,.25); color: #fde68a; }
         .arts li:nth-child(odd) { background: rgba(255,255,255,.04); }
         .arts .ai { font-size: 1.4em; }
+        /* v3.11 pet pictures (the emoji shows only if an image is missing) */
+        .pimg { display: block; width: 1.6em; height: 1.4em; object-fit: contain; margin: 0 auto; }
+        .slot.pet .pimg { width: 1.7em; height: 1.5em; }
+        .arts .ai .pimg { width: 1.7em; height: 1.5em; }
+        .hr-pet .pimg { width: 1.9em; height: 1.7em; filter: drop-shadow(0 0 .15em color-mix(in srgb, var(--t) 70%, transparent)); }
         .arts .an { display: flex; flex-direction: column; line-height: 1.2; }
         .arts .an small { color: var(--muted); font-size: .8em; }
         .tier { color: var(--t); font-family: var(--display); font-size: .9em; white-space: nowrap; }

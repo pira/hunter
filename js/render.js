@@ -538,6 +538,7 @@ extendGame({
         this.drawMob(ctx, m);
         ctx.globalAlpha = 1;
         const tint = (color, a) => {
+            if (this.tintMob(ctx, m, color, a + 0.1)) return;
             ctx.globalAlpha = a;
             ctx.fillStyle = color;
             ctx.beginPath();
@@ -547,18 +548,19 @@ extendGame({
         };
         if (m.poison > 0) tint('#84cc16', 0.3);
         if (this.timers && (m.iced || this.mobSpeedMult < 1)) tint('#bfefff', 0.3);
+        const top = this.mobTop(m);
         if (m.stun > 0) {
             ctx.fillStyle = '#fde047';
             for (let i = 0; i < 3; i++) {
                 const a = this.frameNo * 0.15 + (i * TAU) / 3;
                 ctx.beginPath();
-                ctx.arc(m.x + Math.cos(a) * m.size * 0.9, m.y - m.size * 1.2 - 4 + Math.sin(a) * 3, 2.5, 0, TAU);
+                ctx.arc(m.x + Math.cos(a) * m.size * 0.9, top + 2 + Math.sin(a) * 3, 2.5, 0, TAU);
                 ctx.fill();
             }
         }
         if (m.hp < m.maxHp && !m.dead) {
             const w = Math.min(m.size * 2.4, 6 * m.maxHp + 8);
-            const y = m.y - m.size * 1.35 - 8;
+            const y = top - 8;
             const pct = U.clamp(m.hp / m.maxHp, 0, 1);
             ctx.fillStyle = 'rgba(0,0,0,0.55)';
             ctx.fillRect(m.x - w / 2 - 1, y - 1, w + 2, 6);
