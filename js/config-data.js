@@ -139,7 +139,7 @@ const POWERUPS = {
     magnet: { emoji: '🧲', name: 'Magnet', color: '#f43f5e', timed: true, secs: 30, weight: 0.7 },
     coins2: { emoji: '🪙', pouch: true, tag: '×2', name: 'Coins ×2', color: '#FFC300', timed: true, secs: 25, weight: 0.6 },
     coins3: { emoji: '🪙', pouch: true, tag: '×3', name: 'Coins ×3', color: '#FF8C00', timed: true, secs: 25, weight: 0.25 },
-    heart: { emoji: '❤️', name: 'Extra Life', color: '#FF1493', weight: 1 },
+    heart: { emoji: '❤️', name: 'Extra Life', color: '#FF1493', weight: 0.5 }, // v3.9.1: half as common
     petBoost: { emoji: '🦴', name: 'Pet Treat', color: '#f59e0b', timed: true, secs: 30, weight: 0.6, needsPets: true },
     quake: { emoji: '🌋', name: 'Earthquake', color: '#FF4500', weight: 0.3, instant: true }
 };

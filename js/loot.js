@@ -47,9 +47,9 @@ extendGame({
             return;
         }
         if (m.gk && (m.gen || 0) === 0) this.spawnCoins(m.x, m.y, 6 + this.level, 3.5, 5);
-        // Hearts have their own, more generous roll while you're hurt.
+        // Hearts have their own, more generous roll while you're hurt (v3.9.1: half what it was).
         const p = this.player;
-        if (p.hp < p.maxHp && this.heartCd <= 0 && Math.random() < (m.size > 14 ? 0.05 : 0.01) * luck * this.dropsMult) {
+        if (p.hp < p.maxHp && this.heartCd <= 0 && Math.random() < (m.size > 14 ? 0.025 : 0.005) * luck * this.dropsMult) {
             this.spawnPowerup(m.x, m.y, 'heart', { pop: true });
             this.heartCd = 600;
         }

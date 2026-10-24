@@ -298,7 +298,21 @@ extendGame({
         const s = m.speed * freeze;
         switch (m.ai) {
             case 'shield': {
-                m.facing += U.clamp(U.angleDelta(m.facing, toP), -0.025, 0.025);
+                // the shield turns with inertia: it speeds up and slows down, and to swing the other way
+                // it has to stop and hold for a moment first — circle it fast enough and you get a side
+                const MAX = 0.025;
+                const ACC = 0.0012;
+                const want = U.clamp(U.angleDelta(m.facing, toP) * 0.12, -MAX, MAX);
+                m.turnV = m.turnV || 0;
+                if (m.turnHold > 0) {
+                    m.turnHold--;
+                } else if (m.turnV !== 0 && Math.sign(want) !== Math.sign(m.turnV) && Math.abs(want) > 0.004) {
+                    m.turnV = Math.sign(m.turnV) * Math.max(0, Math.abs(m.turnV) - ACC);
+                    if (m.turnV === 0) m.turnHold = Math.round(0.45 * 60 * GAME_SPEED);
+                } else {
+                    m.turnV += U.clamp(want - m.turnV, -ACC, ACC);
+                }
+                m.facing += m.turnV;
                 if (m.y < 60) m.y += 1.5;
                 m.x += Math.cos(toP) * s * 0.8;
                 m.y += Math.sin(toP) * s * 0.8;
