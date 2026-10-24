@@ -698,6 +698,14 @@ extendGame({
         const frame = moving ? 1 + (Math.floor(p.moveT / 6) % 4) : 0;
         const breathe = moving ? 0 : Math.sin(this.frameNo * 0.06) * 0.6;
         const feetY = p.y + 14 * scale;
+        // v3.11.1: a soft pool of light under the hero (monsters get none) so it's easy to find
+        const pool = ctx.createRadialGradient(p.x, feetY, 2, p.x, feetY, 30 * scale);
+        pool.addColorStop(0, 'rgba(255,251,235,0.7)');
+        pool.addColorStop(1, 'rgba(255,251,235,0)');
+        ctx.fillStyle = pool;
+        ctx.beginPath();
+        ctx.ellipse(p.x, feetY, 30 * scale, 12 * scale, 0, 0, TAU);
+        ctx.fill();
         this.drawShadow(ctx, p.x, feetY, 12 * scale);
         if ((this.timers.magnet > 0 || this.buffs.magnetAll) && this.phase !== 'travel' && !this.bossLootPhase) {
             // how far the magnet reaches (v3.8: a bigger circle, never the whole map)
@@ -762,7 +770,7 @@ extendGame({
         }
         // While swinging, the barbarian's axe is drawn separately along the arc.
         const swinging = this.cls === 'barbarian' && this.cleaves.some(c => !c.whirl);
-        this.blitSprite(ctx, this.cls, this.skin, frame, p.x, feetY + breathe, scale, p.facing, swinging ? 'noweapon' : '');
+        this.blitSprite(ctx, this.cls, this.skin, frame, p.x, feetY + breathe, scale, p.facing, swinging ? 'noweapon' : '', true);
         if (this.superMeter >= 100) {
             // a little crackle around the hero when the super is ready
             const a = this.frameNo * 0.2;
@@ -844,7 +852,7 @@ extendGame({
         // spinning hero (sprite squashed on alternate frames for a blur feel) + two axes
         const spin = t * 0.45;
         const face = Math.cos(spin) >= 0 ? 1 : -1;
-        this.blitSprite(ctx, 'barbarian', this.skin, 0, p.x, p.y + 14, 1, face * Math.max(0.35, Math.abs(Math.cos(spin))), 'noweapon');
+        this.blitSprite(ctx, 'barbarian', this.skin, 0, p.x, p.y + 14, 1, face * Math.max(0.35, Math.abs(Math.cos(spin))), 'noweapon', true);
         for (const off of [0, Math.PI]) {
             const a = spin + off;
             Game.drawAxe(ctx, pal, p.x + Math.cos(a) * 12, p.y - 6 + Math.sin(a) * 12, a + Math.PI / 2, Math.min(1.25, this.impactMult * 1.1));

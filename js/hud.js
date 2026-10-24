@@ -176,7 +176,7 @@ extendGame({
             this.drawBossArt(icon, { ...killer, flash: 0, dying: false, x: 0, y: -40 }, killer.ai);
         } else if (killer.family && MobSprites.get(killer.family, killer.rank)) {
             const sp = MobSprites.get(killer.family, killer.rank);
-            this.blitMob(icon, { x: 0, y: size * 1.2, tilt: 0, face: 1, sq: 1, ...this.mobSpriteBox(sp, size) }, sp.img, 1);
+            this.blitMob(icon, { x: 0, y: size * 1.2, tilt: 0, face: 1, sq: 1, ...this.mobSpriteBox(sp, size, killer.rank) }, sp.img, 1);
         } else if (killer.family && MobArt[killer.family]) {
             icon.lineJoin = 'round';
             icon.ow = Math.max(1, size * 0.1);

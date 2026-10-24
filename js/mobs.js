@@ -357,6 +357,7 @@ const MOB_GAIT = {
     bugs: { hop: 0.03, lean: 0.04, squash: 0.06 }
 };
 const MOB_BOX = { h: 2.4, w: 2.8, foot: 0.95 }; // sprite fits 2.4×2.8 size; feet a little under the centre
+const MOB_ART_SCALE = [1, 1, 1, 1, 1, 0.8, 0.8, 0.8, 0.8]; // by rank: champions' detailed art is drawn 20% smaller
 
 extendGame({
     /** Cached bitmap of a monster look: one per family/rank/size/frame/flash, at screen resolution. */
@@ -390,8 +391,8 @@ extendGame({
     },
 
     /** The sprite's size at this monster size: fits the box, keeps the aspect. */
-    mobSpriteBox(sp, s) {
-        const k = Math.min((MOB_BOX.h * s) / sp.h, (MOB_BOX.w * s) / sp.w);
+    mobSpriteBox(sp, s, rank = 1) {
+        const k = Math.min((MOB_BOX.h * s) / sp.h, (MOB_BOX.w * s) / sp.w) * (MOB_ART_SCALE[rank] || 1);
         return { W: sp.w * k, H: sp.h * k };
     },
 
@@ -407,16 +408,7 @@ extendGame({
             m.heading = m.heading === undefined ? want : m.heading + U.angleDelta(m.heading, want) * 0.15;
         }
         const s = m.size;
-        if (m.glow) {
-            const pulse = 1.25 + Math.sin(m.phase * 0.7) * 0.12;
-            const gr = ctx.createRadialGradient(m.x, m.y, s * 0.3, m.x, m.y, s * 1.5 * pulse);
-            gr.addColorStop(0, `${m.glow}55`);
-            gr.addColorStop(1, `${m.glow}00`);
-            ctx.fillStyle = gr;
-            ctx.beginPath();
-            ctx.arc(m.x, m.y, s * 1.5 * pulse, 0, TAU);
-            ctx.fill();
-        }
+        // v3.11.1: no glow on monsters — only the hero gets effects, so it stands out
         const sp = MobSprites.get(m.family, m.rank);
         if (sp) return this.drawMobSprite(ctx, m, sp);
         m.art = null;
@@ -436,7 +428,7 @@ extendGame({
     drawMobSprite(ctx, m, sp) {
         const s = m.size;
         const gait = MOB_GAIT[m.family] || MOB_GAIT.undead;
-        const { W, H } = this.mobSpriteBox(sp, s);
+        const { W, H } = this.mobSpriteBox(sp, s, m.rank);
         const step = m.phase * 0.55 * Math.PI; // the old two-frame walk cycle
         const up = Math.abs(Math.sin(step));
         const face = (m.face || 1) < 0 ? -1 : 1;

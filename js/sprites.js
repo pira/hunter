@@ -48,8 +48,34 @@ const HeroSprites = {
     /** The sprite for a class and skin, or null (a skin without its own sprite keeps the vector look). */
     get(cls, skin = '') {
         return this.list[skin ? `${cls}_${skin}` : cls] || null;
+    },
+    /** v3.11.1: a light rim around the hero's silhouette (made once per sprite) so it pops off the crowd. */
+    halo(img) {
+        if (img.halo) return img.halo;
+        const w = img.naturalWidth;
+        const h = img.naturalHeight;
+        const pad = Math.max(2, Math.round(h * HERO_HALO.width));
+        const sil = document.createElement('canvas');
+        sil.width = w;
+        sil.height = h;
+        const s = sil.getContext('2d');
+        s.drawImage(img, 0, 0);
+        s.globalCompositeOperation = 'source-in';
+        s.fillStyle = HERO_HALO.color;
+        s.fillRect(0, 0, w, h);
+        const cv = document.createElement('canvas');
+        cv.width = w + pad * 2;
+        cv.height = h + pad * 2;
+        const g = cv.getContext('2d');
+        for (let i = 0; i < 16; i++) {
+            const a = (i / 16) * Math.PI * 2;
+            g.drawImage(sil, pad + Math.cos(a) * pad, pad + Math.sin(a) * pad);
+        }
+        img.halo = { cv, pad };
+        return img.halo;
     }
 };
+const HERO_HALO = { color: '#fffbeb', width: 0.035, alpha: 1 };
 HeroSprites.load();
 const SPRITE_BOX = 72; // world units
 const SPRITE_RES = 3; // cache pixels per world unit
@@ -80,8 +106,8 @@ extendGame({
     },
 
     /** Draws the cached sprite centred on (x, y) = the character's feet-ish centre in world space. */
-    blitSprite(ctx, cls, skin, frame, x, y, scale = 1, facing = 1, variant = '') {
-        if (this.blitHero(ctx, cls, skin, frame, x, y, scale, facing, variant)) return;
+    blitSprite(ctx, cls, skin, frame, x, y, scale = 1, facing = 1, variant = '', halo = false) {
+        if (this.blitHero(ctx, cls, skin, frame, x, y, scale, facing, variant, halo)) return;
         const cv = this.sprite(cls, skin, frame, variant);
         ctx.save();
         ctx.translate(x, y);
@@ -94,7 +120,7 @@ extendGame({
      * Illustrated hero: one picture, brought to life in code — a hop and a sway while walking, a
      * gentle breath standing still, mirrored to face where it walks. Returns false without a sprite.
      */
-    blitHero(ctx, cls, skin, frame, x, y, scale, facing, variant) {
+    blitHero(ctx, cls, skin, frame, x, y, scale, facing, variant, halo = false) {
         const img = HeroSprites.get(cls, skin);
         if (!img) return false;
         const cfg = HERO_SPRITES[cls];
@@ -111,6 +137,14 @@ extendGame({
         ctx.translate(0, -hop);
         ctx.rotate(sway);
         ctx.scale(1 / Math.sqrt(squash), squash);
+        if (halo) {
+            const hl = HeroSprites.halo(img);
+            const k = H / img.naturalHeight;
+            const a = ctx.globalAlpha;
+            ctx.globalAlpha = a * HERO_HALO.alpha;
+            ctx.drawImage(hl.cv, -W / 2 - hl.pad * k, -H - hl.pad * k, hl.cv.width * k, hl.cv.height * k);
+            ctx.globalAlpha = a;
+        }
         ctx.drawImage(img, -W / 2, -H, W, H);
         if (cfg.hand && variant !== 'noweapon') {
             // the axe is drawn on top, in the fist (it swings on its own while cleaving)
