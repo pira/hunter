@@ -3,7 +3,7 @@
 
 const GATEKEEPERS = {
     shield: { name: 'Shieldbearer', title: 'Hit it from the sides!', color: '#64748b', size: 28, hp: 34 },
-    splitter: { name: 'Splitter', title: 'It splits when it dies', color: '#22c55e', size: 30, hp: 24 },
+    splitter: { name: 'Splitter', title: 'It splits when it dies', color: '#22c55e', size: 30, hp: 32 },
     bomber: { name: 'Bomber', title: 'Watch out for the mines!', color: '#9a3412', size: 26, hp: 26 },
     charger: { name: 'Charger', title: 'Dodge the red lane!', color: '#b91c1c', size: 30, hp: 30 },
     totem: { name: 'Totem', title: 'Smash it before it heals them all', color: '#a16207', size: 26, hp: 42 },
@@ -279,9 +279,11 @@ extendGame({
         if (m.gen >= 2) return;
         for (let i = 0; i < 2; i++) {
             const a = (i ? 0 : Math.PI) + (Math.random() - 0.5);
+            // the two halves fly apart and keep going their own way (one flanks left, one right)
             const child = this.makeGatekeeper('splitter', m.x + Math.cos(a) * 10, m.y + Math.sin(a) * 10, {
-                gen: m.gen + 1, sizeMult: m.gen === 0 ? 0.7 : 0.48, hpMult: m.gen === 0 ? 0.45 : 0.2, spawnT: 10,
-                onDeath: mm => this.split(mm), heavy: false
+                gen: m.gen + 1, sizeMult: m.gen === 0 ? 0.7 : 0.48, hpMult: m.gen === 0 ? 0.5 : 0.25, spawnT: 10,
+                onDeath: mm => this.split(mm), heavy: false,
+                flank: (i ? 1 : -1) * (0.7 + Math.random() * 0.5), flankT: 70 + Math.floor(Math.random() * 60), hopRate: 0.12 + Math.random() * 0.08
             });
             child.kbx = Math.cos(a) * 7;
             child.kby = Math.sin(a) * 7;
@@ -319,9 +321,32 @@ extendGame({
                 break;
             }
             case 'splitter': {
-                const hop = Math.max(0, Math.sin(m.t * 0.15));
-                m.x += Math.cos(toP) * s * (0.6 + hop);
-                m.y += Math.sin(toP) * s * (0.6 + hop) + (m.y < 50 ? 1 : 0);
+                // v3.13.4: quicker hops (the smaller the piece, the quicker), and every piece keeps its own
+                // rhythm and angle of attack, swinging to a new one now and then: the pieces spread out and
+                // come at you from different sides instead of moving as one blob
+                if (m.hopRate === undefined) m.hopRate = 0.13 + Math.random() * 0.05;
+                if (!(--m.flankT > 0)) {
+                    m.flank = (Math.random() - 0.5) * 2;
+                    m.flankT = 80 + Math.floor(Math.random() * 90);
+                }
+                const hop = Math.max(0, Math.sin(m.t * m.hopRate));
+                const d = Math.hypot(p.x - m.x, p.y - m.y);
+                const a = toP + (m.flank || 0) * U.clamp((d - 50) / 150, 0, 1); // straight in once close
+                const v = s * (1 + 0.25 * (m.gen || 0)) * (0.9 + 1.6 * hop);
+                m.x += Math.cos(a) * v;
+                m.y += Math.sin(a) * v + (m.y < 50 ? 1 : 0);
+                // pieces don't stack on top of each other
+                for (const o of this.monsters) {
+                    if (o === m || o.ai !== 'splitter' || o.dead || o.dying) continue;
+                    const dx = m.x - o.x;
+                    const dy = m.y - o.y;
+                    const gap = Math.hypot(dx, dy);
+                    const min = (m.size + o.size) * 0.8;
+                    if (gap > 0.01 && gap < min) {
+                        m.x += (dx / gap) * (min - gap) * 0.25;
+                        m.y += (dy / gap) * (min - gap) * 0.25;
+                    }
+                }
                 m.squash = hop;
                 break;
             }
