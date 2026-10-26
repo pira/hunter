@@ -130,7 +130,7 @@ extendGame({
         const v = this.roadSpeed;
         this.roadY += v;
         for (const m of this.monsters) {
-            if (m.anchored || m.boss) continue;
+            if (m.anchored || m.boss || m.returning) continue; // a returning mob walks back against the road
             // chasers walk on the road, so they hold their ground a little against it
             m.y += m.behavior === 'chase' && !m.dying ? v * (1 - CHASE_ROAD_GRIP) : v;
         }
@@ -169,11 +169,17 @@ extendGame({
 
     // ------------------------------------------------------------------ background tiles
 
+    /** The difficulty the world is drawn in: the run's, or on the menu the one picked for the class. */
+    get viewDiff() {
+        return (this.state === 'menu' ? this.menuDiff : this.diff) || 1;
+    },
+
     biomeTile(biome) {
         const k = this.dpr * this.scale;
         const w = this.canvas.width;
         const h = Math.round(this.H * 1.5 * k);
-        const key = `${biome.id}:${w}x${h}`;
+        const diff = this.viewDiff;
+        const key = `${biome.id}:${diff}:${w}x${h}`;
         this.tiles = this.tiles || new Map();
         if (this.tiles.has(key)) return this.tiles.get(key);
         if (this.tiles.size > 3) {
@@ -186,6 +192,7 @@ extendGame({
         const { cv, g } = c;
         g.scale(k, k);
         Game.paintBiome(g, biome, this.W, this.H * 1.5, this.roadLeft, this.roadRight);
+        if (diff > 1) Game.paintEvil(g, biome, this.W, this.H * 1.5, this.roadLeft, this.roadRight, diff);
         const tile = { cv, h: this.H * 1.5 };
         this.tiles.set(key, tile);
         return tile;
@@ -238,12 +245,79 @@ extendGame({
             g.fillRect(0, 0, v.width, v.height);
         }
         if (this.vignette) ctx.drawImage(this.vignette, 0, 0);
+        if (this.viewDiff > 1) this.drawEvilAir(ctx, this.viewDiff);
         if (this.seam) {
             ctx.save();
             ctx.setTransform(k, 0, 0, k, 0, 0);
             this.drawGate(ctx, this.seam.y, this.seam.biome);
             ctx.restore();
         }
+    },
+
+    /** Hard / Hell: a red rim (Hell's throbs) and embers drifting up off the scorched ground. */
+    drawEvilAir(ctx, diff) {
+        const hell = diff >= 3;
+        const cw = this.canvas.width;
+        const ch = this.canvas.height;
+        let rim = this.evilRim;
+        if (!rim || rim.cw !== cw || rim.ch !== ch || rim.diff !== diff) {
+            if (rim) freeCanvas(rim.cv);
+            const c = newCanvas(cw, ch);
+            rim = this.evilRim = c ? { cv: c.cv, cw, ch, diff } : null;
+            if (rim) {
+                const g = c.g;
+                const vg = g.createRadialGradient(cw / 2, ch / 2, Math.min(cw, ch) * 0.3, cw / 2, ch / 2, Math.hypot(cw, ch) * 0.58);
+                // drawn with 'multiply': the edges darken into blood red (Hard: smoke brown)
+                vg.addColorStop(0, 'rgba(255,255,255,0)');
+                vg.addColorStop(0.55, hell ? 'rgba(170,40,30,0.35)' : 'rgba(170,110,80,0.25)');
+                vg.addColorStop(1, hell ? 'rgba(90,5,5,0.9)' : 'rgba(110,55,30,0.7)');
+                g.fillStyle = vg;
+                g.fillRect(0, 0, cw, ch);
+            }
+        }
+        const now = performance.now();
+        if (rim) {
+            ctx.globalAlpha = hell ? 0.75 + 0.25 * Math.sin(now / 520) : 1;
+            ctx.globalCompositeOperation = 'multiply';
+            ctx.drawImage(rim.cv, 0, 0);
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.globalAlpha = 1;
+        }
+        // embers: screen-space sparks rising (real time, so they drift on the menu and in pause too)
+        const dt = Math.min(3, (now - (this.emberT || now)) / 16.7);
+        this.emberT = now;
+        const list = this.embers || (this.embers = []);
+        const max = hell ? 60 : 24;
+        let due = (hell ? 0.5 : 0.18) * dt;
+        while (due > 0 && list.length < max) {
+            if (Math.random() < due) {
+                list.push({ x: Math.random() * this.W, y: this.H + 4, vy: -(0.5 + Math.random() * 1.1), ph: Math.random() * TAU,
+                    r: 0.9 + Math.random() * 1.4, life: 1, fade: 0.002 + Math.random() * 0.004 });
+            }
+            due -= 1;
+        }
+        const k = this.dpr * this.scale;
+        ctx.setTransform(k, 0, 0, k, 0, 0);
+        for (const e of list) {
+            e.ph += 0.05 * dt;
+            e.x += Math.sin(e.ph) * 0.35 * dt;
+            e.y += e.vy * dt;
+            e.life -= e.fade * dt;
+            const a = Math.max(0, e.life) * (0.6 + 0.4 * Math.sin(e.ph * 3));
+            ctx.globalAlpha = a * 0.3;
+            ctx.fillStyle = hell ? '#ef4444' : '#f97316';
+            ctx.beginPath();
+            ctx.arc(e.x, e.y, e.r * 3, 0, TAU);
+            ctx.fill();
+            ctx.globalAlpha = a;
+            ctx.fillStyle = hell ? '#fca5a5' : '#fed7aa';
+            ctx.beginPath();
+            ctx.arc(e.x, e.y, e.r, 0, TAU);
+            ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        this.embers = list.filter(e => e.life > 0 && e.y > -10);
     },
 
     drawGate(ctx, y, biome) {
@@ -345,6 +419,166 @@ Object.assign(Game, {
         }
         items.sort((a, b) => a.y - b.y);
         for (const it of items) wrap(it.y, yy => Game.paintItem(g, it.kind, it.x, yy, it.s, it.seed, biome));
+    },
+
+    /** Hard / Hell (v3.15.1): the same biome, drained, burnt red and broken — scorch marks, glowing
+     *  cracks and embers; Hell adds lava seams, skulls on stakes, bones and dead trees. Seamless like the tile. */
+    paintEvil(g, biome, W, H, L, R, diff) {
+        const hell = diff >= 3;
+        const r = Game.rng(biome.id.split('').reduce((a, c) => a * 31 + c.charCodeAt(0), 7) * 7 + diff * 977);
+        const wrap = (y, draw, pad = 70) => {
+            draw(y);
+            if (y < pad) draw(y + H);
+            if (y > H - pad) draw(y - H);
+        };
+        // 1. scorch marks
+        for (let i = 0; i < W * H / (hell ? 7000 : 14000); i++) {
+            const x = r() * W;
+            const y = r() * H;
+            const rad = 12 + r() * (hell ? 38 : 26);
+            wrap(y, yy => {
+                const sg = g.createRadialGradient(x, yy, 0, x, yy, rad);
+                sg.addColorStop(0, `rgba(12,2,0,${hell ? 0.55 : 0.4})`);
+                sg.addColorStop(1, 'rgba(12,2,0,0)');
+                g.fillStyle = sg;
+                g.beginPath();
+                g.ellipse(x, yy, rad, rad * 0.7, 0, 0, TAU);
+                g.fill();
+            });
+        }
+        // 2. the verges (painted before the tint, so they sink into the burnt ground): dead trees and bones on Hard, skulls on stakes, bone piles and lava pools in Hell
+        const verge = () => (r() < 0.5 ? 8 + r() * (L - 22) : R + 14 + r() * (W - R - 22));
+        const props = hell ? [['stake', 5], ['bones', 10], ['skull', 10], ['deadTree', 6], ['lava', 6]] : [['deadTree', 4], ['bones', 5], ['skull', 3]];
+        const items = [];
+        for (const [kind, density] of props) {
+            const n = Math.round(density * (H / 600) * Math.max(0.6, L / 140));
+            for (let i = 0; i < n; i++) items.push({ kind, x: verge(), y: r() * H, s: 0.8 + r() * 0.5, seed: r() });
+        }
+        items.sort((a, b) => a.y - b.y);
+        for (const it of items) wrap(it.y, yy => Game.paintEvilItem(g, it.kind, it.x, yy, it.s, it.seed, biome));
+        // 3. drain the colour, then burn it: Hard smoulders orange, Hell is scorched blood red
+        g.save();
+        g.globalCompositeOperation = 'saturation';
+        g.fillStyle = `rgba(128,128,128,${hell ? 0.7 : 0.5})`;
+        g.fillRect(0, 0, W, H);
+        g.globalCompositeOperation = 'multiply';
+        g.fillStyle = hell ? '#953a32' : '#a86c58';
+        g.fillRect(0, 0, W, H);
+        g.globalCompositeOperation = 'color';
+        g.fillStyle = hell ? 'rgba(140,15,10,0.32)' : 'rgba(165,55,15,0.22)';
+        g.fillRect(0, 0, W, H);
+        g.restore();
+        // 4. cracks glowing from below (Hell: lava seams across road and verges)
+        const crack = (x, y, len, spread) => {
+            const pts = [[x, y]];
+            let a = r() * TAU;
+            for (let j = 0; j < len; j++) {
+                a += (r() - 0.5) * 1.3;
+                const st = 7 + r() * 11;
+                x += Math.cos(a) * st;
+                y += Math.sin(a) * st;
+                pts.push([x, y]);
+            }
+            const branch = pts.length > 3 && r() < spread ? pts[1 + Math.floor(r() * (pts.length - 2))] : null;
+            const ys = pts.map(p => p[1]);
+            const lo = Math.min(...ys);
+            const hi = Math.max(...ys);
+            const offs = [0];
+            if (lo < 80) offs.push(H);
+            if (hi > H - 80) offs.push(-H);
+            for (const off of offs) {
+                const line = (ps, w, col) => {
+                    g.strokeStyle = col;
+                    g.lineWidth = w;
+                    g.beginPath();
+                    ps.forEach(([px, py], i) => (i ? g.lineTo(px, py + off) : g.moveTo(px, py + off)));
+                    g.stroke();
+                };
+                const twig = branch ? [branch, [branch[0] + (r() - 0.5) * 30, branch[1] + (r() - 0.5) * 30]] : null;
+                for (const [w, col] of hell
+                    ? [[7, 'rgba(255,60,0,0.14)'], [3.2, '#5c1010'], [1.6, '#ea580c'], [0.7, '#fdba74']]
+                    : [[5, 'rgba(255,110,20,0.12)'], [2.2, '#3b1d10'], [0.9, '#fb923c']]) {
+                    line(pts, w, col);
+                    if (twig) line(twig, w * 0.7, col);
+                }
+            }
+        };
+        g.lineCap = 'round';
+        g.lineJoin = 'round';
+        const nCracks = Math.round(H / (hell ? 32 : 80));
+        for (let i = 0; i < nCracks; i++) {
+            const onRoad = r() < 0.4; // the road stays readable: most of it breaks on the verges
+            const x = onRoad ? L + 10 + r() * (R - L - 20) : r() < 0.5 ? r() * (L - 10) : R + 10 + r() * (W - R - 10);
+            crack(x, r() * H, 3 + Math.floor(r() * (hell ? 7 : 4)), hell ? 0.7 : 0.35);
+        }
+        // 5. embers caught in the ground
+        for (let i = 0; i < W * H / (hell ? 3500 : 7000); i++) {
+            const x = r() * W;
+            const y = r() * H;
+            const s = 0.6 + r() * 0.9;
+            wrap(y, yy => Game.paintItem(g, 'ember', x, yy, s, 0, biome), 10);
+        }
+    },
+
+    paintEvilItem(g, kind, x, y, s, seed, biome) {
+        g.save();
+        if (kind === 'stake') {
+            g.strokeStyle = '#1c0f0a';
+            g.lineWidth = 3 * s;
+            g.lineCap = 'round';
+            g.beginPath();
+            g.moveTo(x, y + 2 * s);
+            g.lineTo(x, y - 22 * s);
+            g.stroke();
+            g.fillStyle = 'rgba(0,0,0,0.3)';
+            g.beginPath();
+            g.ellipse(x + 3 * s, y + 2 * s, 6 * s, 2.5 * s, 0, 0, TAU);
+            g.fill();
+            Game.paintItem(g, 'skull', x, y - 24 * s, s * 1.1, seed, biome);
+            g.fillStyle = '#ff3b1f'; // a glint in the eyes
+            g.globalAlpha = 0.85;
+            g.fillRect(x - 2.4 * s, y - 25 * s, 1.2 * s, 1.2 * s);
+            g.fillRect(x + 1.2 * s, y - 25 * s, 1.2 * s, 1.2 * s);
+        } else if (kind === 'bones') {
+            g.strokeStyle = '#b9ad9c';
+            g.lineWidth = 2 * s;
+            g.lineCap = 'round';
+            for (const a of [0.5 + seed, -0.6 + seed * 0.5]) {
+                const dx = Math.cos(a) * 7 * s;
+                const dy = Math.sin(a) * 4 * s;
+                g.beginPath();
+                g.moveTo(x - dx, y - dy);
+                g.lineTo(x + dx, y + dy);
+                g.stroke();
+                g.fillStyle = '#b9ad9c';
+                for (const sg of [-1, 1]) {
+                    g.beginPath();
+                    g.arc(x + sg * dx, y + sg * dy, 1.6 * s, 0, TAU);
+                    g.fill();
+                }
+            }
+        } else if (kind === 'deadTree') {
+            // charred: black trunk, crooked bare branches, an ember or two still in the bark
+            g.strokeStyle = '#1a100c';
+            g.lineWidth = 4 * s;
+            g.lineCap = 'round';
+            g.beginPath();
+            g.moveTo(x, y);
+            g.lineTo(x + 1 * s, y - 28 * s);
+            g.moveTo(x, y - 12 * s);
+            g.lineTo(x - 11 * s, y - 24 * s);
+            g.lineTo(x - 13 * s, y - 31 * s);
+            g.moveTo(x + 1 * s, y - 19 * s);
+            g.lineTo(x + 10 * s, y - 30 * s);
+            g.moveTo(x + 1 * s, y - 28 * s);
+            g.lineTo(x - 3 * s, y - 35 * s);
+            g.stroke();
+            g.fillStyle = '#fb923c';
+            g.fillRect(x - 1 * s, y - (8 + 10 * seed) * s, 1.4 * s, 1.4 * s);
+        } else {
+            Game.paintItem(g, kind, x, y, s, seed, biome);
+        }
+        g.restore();
     },
 
     paintRoad(g, biome, W, H, L, R, r, wrap) {

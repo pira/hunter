@@ -446,8 +446,12 @@ extendGame({
             }
             case 'wave':
                 this.moveWaveMob(m, freeze);
-                if (m.y > this.H + 40 + m.size) {
-                    m.dead = true; // ran off the bottom: this one got away
+                if (m.y > this.H + m.size && this.mustReturn(m)) {
+                    // ran off the bottom (a dodged stampede, a pincer you slipped): it turns round and comes back
+                    this.breakFormation(m);
+                    m.returning = true;
+                } else if (m.y > this.H + 40 + m.size) {
+                    m.dead = true;
                     m.escaped = true;
                 }
                 break;

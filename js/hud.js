@@ -197,6 +197,7 @@ extendGame({
             ['Time', U.formatTime(this.time)]
         ];
         if (this.diff > 1) stats.push(['Difficulty', `${DIFFICULTIES[this.diff].icon} ${DIFFICULTIES[this.diff].name}`]);
+        this.dressPlayButton(this.el.againBtn, this.pickedDiff(this.cls), ['', '↻ PLAY AGAIN', '🔥 HARD AGAIN', '😈 BACK TO HELL']);
         if (this.gems > 0) stats.push(['Gems', `${GEM} ${this.gems}`]);
         if (this.masteryUp && this.masteryUp.cls === this.cls) stats.push(['Mastery', `${this.masteryBadge(this.masteryUp.tier)} new!`]);
         this.masteryUp = null;

@@ -102,6 +102,14 @@ extendGame({
         return (DIFFICULTIES[this.diff] || DIFFICULTIES[1]).k;
     },
 
+    /** Play buttons wear the difficulty: fire for Hard, hellfire for Hell (CSS .d2 / .d3). */
+    dressPlayButton(btn, n, labels) {
+        if (!btn) return;
+        btn.classList.toggle('d2', n === 2);
+        btn.classList.toggle('d3', n === 3);
+        btn.innerHTML = labels[n] || labels[1];
+    },
+
     /** "🔥 Hard" tag for the board, the profile and the HUD; nothing for Normal. */
     diffTag(n) {
         const d = n > 1 && DIFFICULTIES[n];

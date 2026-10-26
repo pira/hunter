@@ -3,7 +3,7 @@
 class Game {
     constructor() {
         // Version system (bumped by the pre-commit hook, see VERSION-README.md)
-        this.version = "3.15.0";
+        this.version = "3.15.1";
         this.buildDate = "2026-10-26";
 
         this.canvas = document.getElementById('gameCanvas');
@@ -179,9 +179,8 @@ class Game {
             this.pickClass(this.cls, true);
             Sfx.tone([0, 660, 494, 330][n], { duration: 0.12, type: n > 1 ? 'sawtooth' : 'triangle', volume: 0.08 });
         }));
-        const diff = DIFFICULTIES[this.pickedDiff(id)];
-        const play = document.getElementById('playBtn');
-        if (play) play.innerHTML = diff.k > 1 ? `▶ PLAY <small class="pdiff" style="--d:${diff.color}">${diff.icon} ${diff.name.toUpperCase()}</small>` : '▶ PLAY';
+        this.menuDiff = this.pickedDiff(id); // the menu's world turns evil with it (see drawBackground)
+        this.dressPlayButton(document.getElementById('playBtn'), this.menuDiff, ['', '▶ PLAY', '🔥 PLAY HARD', '😈 ENTER HELL']);
         if (this.el.whoAvatar) this.drawAvatar(this.el.whoAvatar, id, this.equippedSkin ? this.equippedSkin(id) : '');
         this.drawPortrait(document.getElementById('logoHero'), id, this.equippedSkin ? this.equippedSkin(id) : '');
         if (!quiet) Sfx.tone({ wizard: 784, barbarian: 392, goblin: 587 }[id], { duration: 0.09, type: 'triangle', volume: 0.1 });

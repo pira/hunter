@@ -224,8 +224,21 @@ extendGame({
         }
     },
 
-    /** Mobs leave for good through the bottom; elsewhere they turn back towards the road. */
+    /** A monster the running encounter waits for (wave, escort, boss add): it never gets away. */
+    mustReturn(m) {
+        const enc = this.encounter;
+        return Boolean(m.enc && m.enc === enc && !enc.done && m.behavior !== 'flee');
+    },
+
+    /** Mobs leave for good through the bottom; elsewhere they turn back towards the road.
+     *  v3.15.1: encounter mobs you dodged off the bottom turn round and come back instead (they used
+     *  to stall just below the edge, out of reach, and the wave could never end). */
     keepOnField(m) {
+        if (this.mustReturn(m)) {
+            if (m.y > this.H - m.size) m.returning = true;
+            else if (m.y < this.H * 0.8 - m.size) m.returning = false;
+            if (m.returning) m.y = Math.min(m.y, this.H + 40 + m.size);
+        } else m.returning = false;
         if (m.y > this.H + 40 + m.size) {
             m.dead = true;
             m.escaped = true;
@@ -246,9 +259,8 @@ extendGame({
             m.y += Math.sin(m.dir) * s;
             return;
         }
-        // Soft floor near the bottom edge: slower, and wanderers turn back up.
+        // Soft floor near the bottom edge: slower going down, and wanderers turn back up.
         const nearFloor = m.y > this.floorY && this.floorProtects;
-        if (nearFloor) s *= 0.5;
         if (m.behavior === 'flee') {
             m.y += Math.max(2.4, m.speed * 2);
             m.x += Math.cos(m.phase * 0.3) * 0.6;
@@ -256,9 +268,13 @@ extendGame({
         }
         if (m.behavior === 'chase') {
             const n = U.normalizeVector(this.player.x - m.x, this.player.y - m.y);
+            // coming back from below the screen: straight at you, never slower than a jog
+            if (m.returning) s = Math.max(m.speed, 1.2) * speedMult;
+            else if (nearFloor && n.y > 0) s *= 0.5; // (going up it used to crawl too: slow mobs stalled at the edge)
             m.x += n.x * s;
             m.y += n.y * s;
         } else {
+            if (nearFloor) s *= 0.5;
             if (++m.dirT >= m.dirRate) {
                 m.dir = Math.random() * TAU;
                 // a slight up-screen lean: down-turns flip up a little more often (WANDER_UP_BIAS)

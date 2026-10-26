@@ -323,7 +323,12 @@
         .diffs .dbtn.on { background: var(--d); color: #1c1917; border-color: var(--d); box-shadow: 0 0 10px color-mix(in srgb, var(--d) 60%, transparent); }
         .diffs .dbtn:disabled { opacity: .4; cursor: default; }
         .diff { display: inline-block; margin-left: .25em; font-size: .85em; vertical-align: middle; filter: drop-shadow(0 0 4px var(--d)); }
-        .pdiff { margin-left: .4em; padding: 0 .45em; border-radius: .6em; font-size: .62em; vertical-align: middle; background: var(--d); color: #1c1917; letter-spacing: .5px; }
+        /* v3.15.1: the play buttons wear the difficulty */
+        .btn.primary.d2 { background: linear-gradient(180deg, #fed7aa 0%, #fb923c 22%, #ea580c 60%, #b91c1c 100%); color: #fff7ed; text-shadow: 0 2px 0 #7c2d12, 0 0 10px rgba(255,190,90,.7); box-shadow: 0 4px 0 #7c2d12, 0 0 22px rgba(249,115,22,.6); animation: fireGlow .9s ease-in-out infinite alternate; }
+        .btn.primary.d3 { background: radial-gradient(140% 170% at 50% 115%, #f87171 0%, #dc2626 22%, #7f1d1d 50%, #2b0707 78%, #120303 100%); color: #fee2e2; text-shadow: 0 0 6px #ef4444, 0 0 16px #b91c1c, 0 2px 0 #000; box-shadow: 0 4px 0 #1f0404, 0 0 28px rgba(239,68,68,.7), inset 0 0 0 2px rgba(248,113,113,.55), inset 0 -10px 22px rgba(239,68,68,.35); animation: hellPulse 1.5s ease-in-out infinite; }
+        .btn.primary.d2:active, .btn.primary.d3:active { box-shadow: 0 1px 0 #000, 0 0 18px rgba(239,68,68,.6); }
+        @keyframes fireGlow { from { box-shadow: 0 4px 0 #7c2d12, 0 0 14px rgba(249,115,22,.45); } to { box-shadow: 0 4px 0 #7c2d12, 0 0 30px rgba(251,146,60,.85); } }
+        @keyframes hellPulse { 50% { box-shadow: 0 4px 0 #1f0404, 0 0 46px rgba(239,68,68,1), inset 0 0 0 2px rgba(254,202,202,.8), inset 0 -14px 26px rgba(248,113,113,.55); } }
         .class-info { min-height: 2.6em; margin: 0 0 .9em; font-size: .82em; line-height: 1.45; color: #cbd5e1; }
         .class-info .sup { color: #fde047; }
         /* profile */
