@@ -354,9 +354,15 @@ extendGame({
             const name = String(s.name).replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
             const pid = typeof s.playerId === 'string' && /^[0-9a-f-]{36}$/.test(s.playerId) ? ` data-pid="${s.playerId}"` : '';
             const badge = Number.isInteger(s.mastery) && s.mastery > 0 && s.mastery < 100 ? this.masteryBadge(s.mastery) : '';
-            return `<li class="${isMine ? 'mine' : ''}"${pid}><span class="rank">${i + 1}</span><span class="name${SKINS[s.skin] && SKINS[s.skin].rarity === 'mythic' ? ' glow' : ''}">${CLASSES[s.cls] ? `<span class="cls-i">${CLASSES[s.cls].icon}</span>` : ''}${name}${badge}</span>` +
+            // the hero they hunted with: class, the skin they wore, and the gear of the level they reached
+            const skin = SKINS[s.skin] && SKINS[s.skin].cls === s.cls ? s.skin : '';
+            const hero = CLASSES[s.cls]
+                ? `<canvas class="hero-i" width="72" height="72" data-cls="${s.cls}" data-skin="${skin}" data-tier="${gearTier(Number(s.level) || 1)}" title="${CLASSES[s.cls].name}${skin ? ` · ${SKINS[skin].name}` : ''}"></canvas>`
+                : '';
+            return `<li class="${isMine ? 'mine' : ''}"${pid}><span class="rank">${i + 1}</span><span class="name${skin && SKINS[skin].rarity === 'mythic' ? ' glow' : ''}">${hero}${name}${badge}</span>` +
                 `<span class="lvl">Lv ${Number(s.level) || 1}</span><span class="pts">${(Number(s.score) || 0).toLocaleString()}</span></li>`;
         }).join('');
+        listEl.querySelectorAll('canvas.hero-i').forEach(cv => this.drawPortrait(cv, cv.dataset.cls, cv.dataset.skin, Number(cv.dataset.tier) || 0));
         listEl.querySelectorAll('li[data-pid]').forEach(li => li.addEventListener('click', () => this.openProfile(li.dataset.pid)));
     }
 });
