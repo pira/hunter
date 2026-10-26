@@ -3,8 +3,8 @@
 class Game {
     constructor() {
         // Version system (bumped by the pre-commit hook, see VERSION-README.md)
-        this.version = "3.12.0";
-        this.buildDate = "2026-10-24";
+        this.version = "3.13.0";
+        this.buildDate = "2026-10-26";
 
         this.canvas = document.getElementById('gameCanvas');
         this.ctx = this.canvas.getContext('2d');
@@ -149,8 +149,6 @@ class Game {
             this.drawPortrait(cv, btn.dataset.cls);
         });
         this.pickClass(this.cls, true);
-        // the illustrated heroes arrive a moment later: redraw the portraits then
-        if (HeroSprites.ready) HeroSprites.ready.then(() => this.refreshPortraits());
     }
 
     refreshPortraits() {

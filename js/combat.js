@@ -66,6 +66,7 @@ extendGame({
         const def = PRIMARY.bolt;
         this.cooldown = def.cooldown;
         const base = Math.atan2(aim.y - p.y, aim.x - p.x);
+        this.heroAct('cast', base);
         const count = 1 + this.stack('split');
         const main = Math.floor((count - 1) / 2);
         for (let i = 0; i < count; i++) {
@@ -171,6 +172,7 @@ extendGame({
             aim = { x: aim.x + ((p.x - aim.x) / Math.max(1, d)) * lead, y: aim.y + ((p.y - aim.y) / Math.max(1, d)) * lead };
         }
         const base = aim ? Math.atan2(aim.y - p.y, aim.x - p.x) : -Math.PI / 2;
+        if (!all) this.heroAct('throw', base);
         const range = all ? def.range : Math.min(def.range, Math.hypot(aim.x - p.x, aim.y - p.y));
         // aimed throws land ~26 px apart around the target; the super fans out wide
         const spread = all ? 0.32 : Math.min(0.32, 26 / Math.max(30, range));

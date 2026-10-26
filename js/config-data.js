@@ -273,18 +273,19 @@ const STAT_NAMES = { gold: 'gold', damage: 'damage', rate: 'attack speed', charg
 // Gems: very rare drops, likelier from harder monsters; bosses always drop some.
 const GEM_CHANCE = { small: 0.0005, medium: 0.001, large: 0.003, elite: 0.006, legendary: 0.01, mythic: 0.015, ancient: 0.025, ultimate: 0.06, gatekeeper: 0.25 };
 // Cosmetic skins per class: palette overrides for js/sprites.js + extras (headgear, trail, aura, kill burst).
+// Skin palettes recolour the hero and its gear (gear colours they don't set follow their main colours).
 const SKINS = {
     frost: { cls: 'wizard', rarity: 'basic', name: 'Frost Mage', palette: { robe: '#38bdf8', robeDark: '#0369a1', hat: '#0284c7', trim: '#e0f2fe', hatBand: '#e0f2fe', star: '#ffffff', orb: '#e0f2fe' } },
     flame: { cls: 'wizard', rarity: 'rare', name: 'Flame King', palette: { robe: '#dc2626', robeDark: '#991b1b', trim: '#fbbf24', orb: '#fb923c' }, extras: { noHat: true, crown: '#fbbf24' } },
     shadow: { cls: 'wizard', rarity: 'legendary', name: 'Shadow Archmage', palette: { robe: '#1f2937', robeDark: '#111827', hat: '#312e81', hatBand: '#a78bfa', trim: '#a78bfa', star: '#c4b5fd', orb: '#c084fc', beard: '#9ca3af' }, extras: { trail: '#a78bfa' } },
     celestial: { cls: 'wizard', rarity: 'mythic', name: 'Celestial', palette: { robe: '#fef3c7', robeDark: '#fde68a', hat: '#f8fafc', hatBand: '#facc15', trim: '#facc15', star: '#facc15', orb: '#fde047' }, extras: { trail: '#fde047', aura: '#facc15', burst: '#fde047' } },
-    viking: { cls: 'barbarian', rarity: 'basic', name: 'Snow Viking', palette: { hair: '#facc15', hairDark: '#ca8a04', fur: '#e5e7eb', furLight: '#ffffff', pants: '#1e3a8a' } },
-    warlord: { cls: 'barbarian', rarity: 'rare', name: 'Golden Warlord', palette: { fur: '#7f1d1d', furLight: '#b91c1c', axeHead: '#fde047', buckle: '#fde047' }, extras: { noHelmet: true, crown: '#facc15' } },
-    lava: { cls: 'barbarian', rarity: 'legendary', name: 'Lava Berserker', palette: { hair: '#f97316', hairDark: '#c2410c', helmet: '#292524', helmetDark: '#1c1917', horn: '#fb923c', axeHead: '#fb923c', axeEdge: '#fde047', fur: '#292524', furLight: '#57534e' }, extras: { trail: '#fb923c' } },
-    titan: { cls: 'barbarian', rarity: 'mythic', name: 'Storm Titan', palette: { skin: '#bfdbfe', skinShade: '#93c5fd', hair: '#f8fafc', hairDark: '#cbd5e1', helmet: '#e5e7eb', horn: '#fde047', axeHead: '#fde047', fur: '#1e3a8a', furLight: '#3b82f6' }, extras: { trail: '#93c5fd', aura: '#60a5fa', burst: '#bfdbfe' } },
+    viking: { cls: 'barbarian', rarity: 'basic', name: 'Snow Viking', palette: { hair: '#facc15', hairDark: '#ca8a04', fur: '#e5e7eb', furLight: '#ffffff', pants: '#1e3a8a', paint: '#2563eb' } },
+    warlord: { cls: 'barbarian', rarity: 'rare', name: 'Golden Warlord', palette: { fur: '#7f1d1d', furLight: '#b91c1c', axeHead: '#fde047', buckle: '#fde047', metal: '#facc15', metalDark: '#a16207' }, extras: { noHelmet: true, crown: '#facc15' } },
+    lava: { cls: 'barbarian', rarity: 'legendary', name: 'Lava Berserker', palette: { hair: '#f97316', hairDark: '#c2410c', helmet: '#292524', helmetDark: '#1c1917', horn: '#fb923c', axeHead: '#fb923c', axeEdge: '#fde047', fur: '#292524', furLight: '#57534e', rune: '#fb923c', paint: '#f97316', hornTip: '#fb923c' }, extras: { trail: '#fb923c' } },
+    titan: { cls: 'barbarian', rarity: 'mythic', name: 'Storm Titan', palette: { skin: '#bfdbfe', skinShade: '#93c5fd', hair: '#f8fafc', hairDark: '#cbd5e1', helmet: '#e5e7eb', horn: '#fde047', axeHead: '#fde047', fur: '#1e3a8a', furLight: '#3b82f6', rune: '#bfdbfe', paint: '#60a5fa' }, extras: { trail: '#93c5fd', aura: '#60a5fa', burst: '#bfdbfe' } },
     redcap: { cls: 'goblin', rarity: 'basic', name: 'Red Cap', palette: { cap: '#dc2626', vest: '#1d4ed8', vestDark: '#1e3a8a' } },
-    pirate: { cls: 'goblin', rarity: 'rare', name: 'Pirate Goblin', palette: { vest: '#f8fafc', vestDark: '#1f2937', pants: '#1f2937' }, extras: { noCap: true, pirate: true } },
-    toxic: { cls: 'goblin', rarity: 'legendary', name: 'Toxic Goblin', palette: { skin: '#a3e635', ear: '#bef264', eye: '#f0abfc', vest: '#581c87', vestDark: '#3b0764', bomb: '#4d7c0f', fuse: '#d946ef' }, extras: { trail: '#a3e635' } },
-    king: { cls: 'goblin', rarity: 'mythic', name: 'Goblin King', palette: { vest: '#7e22ce', vestDark: '#581c87', satchel: '#facc15' }, extras: { noCap: true, crown: '#facc15', trail: '#facc15', aura: '#fde047', burst: '#facc15' } }
+    pirate: { cls: 'goblin', rarity: 'rare', name: 'Pirate Goblin', palette: { vest: '#f8fafc', vestDark: '#1f2937', pants: '#1f2937', pack: '#78350f' }, extras: { noCap: true, pirate: true } },
+    toxic: { cls: 'goblin', rarity: 'legendary', name: 'Toxic Goblin', palette: { skin: '#a3e635', ear: '#bef264', eye: '#f0abfc', vest: '#581c87', vestDark: '#3b0764', bomb: '#4d7c0f', fuse: '#d946ef', flame: '#d946ef', lens: '#f0abfc' }, extras: { trail: '#a3e635' } },
+    king: { cls: 'goblin', rarity: 'mythic', name: 'Goblin King', palette: { vest: '#7e22ce', vestDark: '#581c87', satchel: '#facc15', brass: '#facc15', packBand: '#facc15' }, extras: { noCap: true, crown: '#facc15', trail: '#facc15', aura: '#fde047', burst: '#facc15' } }
 };
 const RARITY = { basic: 1, rare: 2, legendary: 3, mythic: 4 };

@@ -20,6 +20,7 @@ Pick a hero, run down the monster road through eleven biomes, chain kills into a
   - 🪓 *Barbarian* — 4 hearts, a cleave that hits everything in front; super **Whirlwind**: 5 s of invincible spinning.
   - 💣 *Goblin* — fastest runner, throws grenades in pairs; super **Bombardment**: 10× a normal throw rains down at random spots over 5 s.
   - Every super makes you invincible while it runs (up to 5 s): a shield bubble shows it.
+  - **Gear grows with the hunt:** at levels 5, 10, 20 and 30 your hero puts on a new piece (🧙 spellbook sash → rune-stitched robe and a crescent staff → starlight cape → archmage aura; 🪓 leather bracers → spiked pauldron and war paint → bear-fur cloak → rune axe; 💣 bomb bandolier → brass goggles → rocket pack → golden hoard). It's announced when the level starts; the menu shows each hero in the gear of the best level reached with it. Skins recolour the gear too, mythic skins twinkle.
 - **Monsters** come in five families — 💀 Undead, 🐺 Beasts, 👹 Fantasy (trolls & ogres), 🗡️ Bandits, 🪲 Bugs — and eight ranks, each drawn bigger and more detailed than the one before (from Skeleton, Skeleton Soldier, Skeleton Officer, Skeleton General up to crowned champions like the Skeleton Emperor). Each biome favours two families. Later levels bring fewer but tougher monsters: the heavy ranks become more common level by level, and past level 12 monster (and boss) HP keeps climbing, so even a fully upgraded hero meets a wall somewhere past level 30. Every family has its own soft hit sound and a louder death (bones collapse, a heavy fall, a dropped blade, a squish).
 - **The road** scrolls down. Monsters come from the top and burst out of the bushes; loot drifts with the road and is gone once it leaves the bottom (it blinks first). Hiding at the very bottom works for three seconds only.
 - **Levels** fill with the damage you deal. When the bar is full: **CLEAR!** → finish the stragglers → the level's encounter → loot → through the gate into the next biome → shop.
@@ -55,8 +56,8 @@ js/                 the game, as classic scripts mixed into one Game class (no b
   encounters.js     level flow, gatekeepers, waves, hazards
   gfx.js            canvas/image helpers: offscreen canvases are freed explicitly (mobile Safari caps canvas
                     memory), images retry on a flaky connection
-  sprites.js        heroes: illustrated sprites from img/heroes/ (every class and skin) brought to life in code
-                    (hop, sway, breath, facing); the vector characters remain as stand-ins and for tools/icons
+  sprites.js        heroes: vector rigs drawn live (legs walk, staff thrust / bomb throw / two-handed swing,
+                    super poses, blinks), gear that grows with the run level, skins recolour every piece
   mobs.js           monster families: illustrated sprites from img/mobs/ that hop, gallop or scuttle in code,
                     vector stand-ins until they load (tools/mobs/lineup.html shows them all; ?vector, ?hit)
   bossart.js        bosses and gatekeepers: illustrated sprites from img/bosses/ animated in code, with vector
@@ -66,7 +67,6 @@ js/                 the game, as classic scripts mixed into one Game class (no b
 game-utils.js       pure helpers shared with tests (level curve, combo tiers, …)
 audio.js            Web Audio engine: buses + limiter, voice manager, health watchdog,
                     synth monster hits/deaths and hero hurt sound (samples in sfx/)
-img/heroes/         hero sprites per class and skin (WebP, 256 px tall, 16–43 KB each; plain at the free look, richer with each skin rarity)
 img/mobs/           monster sprites, family × rank (WebP, 144–192 px, 5–20 KB; rank 1 is two flat colours, detail grows by rank)
 img/pets/           pet sprites, pet × rarity (WebP, 160 px; basic flat → mythic gold and glow)
 img/bosses/         boss and gatekeeper sprites (WebP, 360 px, ~40 KB each; generated with GPT Image 2.5), plus

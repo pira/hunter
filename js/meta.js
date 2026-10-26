@@ -101,7 +101,7 @@ extendGame({
     /** Startup: pull the latest profile so the menu shows the right skin and gold. */
     async syncProfile() {
         await Leaderboard.refreshOwn();
-        if (this.state === 'menu') this.pickClass(this.cls, true);
+        if (this.state === 'menu') this.refreshPortraits(); // the best levels (gear on the portraits) may have changed
         this.refreshWho();
         this.loadArtefacts();
     },
@@ -426,7 +426,8 @@ extendGame({
             (petRows ? `<h3>📖 Pet collection${mine ? ' <small>feed a pet to level it up (+5% a level, every tier) · merge 3 of a kind into the next tier</small>' : ''}</h3><ul class="arts">${petRows}</ul>` : '') +
             (skinCards ? `<h3>🎨 Skins${mine ? ' <small>every skin gives a bonus by rarity</small>' : ''}</h3>${skinCards}` : '') +
             (mine && !online ? '<p class="since">The shop needs the online leaderboard.</p>' : '');
-        el.querySelectorAll('canvas[data-skin]').forEach(cv => this.drawPortrait(cv, cv.dataset.cls, cv.dataset.skin));
+        el.querySelectorAll('canvas[data-skin]').forEach(cv => this.drawPortrait(cv, cv.dataset.cls, cv.dataset.skin,
+            mine ? undefined : gearTier(Number((player.classBest || {})[cv.dataset.cls]) || 0)));
         const act = (sel, fn) => el.querySelectorAll(sel).forEach(btn => btn.addEventListener('click', () => this.shopAction(btn, fn)));
         act('button[data-buy]', b => Leaderboard.buy(b.dataset.buy, b.dataset.id));
         act('button[data-equip]', b => Leaderboard.equip(b.dataset.equip, b.dataset.skin));
@@ -515,11 +516,17 @@ extendGame({
         }
     },
 
-    /** [cls, skin] for a profile's avatar: the chosen icon, else the class they play. */
+    /** [cls, skin, gear tier] for a profile's avatar: the chosen icon, else the class they play. */
     profileLook(p, mine, fallbackCls) {
-        if (p && p.icon && CLASSES[p.icon.cls]) return [p.icon.cls, p.icon.skin && (p.skins || {})[p.icon.skin] ? p.icon.skin : ''];
-        const cls = CLASSES[fallbackCls] ? fallbackCls : mine && CLASSES[this.cls] ? this.cls : 'wizard';
-        return [cls, mine ? this.equippedSkin(cls) : ((p && p.equipped) || {})[cls] || ''];
+        let look;
+        if (p && p.icon && CLASSES[p.icon.cls]) look = [p.icon.cls, p.icon.skin && (p.skins || {})[p.icon.skin] ? p.icon.skin : ''];
+        else {
+            const cls = CLASSES[fallbackCls] ? fallbackCls : mine && CLASSES[this.cls] ? this.cls : 'wizard';
+            look = [cls, mine ? this.equippedSkin(cls) : ((p && p.equipped) || {})[cls] || ''];
+        }
+        // the hero wears the gear of the best level reached with that class
+        look.push(mine ? this.portraitTier(look[0]) : gearTier(Number(((p && p.classBest) || {})[look[0]]) || 0));
+        return look;
     }
 });
 

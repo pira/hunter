@@ -142,10 +142,6 @@ extendGame({
         this.spriteCache = null;
         MobSprites.dropTints();
         BossSprites.dropTints();
-        for (const img of Object.values(HeroSprites.list)) {
-            if (img.halo) freeCanvas(img.halo.cv);
-            img.halo = null;
-        }
         this.ctxDirty = true;
     },
 
@@ -744,9 +740,6 @@ extendGame({
         if (p.iframes > 0 && Math.floor(p.iframes / 5) % 2 === 0) return;
         if (giant && p.iframes <= 0 && Math.floor(this.frameNo / 5) % 2 === 0) return;
         const scale = giant ? 1.6 : 1;
-        const moving = p.moveT > 0;
-        const frame = moving ? 1 + (Math.floor(p.moveT / 6) % 4) : 0;
-        const breathe = moving ? 0 : Math.sin(this.frameNo * 0.06) * 0.6;
         const feetY = p.y + 14 * scale;
         // v3.11.1: a soft pool of light under the hero (monsters get none) so it's easy to find
         const pool = ctx.createRadialGradient(p.x, feetY, 2, p.x, feetY, 30 * scale);
@@ -818,9 +811,9 @@ extendGame({
             this.drawWhirlwind(ctx);
             return;
         }
-        // While swinging, the barbarian's axe is drawn separately along the arc.
-        const swinging = this.cls === 'barbarian' && this.cleaves.some(c => !c.whirl);
-        this.blitSprite(ctx, this.cls, this.skin, frame, p.x, feetY + breathe, scale, p.facing, swinging ? 'noweapon' : '', true);
+        // v3.13: the vector rig picks its own pose (walk, cast/throw/swing, supers; js/sprites.js).
+        // While swinging, the barbarian's axe is drawn separately along the arc (drawCleaves).
+        this.drawHero(ctx, p.x, feetY, scale);
         if (this.superShielded && !(this.whirl > 0)) {
             // super running: a shimmering shield bubble (nothing can hurt you)
             const a = this.frameNo * 0.12;
@@ -923,10 +916,10 @@ extendGame({
             ctx.stroke();
         }
         ctx.restore();
-        // spinning hero (sprite squashed on alternate frames for a blur feel) + two axes
+        // spinning hero (squashed as it turns, for a blur feel), arms out to the two axes
         const spin = t * 0.45;
         const face = Math.cos(spin) >= 0 ? 1 : -1;
-        this.blitSprite(ctx, 'barbarian', this.skin, 0, p.x, p.y + 14, 1, face * Math.max(0.35, Math.abs(Math.cos(spin))), 'noweapon', true);
+        this.drawHero(ctx, p.x, p.y + 14, 1, { face, sx: Math.max(0.35, Math.abs(Math.cos(spin))), act: { kind: 'spin' } });
         for (const off of [0, Math.PI]) {
             const a = spin + off;
             Game.drawAxe(ctx, pal, p.x + Math.cos(a) * 12, p.y - 6 + Math.sin(a) * 12, a + Math.PI / 2, Math.min(1.25, this.impactMult * 1.1));
