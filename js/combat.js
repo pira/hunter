@@ -76,13 +76,28 @@ extendGame({
             this.spawnBolt(p.x + Math.cos(a) * 14, p.y - 6 + Math.sin(a) * 14, a, def.speed, def.radius * this.impactMult, dmg, this.stack('pierce'));
         }
         this.particle({ x: p.x + Math.cos(base) * 18, y: p.y - 6 + Math.sin(base) * 18, vx: 0, vy: 0, life: 6, size: 10, color: '#d8b4fe', kind: 'flash' });
-        Sfx.fx('zap', 0.16, (d, rate, len, k) => {
-            k.osc(len, rate, 'sawtooth', 1400, 380, d, 0.5);
-            k.osc(len, rate, 'square', 2100, 900, d, 0.25);
-            for (let i = 0; i < len; i++) d[i] *= Math.pow(1 - i / len, 2.2);
-            k.biquad(d, rate, 'bandpass', t => 2600 - 1800 * t, 1.2);
-            k.normalize(d, 0.8);
-        }, { volume: 0.2, poly: 3, rate: 0.92 + Math.random() * 0.16 });
+        // v3.14: a short, deep magic chime instead of the old zap: a soft bell gliding up over a low
+        // body, three glitter blips and an airy swish, with a touch of reverb
+        Sfx.fx('spell', 0.22, (d, rate, len, k) => {
+            const tone = (f0, f1, amp, decay, start = 0) => {
+                const s = Math.floor(start * rate);
+                const buf = k.osc(len - s, rate, 'sine', f0, f1, undefined, amp);
+                for (let i = 0; i < buf.length; i++) d[s + i] += buf[i] * Math.exp(-i / (rate * decay)) * Math.min(1, i / (rate * 0.003));
+            };
+            tone(560, 680, 0.55, 0.07);
+            tone(280, 340, 0.3, 0.05); // a low body under it
+            tone(560 * 2.76, 680 * 2.76, 0.14, 0.04); // bell partials
+            tone(560 * 5.4, 680 * 5.4, 0.04, 0.02);
+            for (const [t, f] of [[0.01, 1900], [0.035, 2400], [0.06, 1700]]) tone(f, f * 1.1, 0.08, 0.012, t);
+            const r = k.rng(7);
+            const air = new Float32Array(len);
+            for (let i = 0; i < len; i++) air[i] = (r() * 2 - 1) * Math.pow(Math.sin(Math.PI * Math.min(1, i / (len * 0.55))), 2) * 0.3;
+            k.biquad(air, rate, 'bandpass', t => 900 + 2200 * t, 1.3);
+            for (let i = 0; i < len; i++) d[i] += air[i];
+            k.reverb(d, rate, 0.22, 0.45);
+            for (let i = 0; i < len; i++) d[i] *= Math.min(1, (len - i) / (rate * 0.03)); // no click at the end
+            k.normalize(d, 0.75);
+        }, { volume: 0.17, poly: 3, rate: 0.94 + Math.random() * 0.12 });
     },
 
     spawnBolt(x, y, angle, speed, r, damage, pierce, big = false) {
@@ -244,7 +259,6 @@ extendGame({
     },
 
     explode(x, y, radius, baseDamage) {
-        for (const s of this.enemyShots) if (s.life > 0 && U.distanceSquared(x, y, s.x, s.y) <= (radius + s.r) ** 2) this.popShot(s);
         for (const m of this.monsters) {
             if (m.dead) continue;
             if (U.distanceSquared(x, y, m.x, m.y) <= (radius + m.size) ** 2) {
@@ -293,7 +307,7 @@ extendGame({
             }
             if (b.x < -20 || b.x > this.W + 20 || b.y < -20 || b.y > this.H + 20) b.life = 0;
             if (b.life <= 0) continue;
-            for (const s of this.enemyShots) if (s.life > 0 && U.distanceSquared(b.x, b.y, s.x, s.y) < (b.r + s.r + 3) ** 2) this.popShot(s);
+            // (bolts fly through enemy shots: only the barbarian's axe cuts them down)
             for (const m of this.monsters) {
                 if (m.dead || b.hits.has(m)) continue;
                 if (U.distanceSquared(b.x, b.y, m.x, m.y) < (b.r + m.size) ** 2) {
@@ -415,7 +429,8 @@ extendGame({
             br.t += this.rateMult; // Rapid Fire, Haste and Fury speed the barrage up too
             const every = 0.5 * 60 * GAME_SPEED;
             while (br.t >= every && br.left > 0) {
-                const dmg = 2 * PRIMARY.bolt.damage * this.powerMult;
+                // 3× a basic bolt (Power included; crits and damage cards apply on the hit)
+                const dmg = 3 * PRIMARY.bolt.damage * this.powerMult;
                 const m = this.barrageTarget(dmg);
                 if (!m) {
                     br.t = every; // nothing to shoot: wait for the next monster

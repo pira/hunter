@@ -17,9 +17,8 @@ extendGame({
         return 10 + 2 * level;
     },
 
-    // Permanent upgrades: static base price, ×(1 + 0.75 per rank owned) — a finite sink.
-    // Level buffs: a share of what this player actually earns per level (smoothed), never below the
-    // curve's expectation — all four together cost ~1.5 levels of income, so they stay a real choice.
+    // Whole-run upgrades: base price doubling with every rank owned (no run buys them all).
+    // One-level cards: base price × level/2 (U.cardPrice).
     cardPrice(card) {
         return U.cardPrice(card, this.stack(card.id), this.level);
     },

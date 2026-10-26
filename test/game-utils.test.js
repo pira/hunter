@@ -226,12 +226,15 @@ describe('GameUtils economy', () => {
     it('prices permanent cards statically per rank and one-level cards by the level', () => {
         const perm = { cost: 20 };
         assert.equal(GameUtils.cardPrice(perm, 0, 2), 60);
-        assert.equal(GameUtils.cardPrice(perm, 2, 30), 150);
+        assert.equal(GameUtils.cardPrice(perm, 1, 2), 120);
+        assert.equal(GameUtils.cardPrice(perm, 2, 30), 240);
+        assert.equal(GameUtils.cardPrice(perm, 4, 30), 960);
         const freeze = { cost: 20, oneLevel: true };
         assert.equal(GameUtils.cardPrice(freeze, 0, 1), 20);
         assert.equal(GameUtils.cardPrice(freeze, 0, 2), 20);
-        assert.equal(GameUtils.cardPrice(freeze, 0, 52), 100);
-        assert.equal(GameUtils.cardPrice(freeze, 0, 80), 100);
+        assert.equal(GameUtils.cardPrice(freeze, 0, 10), 100);
+        assert.equal(GameUtils.cardPrice(freeze, 0, 20), 200);
+        assert.equal(GameUtils.cardPrice(freeze, 0, 52), 520);
         assert.equal(GameUtils.cardPrice({ cost: 35, oneLevel: true }, 0, 10) % 5, 0);
     });
 

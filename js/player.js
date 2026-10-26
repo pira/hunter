@@ -35,11 +35,16 @@ extendGame({
         return this.buffs.freeze2 ? 0.5 : this.buffs.freeze1 ? 0.75 : 1;
     },
 
+    /** Ice Cloud size: the poison cloud's, +10% a Deep Freeze rank. */
+    get iceRadius() {
+        return POISON_RADIUS * (1 + 0.1 * this.stack('frost'));
+    },
+
     /** Ice Cloud powerup: monsters inside the cloud around you move at 50% (Deep Freeze: 40/30/20%). */
     iceMult(x, y, size = 0) {
         if (!(this.timers.freeze > 0)) return 1;
         const p = this.player;
-        if (U.distanceSquared(x, y, p.x, p.y) > (POISON_RADIUS + size * 0.5) ** 2) return 1;
+        if (U.distanceSquared(x, y, p.x, p.y) > (this.iceRadius + size * 0.5) ** 2) return 1;
         return Math.max(0.1, 0.5 - 0.1 * this.stack('frost'));
     },
 

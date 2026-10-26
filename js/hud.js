@@ -38,7 +38,7 @@ extendGame({
         const mult = U.comboMultiplier(this.combo);
         // coin multiplier next to the combo while a gold boost runs
         const gold = this.goldBoost >= 2 ? Math.round(this.coinMult * 10) / 10 : 0;
-        this.setText('goldMult', this.el.goldMult, gold ? `🪙×${gold}` : '');
+        this.setHtml('goldMult', this.el.goldMult, gold ? `${COIN}×${gold}` : '');
         this.el.goldMult.hidden = !gold;
         this.el.combo.classList.toggle('gold-only', Boolean(gold) && this.combo < 2);
         this.el.combo.classList.toggle('show', this.combo >= 2 || Boolean(gold));

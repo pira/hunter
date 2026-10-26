@@ -223,12 +223,14 @@
      * level 52 (Freeze I: 20 → ~100), rounded to 5.
      */
     const PERMANENT_PRICE_MULT = 3;
+    // v3.14: one-level cards cost cost × level/2 (×1 on levels 1–2, ×5 at 10, ×10 at 20 — no cap),
+    // whole-run upgrades double with every rank owned (×1, ×2, ×4, ×8, ×16), so a run can't buy them all.
     function oneLevelScale(level) {
-        return Math.min(5, 1 + 0.08 * Math.max(0, level - 2));
+        return Math.max(1, level / 2);
     }
     function cardPrice(card, rank, level = 2) {
         if (card.oneLevel) return Math.max(5, Math.round((card.cost * oneLevelScale(level)) / 5) * 5);
-        return Math.round(card.cost * PERMANENT_PRICE_MULT * (1 + 0.75 * rank));
+        return Math.round(card.cost * PERMANENT_PRICE_MULT * Math.pow(2, rank));
     }
 
     /** Coins a player can expect to earn during a level (kills + level bonus + encounter loot). */

@@ -752,7 +752,7 @@ extendGame({
         this.drawShadow(ctx, p.x, feetY, 12 * scale);
         if (this.timers.freeze > 0) {
             // the ice cloud you carry around: monsters inside move slowly
-            const r = POISON_RADIUS;
+            const r = this.iceRadius;
             const wob = Math.sin(this.frameNo * 0.04 + 1) * 4;
             const g = ctx.createRadialGradient(p.x, p.y, 8, p.x, p.y, r + wob);
             g.addColorStop(0, 'rgba(224,242,254,0.06)');

@@ -157,7 +157,7 @@ const COIN = '<i class="i-coin"></i>';
 const POUCH = '<i class="i-pouch"></i>';
 const GEM = '<i class="i-gem"></i>';
 
-// Permanent shop cards. Price = cost × 3 × (1 + 0.75 × rank already owned) — a finite sink (D3).
+// Whole-run shop cards. Price = cost × 3 × 2^(rank already owned): each rank costs double the last (v3.14).
 const UPGRADES = [
     { id: 'power', icon: '💪', name: 'Power', max: 5, cost: 40, desc: '+20% basic attack damage' },
     { id: 'haste', icon: '⏱️', name: 'Haste', max: 5, cost: 35, desc: '+10% attack speed' },
@@ -171,7 +171,7 @@ const UPGRADES = [
     { id: 'magnet', icon: '🧲', name: 'Magnet', max: 3, cost: 9, desc: 'Pull coins from further away' },
     { id: 'overtime', icon: '⌛', name: 'Overtime', max: 3, cost: 15, desc: 'Powerups last 20% longer (not gold boosts)' },
     { id: 'toxin', icon: '☠️', name: 'Toxic Cloud', max: 1, cost: 20, desc: 'Whole run: Poison Cloud does ×2 damage' },
-    { id: 'frost', icon: '🧊', name: 'Deep Freeze', max: 3, cost: 15, desc: 'Whole run: Ice Cloud slows 10% more' },
+    { id: 'frost', icon: '🧊', name: 'Deep Freeze', max: 3, cost: 15, desc: 'Whole run: Ice Cloud slows 10% more and reaches 10% further' },
     { id: 'thunder', icon: '⛈️', name: 'Thunder God', max: 1, cost: 20, desc: 'Whole run: Storm’s first strike hits ×2' },
     { id: 'recoil', icon: '🌪️', name: 'Big Kick', max: 1, cost: 20, desc: 'Whole run: Kickback reaches ×2 as far' },
     { id: 'regen', icon: '🌿', name: 'Regeneration', max: 2, cost: 60, desc: 'Regrow a heart every 40s (25s at rank 2)' },
@@ -187,8 +187,8 @@ const UPGRADES = [
 // Core upgrades: always on offer in their own row above the three dealt cards —
 // attack speed, more projectiles (or reach, for the axe), damage and move speed.
 const CORE_CARDS = { wizard: ['haste', 'split', 'power', 'boots'], barbarian: ['haste', 'impact', 'power', 'boots'], goblin: ['haste', 'cluster', 'power', 'boots'] };
-// One-level cards: last until the next level. `cost` = price on the first levels; it grows slowly with
-// the level (×5 by level 52, then flat — U.cardPrice). Cheap = nice to have, pricier = strong.
+// One-level cards: last until the next level. `cost` = price on levels 1–2; it grows with the level
+// (cost × level/2: ×5 at level 10, ×10 at 20 — U.cardPrice). Cheap = nice to have, pricier = strong.
 const LEVEL_BUFFS = [
     { id: 'brake', icon: '🐢', name: 'Road Brake', buff: true, cost: 5, weight: 0.5, desc: 'This level: the road moves at 60%' },
     { id: 'magnetAll', icon: '🧲', name: 'Coin Magnet', buff: true, cost: 10, weight: 0.5, desc: 'This level: pull coins from twice as far' },
