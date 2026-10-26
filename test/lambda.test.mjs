@@ -391,6 +391,41 @@ describe('lambda: banking, wheel and meta shop', () => {
         assert.equal(board.find(s => s.cls === 'goblin').mastery, undefined);
     });
 
+    it('takes Hard/Hell runs: ×2/×3 coin caps, their own boards once the class has the mastery for them', async () => {
+        const api = rigged();
+        const board = async diff => (await t.call('GET', '/scores', undefined, '1.2.3.4', { board: 'v3', ...(diff ? { diff: String(diff) } : {}) })).body.scores;
+        // coinCap for level 5, 60 kills, no boss: 1520
+        assert.equal((await finishRun(api, 2500)).status, 422);
+        assert.equal((await finishRun(api, 2500, { diff: 4 })).status, 400);
+        assert.equal((await finishRun(api, 2500, { diff: 1.5 })).status, 400);
+        // no mastery yet: the run counts (caps trust the claim) but is kept as a Normal one
+        let res = await finishRun(api, 2500, { diff: 2 });
+        assert.equal(res.status, 200);
+        assert.equal(res.body.diff, 1);
+        assert.ok((await board()).some(s => s.score === 1200));
+        assert.equal((await board(2)).length, 0);
+        assert.equal((await api.call('GET', `/player/${PID}`)).body.runs[0].diff, undefined);
+        const token = (await api.call('POST', '/run')).body.token; // a long run to level 21: Mastery II
+        api.advance(400_000);
+        assert.equal((await api.call('POST', '/scores', { ...run({ level: 21, bosses: 4, score: 9000, duration: 390 }), board: 'v3', cls: 'wizard', coins: 0, token, playerId: PID, secret: SECRET })).status, 200);
+        res = await finishRun(api, 4000, { diff: 3, score: 1300 });
+        assert.equal(res.status, 200);
+        assert.equal(res.body.diff, 3);
+        assert.deepEqual(res.body.scores.map(s => s.score), [1300]); // the Hell board
+        assert.equal(res.body.rank, 1);
+        assert.deepEqual((await board(3)).map(s => [s.score, s.diff, s.mastery]), [[1300, 3, 2]]);
+        assert.ok(!(await board()).some(s => s.score === 1300));
+        assert.equal((await api.call('GET', `/player/${PID}`)).body.runs[0].diff, 3);
+        assert.equal((await finishRun(api, 4000, { diff: 2 })).status, 422); // over Hard's ×2 cap
+        res = await finishRun(api, 0, { diff: 2, score: 1250, cls: 'wizard' });
+        assert.deepEqual((await board(2)).map(s => s.score), [1250]);
+        // the goblin has no mastery: Normal board
+        res = await finishRun(api, 0, { diff: 2, cls: 'goblin', score: 1100 });
+        assert.equal(res.body.diff, 1);
+        assert.ok((await board()).some(s => s.score === 1100));
+        assert.equal((await t.call('GET', '/scores', undefined, '1.2.3.4', { board: 'v3', diff: '__proto__' })).status, 200);
+    });
+
     it('works out mastery for profiles from before v3.7 from their run history', async () => {
         const api = rigged();
         await finishRun(api, 0, { level: 6 });

@@ -60,7 +60,7 @@ extendGame({
 
     makeMonster(type, x, y, behavior) {
         const levelSpeed = 1 + Math.min(0.45, (this.level - 1) * 0.012);
-        const hp = Math.max(1, Math.round(type.health * U.hpScale(this.level)));
+        const hp = Math.max(1, Math.round(type.health * U.hpScale(this.level) * (this.diffK || 1))); // Hard ×2, Hell ×3
         return {
             x, y, kbx: 0, kby: 0, type,
             size: type.size + Math.random() * type.size * 0.25,

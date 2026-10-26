@@ -249,6 +249,13 @@ const FEED_COST = [500, 900, 1600, 2900, 5200, 9400, 17000, 30000, 55000, 100000
 // Class mastery (v3.7): beat the level-10/20/30… boss with a class and its early levels speed up
 // (U.masterySpeed). Badge colours per tier, then the last one repeats.
 const MASTERY_COLORS = [null, '#cd7f32', '#d1d5db', '#facc15', '#7dd3fc', '#e879f9'];
+// Difficulty (v3.15): Hard needs Mastery I, Hell Mastery II (U.maxDifficulty). `k` multiplies monster,
+// gatekeeper and boss HP, the damage the level bar needs (so a level has as many kills as on Normal)
+// and every drop: coin/gem/powerup/heart chances, encounter and boss coins, boss gems and egg chance.
+const DIFFICULTIES = [null,
+    { k: 1, name: 'Normal', icon: '⚔️', color: '#e5e7eb' },
+    { k: 2, name: 'Hard', icon: '🔥', color: '#fb923c' },
+    { k: 3, name: 'Hell', icon: '😈', color: '#ef4444' }];
 const HATCH_MS = 6 * 3600 * 1000;
 const HURRY_GEMS_PER_HOUR = 1;
 const EGG_ODDS = [80, 16, 3.5, 0.5]; // one kind of egg, bought or dropped by a boss

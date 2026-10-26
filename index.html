@@ -317,6 +317,13 @@
         .mline small { display: block; opacity: .65; font-size: .85em; }
         .mline .lane { margin-left: .3em; padding: 0 .5em; border-radius: .7em; font-size: .85em; border: 1px solid rgba(255,255,255,.35); background: rgba(255,255,255,.08); color: #fff; }
         .mline .lane.on { background: #facc15; color: #1c1917; border-color: #facc15; }
+        .diffs { display: flex; justify-content: center; gap: .35em; margin-top: .45em; }
+        .diffs .dbtn { padding: .15em .65em; border-radius: .8em; font-size: .9em; border: 1px solid color-mix(in srgb, var(--d) 60%, transparent); background: rgba(255,255,255,.06); color: #fff; cursor: pointer; }
+        .diffs .dbtn small { opacity: .7; font-size: .8em; }
+        .diffs .dbtn.on { background: var(--d); color: #1c1917; border-color: var(--d); box-shadow: 0 0 10px color-mix(in srgb, var(--d) 60%, transparent); }
+        .diffs .dbtn:disabled { opacity: .4; cursor: default; }
+        .diff { display: inline-block; margin-left: .25em; font-size: .85em; vertical-align: middle; filter: drop-shadow(0 0 4px var(--d)); }
+        .pdiff { margin-left: .4em; padding: 0 .45em; border-radius: .6em; font-size: .62em; vertical-align: middle; background: var(--d); color: #1c1917; letter-spacing: .5px; }
         .class-info { min-height: 2.6em; margin: 0 0 .9em; font-size: .82em; line-height: 1.45; color: #cbd5e1; }
         .class-info .sup { color: #fde047; }
         /* profile */
@@ -450,7 +457,7 @@
         .skin.mythic { background: radial-gradient(circle at 50% 30%, rgba(232,121,249,.25), rgba(255,255,255,.04)); }
         .skin.legendary { background: radial-gradient(circle at 50% 30%, rgba(245,158,11,.2), rgba(255,255,255,.04)); }
         .board .name.glow { color: #fdf4ff; text-shadow: 0 0 8px #e879f9, 0 0 14px #c026d3; }
-        .board-tabs { display: flex; justify-content: center; gap: 4px; margin: .35em 0 0; }
+        .board-tabs { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; margin: .35em 0 0; }
         .board-tabs button { border: 1px solid var(--line); background: transparent; color: var(--muted); border-radius: 999px; padding: .2em .8em; font-size: .75em; }
         .board-tabs button.on { background: rgba(250,204,21,.15); color: var(--gold); border-color: rgba(250,204,21,.5); }
         .cls-tabs { margin-top: .25em; }
@@ -556,7 +563,7 @@
                 <div class="howto touch-only">Drag anywhere to move · you attack on your own<br>Tap ⚡ SUPER when the bar is full</div>
                 <div id="iosHint" class="hint" hidden>📲 Tap <b>Share</b> → <b>Add to Home Screen</b> to play fullscreen <button id="iosHintClose" aria-label="Dismiss">✕</button></div>
                 <h3 id="menuBoardTitle">🏆 Top Hunters</h3>
-                <div class="board-tabs" id="boardTabs"><button data-board="v3" class="on">Monster Road</button><button data-board="v2">Classic</button></div>
+                <div class="board-tabs" id="boardTabs"><button data-board="v3" class="on">Monster Road</button><button data-board="hard">🔥 Hard</button><button data-board="hell">😈 Hell</button><button data-board="v2">Classic</button></div>
                 <div class="board-tabs cls-tabs" id="clsTabs"><button data-cls="" class="on">All</button><button data-cls="wizard">🧙 Wizard</button><button data-cls="barbarian">🪓 Barbarian</button><button data-cls="goblin">💣 Goblin</button></div>
                 <ol id="menuBoard" class="board"></ol>
                 <div id="version"></div>

@@ -8,6 +8,7 @@
     const HISTORY_KEY = 'hunter.history';
     const TOKEN_MAX_AGE = 7 * 24 * 3600 * 1000; // matches the server: runs may be paused for a week
     const TIMEOUT_MS = 6000;
+    const DIFF_OF_BOARD = { hard: 2, hell: 3 }; // v3.15: Hard / Hell runs have boards of their own
 
     function apiUrl() {
         const url = (root.HUNTER_CONFIG && root.HUNTER_CONFIG.leaderboardUrl) || '';
@@ -152,13 +153,16 @@
         },
 
         /** Top scores. Returns { scores, source: 'global' | 'local' }. */
+        /** Boards: 'v3' (Normal), 'hard' and 'hell' (v3 runs on that difficulty), 'v2' (Classic). */
         async top(limit = 10, board = this.board, cls = '') {
+            const diff = DIFF_OF_BOARD[board] || 0;
             try {
-                const body = await request(`/scores?limit=${limit}&board=${board}${cls ? `&cls=${encodeURIComponent(cls)}` : ''}`);
+                const query = diff ? `v3&diff=${diff}` : board;
+                const body = await request(`/scores?limit=${limit}&board=${query}${cls ? `&cls=${encodeURIComponent(cls)}` : ''}`);
                 return { scores: body.scores || [], source: 'global' };
             } catch (e) {
-                if (board !== this.board) return { scores: [], source: 'local' };
-                return { scores: readLocal().filter(s => !cls || s.cls === cls).slice(0, limit), source: 'local' };
+                if (board !== this.board && !diff) return { scores: [], source: 'local' };
+                return { scores: readLocal().filter(s => (s.diff || 1) === (diff || 1) && (!cls || s.cls === cls)).slice(0, limit), source: 'local' };
             }
         },
 
@@ -170,9 +174,10 @@
             local.sort((a, b) => b.score - a.score);
             write(LOCAL_KEY, local.slice(0, 20));
             const history = read(HISTORY_KEY, []);
-            history.unshift({ score: entry.score, level: entry.level, kills: entry.kills, combo: entry.combo, bosses: entry.bosses, duration: entry.duration, ts: record.ts, cls: entry.cls, gold: entry.coins, gems: entry.gems });
+            history.unshift({ score: entry.score, level: entry.level, kills: entry.kills, combo: entry.combo, bosses: entry.bosses, duration: entry.duration, ts: record.ts, cls: entry.cls, gold: entry.coins, gems: entry.gems, diff: entry.diff });
             write(HISTORY_KEY, history.slice(0, 20));
-            return { record, rank: local.indexOf(record) + 1, scores: local.slice(0, 10) };
+            const same = local.filter(s => (s.diff || 1) === (entry.diff || 1)); // Hard and Hell have boards of their own
+            return { record, rank: same.indexOf(record) + 1, scores: same.slice(0, 10) };
         },
 
         /** Save a finished run locally, then try the global board (queued for later if offline). */
@@ -187,7 +192,7 @@
             try {
                 const res = await request('/scores', { method: 'POST', body: JSON.stringify(body) });
                 if (res.player) this.cacheProfile(res.player);
-                return { source: 'global', rank: res.rank, id: res.id, scores: res.scores || [], player: res.player, pot: res.pot };
+                return { source: 'global', rank: res.rank, id: res.id, scores: res.scores || [], player: res.player, pot: res.pot, diff: res.diff };
             } catch (e) {
                 const rejected = e.status >= 400 && e.status < 500;
                 if (!rejected) write(PENDING_KEY, { body, at: Date.now() }); // network trouble: retry on next launch

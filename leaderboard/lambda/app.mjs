@@ -4,7 +4,7 @@
 // Get | Put | Update | Query | TransactWrite. index.mjs wires it to the real SDK, tests to a fake.
 //
 // Routes
-//   GET  /scores?limit=10&board=v3&cls=wizard   top scores (cls filters the v3 board by class)
+//   GET  /scores?limit=10&board=v3&cls=wizard   top scores (cls filters the v3 board by class; &diff=2|3: Hard/Hell board)
 //   POST /run                        start a run, returns a signed single-use token
 //   POST /scores                     submit a finished run (optionally with playerId + secret)
 //   GET  /player/{id}                public profile + last 20 runs
@@ -26,6 +26,7 @@
 // Items (single table):
 //   pk="board#v2"      sk="<inverted score>#<ts>#<id>"   Classic score rows, best first
 //   pk="board#v3"      sk=…                               v3 score rows (classes, the road)
+//   pk="board#v3#hard" / "board#v3#hell"                  v3 runs on Hard / Hell (v3.15)
 //   pk="nonce"         sk=<token nonce>                   consumed run tokens (TTL)
 //   pk="rate"          sk=<ip>#<minute>                   per-IP submit counter (TTL)
 //   pk="player#<pid>"  sk="meta"                          profile (secretHash never leaves the server)
@@ -34,11 +35,13 @@
 import { createHmac, createHash, randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
 import {
     PETS, MERGE_GEMS, MAX_SLOTS, SLOT_UNLOCK, petKey, EGG_PRICE, NESTS, MAX_NESTS, NEST_UNLOCK, HATCH_MS, HURRY_GEMS_PER_HOUR, EGG_ODDS,
-    ART_REFUND_GOLD, ART_REFUND_GEMS, SKINS, SKIN_PRICES, WHEEL_WIN, PET_LEVEL_MAX, FEED_COST, masteryTier, reachedLevel
+    ART_REFUND_GOLD, ART_REFUND_GEMS, SKINS, SKIN_PRICES, WHEEL_WIN, PET_LEVEL_MAX, FEED_COST, masteryTier, reachedLevel, maxDifficulty
 } from './catalog.mjs';
 
 export const BOARD = 'board#v2';
 export const BOARD_V3 = 'board#v3';
+// v3.15: Hard and Hell runs have boards of their own
+export const DIFF_BOARDS = { 2: 'board#v3#hard', 3: 'board#v3#hell' };
 export const CLASSES = ['wizard', 'barbarian', 'goblin'];
 export const MIN_LEVEL_SECONDS = 12; // no level (fight + encounter + travel) is faster than this
 export const MAX_SCORE = 50_000_000;
@@ -202,8 +205,8 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
             } while (ExclusiveStartKey && items.length < limit && ++pages < 10);
             items = items.slice(0, limit);
         }
-        return items.map(({ id, name, score, level, kills, combo, bosses, duration, ts, playerId, cls, skin, mastery }) =>
-            ({ id, name, score, level, kills, combo, bosses, duration, ts, playerId, cls, skin, mastery }));
+        return items.map(({ id, name, score, level, kills, combo, bosses, duration, ts, playerId, cls, skin, mastery, diff }) =>
+            ({ id, name, score, level, kills, combo, bosses, duration, ts, playerId, cls, skin, mastery, diff }));
     }
 
     async function rankOf(board, sk) {
@@ -316,17 +319,23 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
                 if (!isInt(body.bossEggs, 0, 10_000)) throw new HttpError(400, 'invalid eggs');
                 out.bossEggs = body.bossEggs;
             }
+            // difficulty (v3.15): 2 = Hard, 3 = Hell — ×2/×3 monster HP and drops
+            if (body.diff !== undefined) {
+                if (!isInt(body.diff, 1, 3)) throw new HttpError(400, 'invalid difficulty');
+                if (body.diff > 1) out.diff = body.diff;
+            }
         }
         return out;
     }
 
     /** v3: levels are earned by damage over time, so the level is bounded by the run length. */
     function checkPlausibleV3(run) {
-        const { score, level, kills, combo, duration, bosses, coins, gems, eggCards, bossEggs } = run;
+        const { score, level, kills, combo, duration, bosses, coins, gems, eggCards, bossEggs, diff = 1 } = run;
         if (level > 2 + Math.floor(duration / MIN_LEVEL_SECONDS)) throw new HttpError(422, 'implausible level');
         if (score > 1000 + duration * 4000 || kills > 60 + duration * 25 || combo > kills) throw new HttpError(422, 'implausible score');
-        if (coins !== undefined && coins > coinCap(kills, bosses, level)) throw new HttpError(422, 'implausible coins');
-        if (gems !== undefined && gems > gemCap(kills, bosses, level)) throw new HttpError(422, 'implausible gems');
+        // Hard/Hell drop ×2/×3
+        if (coins !== undefined && coins > coinCap(kills, bosses, level) * diff) throw new HttpError(422, 'implausible coins');
+        if (gems !== undefined && gems > gemCap(kills, bosses, level) * diff) throw new HttpError(422, 'implausible gems');
         if (eggCards && eggCards > 1 + Math.floor(level / 5)) throw new HttpError(422, 'implausible eggs');
         if (bossEggs && bossEggs > bosses) throw new HttpError(422, 'implausible eggs');
     }
@@ -357,9 +366,19 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
 
         if (await rateLimited(ip)) throw new HttpError(429, 'slow down');
 
+        // the class mastery badge, including what this run just earned
+        let mastery = 0;
+        if (pid && run.cls) {
+            const best = Math.max((meta && meta.classBest && meta.classBest[run.cls]) || 0, reachedLevel(run.level, run.bosses));
+            mastery = masteryTier(best);
+            // Hard/Hell only when the class's mastery allows it (the caps above trust the claim); otherwise
+            // the run is kept as a Normal one
+            if (run.diff > maxDifficulty(best)) delete run.diff;
+        } else delete run.diff;
+
         const ts = now();
         const id = random(6).toString('base64url');
-        const board = v3 ? BOARD_V3 : BOARD;
+        const board = v3 ? DIFF_BOARDS[run.diff] || BOARD_V3 : BOARD;
         const sk = `${pad(MAX_SCORE - run.score, 9)}#${pad(ts, 14)}#${id}`;
         const nonceItem = { pk: 'nonce', sk: token.nonce, ttl: Math.floor((token.issuedAt + MAX_TOKEN_MS) / 1000) + 3600 };
         const { coins: unspent, gems: _gems, eggCards: _cards, bossEggs: _boss, ...shown } = run;
@@ -368,11 +387,7 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
         // The skin shown on the board is whatever the profile has equipped — never the client's word.
         delete boardItem.skin;
         if (meta && meta.equipped && run.cls && meta.equipped[run.cls]) boardItem.skin = meta.equipped[run.cls];
-        // the class mastery badge, including what this run just earned
-        if (pid && run.cls) {
-            const tier = masteryTier(Math.max((meta && meta.classBest && meta.classBest[run.cls]) || 0, reachedLevel(run.level, run.bosses)));
-            if (tier > 0) boardItem.mastery = tier;
-        }
+        if (mastery > 0) boardItem.mastery = mastery;
 
         if (!pid) {
             try {
@@ -387,7 +402,7 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
         }
 
         const [rank, scores] = await Promise.all([rankOf(board, sk), topScores(board, 10)]);
-        const out = { id, rank, scores };
+        const out = { id, rank, scores, diff: run.diff || 1 };
         if (meta) out.player = publicMeta(pid, meta);
         if (meta && meta.potCredited > 0) out.pot = { id: token.nonce, amount: meta.potCredited, spins: 0, status: 'open' };
         return out;
@@ -401,7 +416,8 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
             score: run.score, level: run.level, kills: run.kills, combo: run.combo, bosses: run.bosses, duration: run.duration, ts,
             ...(run.cls ? { cls: run.cls, board: 'v3' } : {}),
             ...(unspent > 0 ? { gold: unspent } : {}),
-            ...(run.gems > 0 ? { gems: run.gems } : {})
+            ...(run.gems > 0 ? { gems: run.gems } : {}),
+            ...(run.diff > 1 ? { diff: run.diff } : {})
         };
         for (let attempt = 0; attempt < 3; attempt++) {
             const next = {
@@ -734,7 +750,7 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
             ScanIndexForward: false,
             Limit: 20
         });
-        const runs = (out.Items || []).map(({ score, level, kills, combo, bosses, duration, ts, cls, gold, gems }) => ({ score, level, kills, combo, bosses, duration, ts, cls, gold, gems }));
+        const runs = (out.Items || []).map(({ score, level, kills, combo, bosses, duration, ts, cls, gold, gems, diff }) => ({ score, level, kills, combo, bosses, duration, ts, cls, gold, gems, diff }));
         return { player: publicMeta(pid, meta), runs };
     }
 
@@ -818,7 +834,8 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
                 const limit = Math.min(50, Math.max(1, Number(query.limit) || 10));
                 const v3 = query.board === 'v3';
                 const cls = v3 && CLASSES.includes(query.cls) ? query.cls : undefined;
-                return json(200, { scores: await topScores(v3 ? BOARD_V3 : BOARD, limit, cls) });
+                const board = v3 && Object.hasOwn(DIFF_BOARDS, query.diff) ? DIFF_BOARDS[query.diff] : v3 ? BOARD_V3 : BOARD; // diff=2 Hard, 3 Hell
+                return json(200, { scores: await topScores(board, limit, cls) });
             }
             if (method === 'POST' && path === '/run') return json(200, { token: makeToken() });
             if (method === 'POST' && path === '/scores') return json(200, await submit(parseBody(event), ip));

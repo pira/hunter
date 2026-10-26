@@ -62,7 +62,8 @@ extendGame({
         // v3.6: past level 12 bosses also get part of the monsters' steeper HP climb (×1.4 at L30, ×1.6 at L40)
         const late = Math.pow(U.hpScale(this.level) / U.hpStep(this.level), 0.75);
         // and on a mastered level (beaten before with this class) the boss has less HP: ÷√(level speed)
-        const hp = Math.round(def.hp * (1 + (big ? 0.5 : 0.4) * (n - 1)) * (1 + 0.4 * cycle) * late / Math.sqrt(this.levelSpeed));
+        // Hard/Hell: ×2/×3 HP like every monster
+        const hp = Math.round(def.hp * (1 + (big ? 0.5 : 0.4) * (n - 1)) * (1 + 0.4 * cycle) * late * this.diffK / Math.sqrt(this.levelSpeed));
         const b = this.makeBossBody(def, hp, cycle, this.W / 2, -def.size * 2);
         this.boss = b;
         this.bossParts = [b];
@@ -699,7 +700,8 @@ extendGame({
         for (let i = 0; i < n; i++) {
             const a = (i / n) * TAU;
             const m = this.makeMonster({ name: 'Skeleton', family: 'undead', rank: 1, shape: 'skull', color: '#e7e5e4', size: 12, speed: 1.1, speedVariation: 0.3, health: 3, points: 20, tier: 'medium' }, b.x + Math.cos(a) * 70, b.y + Math.sin(a) * 70, 'chase');
-            Object.assign(m, { lichAdd: b, minion: true, spawnT: 30, enc: b.enc, hp: Math.round(3 * U.hpStep(this.level)), maxHp: Math.round(3 * U.hpStep(this.level)) });
+            const hp = Math.round(3 * U.hpStep(this.level) * this.diffK);
+            Object.assign(m, { lichAdd: b, minion: true, spawnT: 30, enc: b.enc, hp, maxHp: hp });
             this.monsters.push(m);
         }
         this.ring(b.x, b.y, 90, '#a78bfa', 22);
@@ -746,7 +748,7 @@ extendGame({
         b.dying = true;
         b.deathT = 0;
         b.deathMax = 210; // ~3.9s of falling apart
-        b.coinsTotal = Math.round((25 + 15 * this.bossCount) * (b.boss.big ? 2 : 1) / Math.max(1, (this.bossParts || [b]).length));
+        b.coinsTotal = Math.round((25 + 15 * this.bossCount) * (b.boss.big ? 2 : 1) * this.diffK / Math.max(1, (this.bossParts || [b]).length));
         b.coinsOut = 0;
         b.lootOut = 0;
         b.cracks = Array.from({ length: 7 }, () => ({ a: Math.random() * TAU, len: 0.5 + Math.random() * 0.5, bend: (Math.random() - 0.5) * 0.8 }));
@@ -820,11 +822,11 @@ extendGame({
         const bonus = 300 * this.bossCount * (b.boss.big ? 2 : 1);
         this.score += bonus;
         this.floater(b.x, b.y - b.size - 10, `BOSS SLAIN +${bonus}`, '#ffd60a', 30);
-        // gems: small bosses 1–2, big bosses 3–5
-        this.spawnGems(b.x, b.y, b.boss.big ? 3 + Math.floor(Math.random() * 3) : 1 + (Math.random() < 0.5 ? 1 : 0));
+        // gems: small bosses 1–2, big bosses 3–5 (×2 Hard, ×3 Hell)
+        this.spawnGems(b.x, b.y, (b.boss.big ? 3 + Math.floor(Math.random() * 3) : 1 + (Math.random() < 0.5 ? 1 : 0)) * this.diffK);
         this.dropRoadSack(b);
         // a pet egg now and then (only kept with a profile)
-        if (Leaderboard.identity() && Math.random() < BOSS_EGG_CHANCE) this.spawnEgg(b.x, b.y);
+        if (Leaderboard.identity() && Math.random() < BOSS_EGG_CHANCE * this.diffK) this.spawnEgg(b.x, b.y);
         Sfx.arpeggio([523, 659, 784, 1046, 1318], 0.09, { type: 'triangle', volume: 0.12 });
         this.monsters.forEach(m => { if (m.minion || m.lichAdd || m.body === b) m.behavior = 'flee'; });
         this.encounterWon();

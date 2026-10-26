@@ -16,9 +16,9 @@ extendGame({
         return Math.floor(chance) + (Math.random() < chance % 1 ? 1 : 0);
     },
 
-    /** Mythic skins: every drop chance ×2. */
+    /** Mythic skins: every drop chance ×2; Hard ×2 and Hell ×3 on top. */
     get dropsMult() {
-        return this.artefactMult('drops');
+        return this.artefactMult('drops') * this.diffK;
     },
 
     /** Gold Rush (+15% a rank) and rare skins (+5%) raise the chance a monster drops coins. */
@@ -46,7 +46,7 @@ extendGame({
             this.dropCd = Math.max(DROP_COOLDOWN_MIN, DROP_COOLDOWN - 8 * this.level);
             return;
         }
-        if (m.gk && (m.gen || 0) === 0) this.spawnCoins(m.x, m.y, 6 + this.level, 3.5, 5);
+        if (m.gk && (m.gen || 0) === 0) this.spawnCoins(m.x, m.y, (6 + this.level) * this.diffK, 3.5, 5);
         // Hearts have their own, more generous roll while you're hurt (v3.9.1: half what it was).
         const p = this.player;
         if (p.hp < p.maxHp && this.heartCd <= 0 && Math.random() < (m.size > 14 ? 0.025 : 0.005) * luck * this.dropsMult) {

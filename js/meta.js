@@ -64,17 +64,61 @@ extendGame({
         const tier = U.masteryTier(best);
         const next = 10 * (tier + 1);
         const name = CLASSES[cls].name;
-        if (!tier) return `<br><span class="mline">🏅 Beat the level ${next} boss as ${name} and levels 1–10 run twice as fast</span>`;
+        if (!tier) return `<br><span class="mline">🏅 Beat the level ${next} boss as ${name}: levels 1–10 run twice as fast and 🔥 Hard unlocks</span>`;
         const on = this.fastLaneOn();
         return `<br><span class="mline">${this.masteryBadge(tier)} <b>Mastery ${Game.roman(tier)}</b> · ${this.masteryText(best)}` +
             ` <button class="lane ${on ? 'on' : ''}" data-lane="1" title="Fast lane: mastered levels fill their bar faster">⚡ ${on ? 'ON' : 'OFF'}</button>` +
-            `<small>next: beat the level ${next} boss</small></span>`;
+            `<small>next: beat the level ${next} boss${tier < 2 ? ' (unlocks 😈 Hell)' : ''}</small></span>` + this.diffLine(cls);
     },
 
     masteryBadge(tier) {
         if (!(tier > 0)) return '';
         const color = MASTERY_COLORS[Math.min(tier, MASTERY_COLORS.length - 1)];
         return `<span class="mastery" style="--m:${color}" title="Mastery ${tier}">${Game.roman(tier)}</span>`;
+    },
+
+    // ------------------------------------------------------------------ difficulty (v3.15)
+
+    /** The difficulty picked for a class on the menu (1–3), never above what its mastery unlocks. */
+    pickedDiff(cls) {
+        let map = {};
+        try {
+            map = JSON.parse(this.storeGet('hunter.diff')) || {};
+        } catch (e) { /* bad value: Normal */ }
+        return U.clamp(Math.round(Number(map[cls]) || 1), 1, U.maxDifficulty(this.classBest(cls)));
+    },
+
+    setDiff(cls, n) {
+        let map = {};
+        try {
+            map = JSON.parse(this.storeGet('hunter.diff')) || {};
+        } catch (e) { /* start over */ }
+        map[cls] = n;
+        this.storeSet('hunter.diff', JSON.stringify(map));
+    },
+
+    /** This run's multiplier for monster HP, the level bar and drops (×1 Normal, ×2 Hard, ×3 Hell). */
+    get diffK() {
+        return (DIFFICULTIES[this.diff] || DIFFICULTIES[1]).k;
+    },
+
+    /** "🔥 Hard" tag for the board, the profile and the HUD; nothing for Normal. */
+    diffTag(n) {
+        const d = n > 1 && DIFFICULTIES[n];
+        return d ? `<span class="diff" style="--d:${d.color}" title="${d.name}: monsters ×${d.k} HP, ×${d.k} drops">${d.icon}</span>` : '';
+    },
+
+    /** The class card's difficulty picker: Normal / Hard (Mastery I) / Hell (Mastery II). */
+    diffLine(cls) {
+        const max = U.maxDifficulty(this.classBest(cls));
+        const cur = this.pickedDiff(cls);
+        return '<span class="diffs">' + DIFFICULTIES.slice(1).map((d, i) => {
+            const n = i + 1;
+            const locked = n > max;
+            const tip = locked ? `Unlocks with Mastery ${Game.roman(n - 1)}` : `Monsters ×${d.k} HP, ×${d.k} drops`;
+            return `<button type="button" class="dbtn${n === cur ? ' on' : ''}" data-diff="${n}" style="--d:${d.color}"${locked ? ' disabled' : ''} title="${tip}">` +
+                `${locked ? '🔒' : d.icon} ${d.name}${d.k > 1 ? ` <small>×${d.k}</small>` : ''}</button>`;
+        }).join('') + '</span>';
     },
 
     parsePet(key) {

@@ -7,7 +7,9 @@
   // opts.perks: pretend skin perks, e.g. { drops: 1 } (mythic) or { coinDrop: 0.05 } (rare)
   if (opts.perks) g.artefacts = { mult: k => 1 + (opts.perks[k] || 0) };
   // opts.best: pretend this class has reached that level before (class mastery speeds early levels)
-  if (opts.best) { g.masteryBest = opts.best; g.target = Math.round(GameUtils.levelDamage(1) / g.levelSpeed); }
+  // opts.diff: play on Hard (2) or Hell (3) whatever the class has unlocked
+  if (opts.diff) g.diff = opts.diff;
+  if (opts.best || opts.diff) { if (opts.best) g.masteryBest = opts.best; g.target = Math.round(GameUtils.levelDamage(1) * g.diffK / g.levelSpeed); }
   // per-level economy sample: fight seconds, coins, kills, share of fight time with a ×2+ gold boost, …
   const econ = []; let cur = null;
   const startLvl = () => { cur = { L: g.level, t0: g.time, e0: g.coinsEarned, k0: g.kills, h0: g.hits || 0, g0: g.gems || 0, fight: 0, boost: 0, mult: 0, alive: 0, pu: 0 }; };

@@ -3,7 +3,7 @@
 class Game {
     constructor() {
         // Version system (bumped by the pre-commit hook, see VERSION-README.md)
-        this.version = "3.14.0";
+        this.version = "3.15.0";
         this.buildDate = "2026-10-26";
 
         this.canvas = document.getElementById('gameCanvas');
@@ -173,6 +173,15 @@ class Game {
             this.pickClass(this.cls, true);
             Sfx.tone(this.fastLaneOn() ? 988 : 660, { duration: 0.08, type: 'triangle', volume: 0.1 });
         });
+        this.el.classInfo.querySelectorAll('[data-diff]').forEach(b => b.addEventListener('click', () => {
+            const n = Number(b.dataset.diff);
+            this.setDiff(this.cls, n);
+            this.pickClass(this.cls, true);
+            Sfx.tone([0, 660, 494, 330][n], { duration: 0.12, type: n > 1 ? 'sawtooth' : 'triangle', volume: 0.08 });
+        }));
+        const diff = DIFFICULTIES[this.pickedDiff(id)];
+        const play = document.getElementById('playBtn');
+        if (play) play.innerHTML = diff.k > 1 ? `▶ PLAY <small class="pdiff" style="--d:${diff.color}">${diff.icon} ${diff.name.toUpperCase()}</small>` : '▶ PLAY';
         if (this.el.whoAvatar) this.drawAvatar(this.el.whoAvatar, id, this.equippedSkin ? this.equippedSkin(id) : '');
         this.drawPortrait(document.getElementById('logoHero'), id, this.equippedSkin ? this.equippedSkin(id) : '');
         if (!quiet) Sfx.tone({ wizard: 784, barbarian: 392, goblin: 587 }[id], { duration: 0.09, type: 'triangle', volume: 0.1 });
@@ -550,6 +559,7 @@ class Game {
         this.petList = [];
         this.hits = 0;
         this.runMasteryTier = U.masteryTier(this.classBest(this.cls)); // to tell a new tier at game over
+        this.diff = 1; // the run's difficulty: set by startRun / resumeRun
         this.levelCoinsStart = 0;
         this.incomeEMA = 0;
         this.buffs = {};
@@ -636,6 +646,7 @@ class Game {
         Sfx.stopMusic();
         this.clearSavedRun(); // a new hunt replaces any saved one
         this.resetRun();
+        this.diff = this.pickedDiff(this.cls);
         this.releaseStick();
         const runId = (this.runId = (this.runId || 0) + 1);
         this.attract = [];
@@ -650,7 +661,8 @@ class Game {
         this.statsLog = /[?&]stats\b/.test(window.location.search) ? this.makeStatsLog() : null;
         this.startLevel();
         this.enterGameMode(true);
-        this.banner('HUNT!', `${this.biome.name} · fill the bar to clear the level`);
+        const d = DIFFICULTIES[this.diff];
+        this.banner(d.k > 1 ? `${d.icon} ${d.name.toUpperCase()} HUNT!` : 'HUNT!', d.k > 1 ? `monsters ×${d.k} HP · ×${d.k} drops` : `${this.biome.name} · fill the bar to clear the level`);
         Sfx.arpeggio([392, 523, 659], 0.08, { type: 'triangle', volume: 0.12 });
         Leaderboard.startRun().then(token => {
             if (this.runId === runId) this.runToken = token;

@@ -15,6 +15,9 @@ describe('meta catalog: client and server agree', () => {
     it('agrees on class mastery tiers', () => {
         for (const best of [0, 1, 10, 11, 20, 21, 35, 99, 100, 101]) assert.equal(GameUtils.masteryTier(best), server.masteryTier(best), String(best));
     });
+    it('agrees on the difficulties mastery unlocks', () => {
+        for (const best of [0, 10, 11, 20, 21, 35, 99]) assert.equal(GameUtils.maxDifficulty(best), server.maxDifficulty(best), String(best));
+    });
     it('has the same pets', () => {
         assert.deepEqual(Object.keys(client.PETS).sort(), [...server.PETS].sort());
     });

@@ -26,8 +26,9 @@ extendGame({
         this.phase = 'intro';
         this.introT = this.level > 1 ? Math.round(50 / this.levelSpeed) : 10;
         this.progress = 0;
-        // class mastery: a mastered level's bar fills 2–3× faster (same monsters, same danger)
-        this.target = Math.round(U.levelDamage(this.level) / this.levelSpeed);
+        // class mastery: a mastered level's bar fills 2–3× faster (same monsters, same danger);
+        // Hard/Hell: monsters have ×2/×3 HP, so the bar needs ×2/×3 damage (as many kills as on Normal)
+        this.target = Math.round(U.levelDamage(this.level) * this.diffK / this.levelSpeed);
         this.biome = this.biomeFor(this.level);
         this.encounter = null;
         this.clearT = 0;
@@ -86,7 +87,8 @@ extendGame({
             if (--this.introT <= 0 && d < 30) {
                 this.phase = 'fight';
                 const fast = this.levelSpeed;
-                if (this.level > 1) this.banner(`LEVEL ${this.level}`, `${this.biome.name}${fast > 1 ? ` · ⚡ mastery ×${fast}` : ''}`);
+                const d = DIFFICULTIES[this.diff];
+                if (this.level > 1) this.banner(`LEVEL ${this.level}`, `${this.biome.name}${d.k > 1 ? ` · ${d.icon} ${d.name}` : ''}${fast > 1 ? ` · ⚡ mastery ×${fast}` : ''}`);
             }
         }
     },
@@ -132,7 +134,8 @@ extendGame({
         const tier = U.masteryTier(this.level + 1);
         if (tier > before) {
             this.bossKill.mastery = tier;
-            this.banner(`${CLASSES[this.cls].name.toUpperCase()} MASTERY ${Game.roman(tier)}!`, `next hunt: ${this.masteryText(this.level + 1)}`, 'super');
+            const unlock = DIFFICULTIES[tier + 1];
+            this.banner(`${CLASSES[this.cls].name.toUpperCase()} MASTERY ${Game.roman(tier)}!`, `next hunt: ${this.masteryText(this.level + 1)}${unlock ? ` · ${unlock.icon} ${unlock.name} unlocked` : ''}`, 'super');
             Sfx.arpeggio([523, 659, 784, 1046, 1318], 0.07, { type: 'triangle', volume: 0.13 });
         }
     },
@@ -207,7 +210,7 @@ extendGame({
         this.hazards = this.hazards.filter(h => h.type === 'scorch');
         if (enc.kind === 'gatekeeper' || enc.kind === 'wave') {
             // reward: a shower of coins on the road ahead and a pickup
-            const n = 8 + 2 * this.level;
+            const n = (8 + 2 * this.level) * this.diffK;
             for (let i = 0; i < 5; i++) this.spawnCoins(this.roadLeft + 40 + Math.random() * (this.roadRight - this.roadLeft - 80), this.H * (0.15 + Math.random() * 0.3), n / 5, 2.5, 5);
             this.spawnPowerup(this.W / 2, this.H * 0.25, null, { pop: true, loot: true });
             this.banner(enc.kind === 'wave' ? 'WAVE BEATEN!' : 'GATE OPEN!', '+ loot ahead');
@@ -223,7 +226,7 @@ extendGame({
 
     gkHp(base) {
         // mastered levels: an encounter you have beaten before goes down quicker (×0.71 at ×2, ×0.58 at ×3)
-        return Math.round(base * U.hpStep(this.level) * (1 + 0.12 * (this.level - 1)) / Math.sqrt(this.levelSpeed));
+        return Math.round(base * U.hpStep(this.level) * (1 + 0.12 * (this.level - 1)) * this.diffK / Math.sqrt(this.levelSpeed));
     },
 
     makeGatekeeper(id, x, y, extra = {}) {

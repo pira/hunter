@@ -213,6 +213,15 @@ describe('GameUtils class mastery', () => {
         assert.equal(GameUtils.masterySpeed(25, 41), 3);
         assert.equal(GameUtils.masterySpeed(35, 41), 2);
     });
+
+    it('unlocks Hard with Mastery I and Hell with Mastery II', () => {
+        assert.equal(GameUtils.maxDifficulty(0), 1);
+        assert.equal(GameUtils.maxDifficulty(10), 1);
+        assert.equal(GameUtils.maxDifficulty(11), 2);
+        assert.equal(GameUtils.maxDifficulty(20), 2);
+        assert.equal(GameUtils.maxDifficulty(21), 3);
+        assert.equal(GameUtils.maxDifficulty(99), 3);
+    });
 });
 
 describe('GameUtils economy', () => {

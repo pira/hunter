@@ -218,7 +218,8 @@ extendGame({
         if (!Leaderboard.enabled || !Leaderboard.identity() || this.eggCards >= cap || Math.random() > 0.06) return null;
         return {
             id: 'egg', egg: true, artefact: true, icon: '🥚', name: 'Pet Egg', desc: 'Keep forever: hatches into a pet in your profile overnight.',
-            price: Math.max(60, Math.round(1.5 * this.expectedIncome(this.level) / 5) * 5)
+            // Hard/Hell pay ×2/×3, so the egg costs that much more too (same share of a level's income)
+            price: Math.max(60, Math.round(1.5 * this.expectedIncome(this.level) * this.diffK / 5) * 5)
         };
     },
 

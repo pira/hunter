@@ -14,7 +14,10 @@ Serverless backend for the global score table: one Lambda (Node.js 22) behind a 
 | `POST /player/{id}/buy` | `{ secret, item: 'artefact'\|'skin', id, tier? }` | `{ player }` — conditional on gold, previous tier and best-level gate |
 | `POST /player/{id}/equip` | `{ secret, cls, skin }` | `{ player }` — must own the skin (`''` takes it off) |
 
-v3 runs send `board: 'v3', cls, coins` (unspent gold). They land on `board#v3`; `GET /scores?board=v3` reads it
+v3 runs send `board: 'v3', cls, coins` (unspent gold) and, on Hard/Hell, `diff: 2 | 3`. They land on `board#v3`
+(`board#v3#hard` / `board#v3#hell` when the class's mastery unlocks that difficulty, else the run counts as Normal);
+`GET /scores?board=v3[&diff=2|3]` reads them. Hard/Hell runs get ×2/×3 coin and gem caps; the submit response says
+which board the run landed on (`diff`). `GET /scores?board=v3` reads the Normal board
 (default stays the Classic `board#v2`). v3 plausibility: `level ≤ 2 + duration/12`, score ≤ 1000 + 4000/s,
 kills ≤ 60 + 25/s, `coins ≤ coinCap(kills, bosses, level)`. The submit transaction credits the unspent gold to the
 profile and opens a pot (`pk=pot#<nonce>`, TTL 24 h) the wheel can ride on; every spin is one transaction

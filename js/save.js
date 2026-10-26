@@ -36,7 +36,7 @@ extendGame({
         }
         const p = this.player;
         const snap = {
-            v: 1, at: Date.now(), game: this.version, pid: id.id, where, cls: this.cls, level: this.level,
+            v: 1, at: Date.now(), game: this.version, pid: id.id, where, cls: this.cls, diff: this.diff || 1, level: this.level,
             progress: where === 'fight' ? Math.min(this.progress, this.target * 0.95) : 0,
             score: this.score, kills: this.kills, time: this.time, bestCombo: this.bestCombo, bossesSlain: this.bossesSlain,
             regularCount: counters.regularCount || 0, smallCount: counters.smallCount || 0, bigCount: counters.bigCount || 0,
@@ -79,7 +79,7 @@ extendGame({
         if (!btn) return;
         const snap = this.state === 'menu' ? this.savedRun() : null;
         btn.hidden = !snap;
-        if (snap) btn.innerHTML = `⏯ RESUME <small>${CLASSES[snap.cls].icon} level ${snap.level} · ${snap.score.toLocaleString()} pts</small>`;
+        if (snap) btn.innerHTML = `⏯ RESUME <small>${CLASSES[snap.cls].icon}${snap.diff > 1 && DIFFICULTIES[snap.diff] ? DIFFICULTIES[snap.diff].icon : ''} level ${snap.level} · ${snap.score.toLocaleString()} pts</small>`;
     },
 
     resumeRun() {
@@ -89,6 +89,7 @@ extendGame({
         Sfx.stopMusic();
         this.cls = snap.cls;
         this.resetRun();
+        this.diff = DIFFICULTIES[snap.diff] ? snap.diff : 1; // a resumed hunt keeps its difficulty
         this.releaseStick();
         this.runId = (this.runId || 0) + 1;
         this.attract = [];
@@ -133,7 +134,8 @@ extendGame({
             this.startLevel();
             if (snap.where === 'fight' && snap.progress > 0) this.progress = snap.progress;
         }
-        this.banner('WELCOME BACK!', `Level ${this.level} · ${this.biome.name}`);
+        const d = DIFFICULTIES[this.diff];
+        this.banner('WELCOME BACK!', `${d.k > 1 ? `${d.icon} ${d.name} · ` : ''}Level ${this.level} · ${this.biome.name}`);
         Sfx.arpeggio([392, 523, 659], 0.08, { type: 'triangle', volume: 0.12 });
         this.saveRun();
     }

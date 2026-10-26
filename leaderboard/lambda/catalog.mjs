@@ -56,4 +56,7 @@ export const masteryTier = best => Math.max(0, Math.floor(((best || 0) - 1) / 10
 // A run that died after beating its tenth-level boss (level 10, 20 … with every boss so far, one per
 // 5 levels) counts as reaching the next level.
 export const reachedLevel = (level, bosses) => (level % 10 === 0 && (bosses || 0) >= level / 5 ? level + 1 : level);
+// Difficulty (v3.15): Mastery I unlocks Hard (2), Mastery II Hell (3); a run on it has ×2/×3 monster HP
+// and drops. Must match GameUtils.maxDifficulty.
+export const maxDifficulty = best => Math.min(3, 1 + masteryTier(best));
 export const WHEEL_WIN = 0.5; // chance to double the pot; at 0.5 average gold is unchanged

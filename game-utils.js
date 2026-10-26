@@ -204,6 +204,13 @@
         return 1;
     }
 
+    /** Hardest difficulty a class may pick (v3.15): 1 Normal; Mastery I unlocks 2 (Hard), Mastery II
+     *  unlocks 3 (Hell). Monster and boss HP, the level bar and every drop scale by it (must match
+     *  catalog.mjs maxDifficulty). */
+    function maxDifficulty(best) {
+        return Math.min(3, 1 + masteryTier(best));
+    }
+
     /** Encounter at the end of a level: big boss every 10, small boss at 5/15/25…, else gatekeeper/wave. */
     function encounterKind(level) {
         if (level % 10 === 0) return 'bigBoss';
@@ -270,6 +277,7 @@
         encounterKind,
         masteryTier,
         masterySpeed,
+        maxDifficulty,
         hpScale,
         hpStep,
         coinScale,

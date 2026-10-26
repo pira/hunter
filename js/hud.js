@@ -31,7 +31,7 @@ extendGame({
             ? `❤️ <b>${p.hp}</b>`
             : Array.from({ length: p.maxHp }, (_, i) => `<span class="${i < p.hp ? 'full' : 'empty'}">${i < p.hp ? '❤️' : '🖤'}</span>`).join('')) + green);
         const phaseTag = { clear: ' ✓', encounter: ' ⚔️', loot: ' 🎁', travel: ' 🚩' }[this.phase] || '';
-        this.setText('level', this.el.level, `LV ${this.level}${phaseTag}`);
+        this.setText('level', this.el.level, `${this.diff > 1 ? DIFFICULTIES[this.diff].icon : ''}LV ${this.level}${phaseTag}`);
         this.el.xpFill.style.width = `${(this.levelProgress() * 100).toFixed(1)}%`;
         this.setText('score', this.el.score, this.score.toLocaleString());
 
@@ -196,6 +196,7 @@ extendGame({
             ['Bosses', this.bossesSlain],
             ['Time', U.formatTime(this.time)]
         ];
+        if (this.diff > 1) stats.push(['Difficulty', `${DIFFICULTIES[this.diff].icon} ${DIFFICULTIES[this.diff].name}`]);
         if (this.gems > 0) stats.push(['Gems', `${GEM} ${this.gems}`]);
         if (this.masteryUp && this.masteryUp.cls === this.cls) stats.push(['Mastery', `${this.masteryBadge(this.masteryUp.tier)} new!`]);
         this.masteryUp = null;
@@ -306,7 +307,7 @@ extendGame({
         this.el.submitStatus.textContent = 'Saving your hunt…';
         const entry = {
             name, cls: this.cls, skin: this.skin || undefined, coins: Math.max(0, Math.floor(this.coins)), gems: this.gems || 0, eggs: this.eggCards || undefined, bossEggs: this.bossEggs || undefined, score: this.score, level: this.level, kills: this.kills,
-            combo: this.bestCombo, bosses: this.bossesSlain, duration: Math.max(1, Math.round(this.time))
+            combo: this.bestCombo, bosses: this.bossesSlain, duration: Math.max(1, Math.round(this.time)), diff: this.diff > 1 ? this.diff : undefined
         };
         const runId = this.runId;
         const result = await Leaderboard.submit(entry, this.runToken);
@@ -320,7 +321,9 @@ extendGame({
                     ? `Saved on this device (#${result.rank}) — global board refused it: ${result.error}`
                     : `Saved on this device (#${result.rank}) — will upload when you're back online`;
         }
-        this.renderBoard(this.el.finalBoard, this.el.finalBoardTitle, result.scores, result.source, { id: result.id, name, score: this.score });
+        // Hard / Hell runs land on their own board (the server says which; offline, the run's own)
+        const diff = result.source === 'global' ? result.diff || 1 : this.diff;
+        this.renderBoard(this.el.finalBoard, this.el.finalBoardTitle, result.scores, result.source, { id: result.id, name, score: this.score }, ['v3', 'v3', 'hard', 'hell'][diff] || 'v3');
         if (result.pot) this.showPot(result.pot, result.player && result.player.gold);
     },
 
@@ -328,21 +331,23 @@ extendGame({
         const sel = this.boardSel || { board: Leaderboard.board, cls: '' };
         document.querySelectorAll('#boardTabs button').forEach(b => b.classList.toggle('on', b.dataset.board === sel.board));
         document.querySelectorAll('#clsTabs button').forEach(b => b.classList.toggle('on', b.dataset.cls === sel.cls));
-        document.getElementById('clsTabs').hidden = sel.board !== 'v3';
+        document.getElementById('clsTabs').hidden = sel.board === 'v2';
     },
 
     async loadBoard(listEl, titleEl, board = Leaderboard.board, cls = '') {
         listEl.innerHTML = '<li class="muted">Loading…</li>';
         const want = `${board}|${cls}`;
         listEl.dataset.want = want;
-        const { scores, source } = await Leaderboard.top(10, board, board === 'v3' ? cls : '');
+        const { scores, source } = await Leaderboard.top(10, board, board !== 'v2' ? cls : '');
         if (listEl.dataset.want !== want) return; // a newer tab click won
         this.renderBoard(listEl, titleEl, scores, source, null, board, cls);
     },
 
     renderBoard(listEl, titleEl, scores, source, mine, board = Leaderboard.board, cls = '') {
         titleEl.hidden = false;
-        titleEl.textContent = (board === 'v2' ? '🏆 Classic Hunters' : cls && CLASSES[cls] ? `🏆 Top ${CLASSES[cls].name}s` : '🏆 Top Hunters') + (source === 'global' ? '' : ' (this device)');
+        const d = { hard: DIFFICULTIES[2], hell: DIFFICULTIES[3] }[board];
+        const who = cls && CLASSES[cls] ? `${CLASSES[cls].name}s` : 'Hunters';
+        titleEl.textContent = (board === 'v2' ? '🏆 Classic Hunters' : d ? `${d.icon} Top ${d.name} ${who}` : `🏆 Top ${who}`) + (source === 'global' ? '' : ' (this device)');
         if (!scores.length) {
             listEl.innerHTML = '<li class="muted">No scores yet — be the first!</li>';
             return;
