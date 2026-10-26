@@ -22,15 +22,40 @@ extendGame({
         return 'large';
     },
 
-    /** A monster of this tier: the biome's two home families turn up three times as often. */
+    /**
+     * The families of a level: [leader, guest], both from the biome's home pair. The leader alternates
+     * between the two on each lap of the biomes and never repeats the previous level's (when it can),
+     * so neighbouring levels look different. Fixed per level, so a resumed hunt gets the same ones.
+     */
+    levelFamilies(level = this.level) {
+        const cache = this.famCache || (this.famCache = [null]);
+        for (let L = cache.length; L <= level; L++) {
+            const home = BIOME_FAMILIES[this.biomeFor(L).id] || MOB_FAMILY_ORDER.slice(0, 2);
+            const lap = Math.floor((L - 1) / BIOMES.length);
+            let pair = lap % 2 ? [home[1], home[0]] : [home[0], home[1]];
+            if (cache[L - 1] && pair[0] === cache[L - 1][0]) pair = [pair[1], pair[0]];
+            cache[L] = pair;
+        }
+        return cache[Math.max(1, level)];
+    },
+
+    /** A monster of this tier: mostly the level's leading family, its guest family in small groups. */
     pickType(tier) {
         const list = MONSTER_TYPES[tier];
-        const home = (this.biome && BIOME_FAMILIES[this.biome.id]) || [];
-        const weights = list.map(t => (home.includes(t.family) ? 3 : 1));
-        let r = Math.random() * weights.reduce((a, b) => a + b, 0);
-        let i = 0;
-        while (i < list.length - 1 && (r -= weights[i]) >= 0) i++;
-        return { ...list[i], tier };
+        const [main, guest] = this.levelFamilies();
+        const run = this.guestRun && this.guestRun.level === this.level ? this.guestRun : null;
+        let family = main;
+        if (run && run.left > 0) {
+            run.left--;
+            family = guest;
+        } else if (Math.random() < MOB_MIX.guestStart) {
+            this.guestRun = { level: this.level, left: MOB_MIX.guestRun - 1 };
+            family = guest;
+        } else if (Math.random() < MOB_MIX.stray) {
+            family = MOB_FAMILY_ORDER[Math.floor(Math.random() * MOB_FAMILY_ORDER.length)];
+        }
+        const type = list.find(t => t.family === family) || list[Math.floor(Math.random() * list.length)];
+        return { ...type, tier };
     },
 
     makeMonster(type, x, y, behavior) {

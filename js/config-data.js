@@ -54,12 +54,16 @@ const MOB_FAMILIES = {
     bugs: { color: '#15803d', names: ['Beetle', 'Spider', 'Scorpion', 'Mantis', 'Brood Queen', 'Hive Empress', 'Ancient Queen', 'World Eater'] }
 };
 const MOB_FAMILY_ORDER = ['undead', 'beasts', 'fantasy', 'bandits', 'bugs'];
-// each biome is home to two families (they show up three times as often there)
+// each biome is home to two families: one leads each level (MOB_MIX.main of the monsters), the other
+// drops in now and then as a small group (js/monsters.js pickType)
 const BIOME_FAMILIES = {
     meadow: ['beasts', 'bugs'], pines: ['beasts', 'bandits'], lakes: ['bugs', 'fantasy'], hills: ['bandits', 'fantasy'],
     autumn: ['beasts', 'undead'], swamp: ['bugs', 'fantasy'], snow: ['beasts', 'undead'], canyon: ['bandits', 'bugs'],
     volcano: ['fantasy', 'undead'], crystal: ['bugs', 'undead'], night: ['undead', 'beasts']
 };
+// v3.13.2: levels are mostly one family. `guestStart` = chance a spawn starts a guest group of
+// `guestRun` (≈15% of the level), `stray` = chance of any other family.
+const MOB_MIX = { guestStart: 0.055, guestRun: 3, stray: 0.02 };
 const mob = (family, rank, stats) => ({ family, rank, name: MOB_FAMILIES[family].names[rank - 1], color: MOB_FAMILIES[family].color, shape: 'circle', ...stats });
 const MONSTER_TYPES = {
     small: [

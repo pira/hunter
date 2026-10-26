@@ -750,18 +750,6 @@ extendGame({
         ctx.ellipse(p.x, feetY, 30 * scale, 12 * scale, 0, 0, TAU);
         ctx.fill();
         this.drawShadow(ctx, p.x, feetY, 12 * scale);
-        if ((this.timers.magnet > 0 || this.buffs.magnetAll) && this.phase !== 'travel' && !this.bossLootPhase) {
-            // how far the magnet reaches (v3.8: a bigger circle, never the whole map)
-            ctx.save();
-            ctx.strokeStyle = 'rgba(244,63,94,0.28)';
-            ctx.lineWidth = 2;
-            ctx.setLineDash([6, 8]);
-            ctx.lineDashOffset = -this.frameNo * 0.4;
-            ctx.beginPath();
-            ctx.arc(p.x, p.y, this.magnetRadius, 0, TAU);
-            ctx.stroke();
-            ctx.restore();
-        }
         if (this.timers.freeze > 0) {
             // the ice cloud you carry around: monsters inside move slowly
             const r = POISON_RADIUS;

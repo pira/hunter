@@ -3,7 +3,7 @@
 class Game {
     constructor() {
         // Version system (bumped by the pre-commit hook, see VERSION-README.md)
-        this.version = "3.13.0";
+        this.version = "3.13.1";
         this.buildDate = "2026-10-26";
 
         this.canvas = document.getElementById('gameCanvas');
@@ -85,7 +85,7 @@ class Game {
         document.getElementById('resumeBtn').addEventListener('click', () => this.resumeRun());
         this.el.againBtn.addEventListener('click', () => this.startRun());
         $('menuBtn').addEventListener('click', () => this.showMenu());
-        $('resumeBtn').addEventListener('click', () => this.resume());
+        $('pauseResumeBtn').addEventListener('click', () => this.resume()); // the pause menu's (resumeBtn is the menu's saved hunt)
         $('restartBtn').addEventListener('click', () => this.startRun());
         $('quitBtn').addEventListener('click', () => this.showMenu());
         this.el.pauseBtn.addEventListener('click', e => {
