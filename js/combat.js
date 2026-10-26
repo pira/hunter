@@ -20,8 +20,10 @@ extendGame({
         for (const m of this.monsters) {
             if (m.dead || m.dying || (exclude && exclude.has(m))) continue;
             if (m.x < -m.size || m.x > this.W + m.size || m.y < -m.size || m.y > this.H + m.size) continue;
-            // Bosses count as closer than they are, so auto-aim focuses them.
-            const d = U.distanceSquared(x, y, m.x, m.y) * (m.shielded ? 4 : m.boss || m.gk ? bossBias : 1);
+            // Bosses count as closer than they are, so auto-aim focuses them. On Hard/Hell a minion that
+            // has got close comes first (v3.16: it used to nibble you while every shot went into its master).
+            const d0 = U.distanceSquared(x, y, m.x, m.y);
+            const d = d0 * (m.shielded ? 4 : m.boss || m.gk ? bossBias : m.minion && this.diff > 1 && d0 < 130 * 130 ? 0.1 : 1);
             if (d < bestD) {
                 bestD = d;
                 best = m;

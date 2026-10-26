@@ -113,7 +113,7 @@ extendGame({
     /** "🔥 Hard" tag for the board, the profile and the HUD; nothing for Normal. */
     diffTag(n) {
         const d = n > 1 && DIFFICULTIES[n];
-        return d ? `<span class="diff" style="--d:${d.color}" title="${d.name}: monsters ×${d.k} HP, ×${d.k} drops">${d.icon}</span>` : '';
+        return d ? `<span class="diff" style="--d:${d.color}" title="${d.name}">${d.icon}</span>` : '';
     },
 
     /** The class card's difficulty picker: Normal / Hard (Mastery I) / Hell (Mastery II). */
@@ -123,9 +123,9 @@ extendGame({
         return '<span class="diffs">' + DIFFICULTIES.slice(1).map((d, i) => {
             const n = i + 1;
             const locked = n > max;
-            const tip = locked ? `Unlocks with Mastery ${Game.roman(n - 1)}` : `Monsters ×${d.k} HP, ×${d.k} drops`;
+            const tip = locked ? `Unlocks with Mastery ${Game.roman(n - 1)}` : d.blurb;
             return `<button type="button" class="dbtn${n === cur ? ' on' : ''}" data-diff="${n}" style="--d:${d.color}"${locked ? ' disabled' : ''} title="${tip}">` +
-                `${locked ? '🔒' : d.icon} ${d.name}${d.k > 1 ? ` <small>×${d.k}</small>` : ''}</button>`;
+                `${locked ? '🔒' : d.icon} ${d.name}</button>`;
         }).join('') + '</span>';
     },
 

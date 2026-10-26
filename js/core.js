@@ -3,7 +3,7 @@
 class Game {
     constructor() {
         // Version system (bumped by the pre-commit hook, see VERSION-README.md)
-        this.version = "3.15.1";
+        this.version = "3.16.0";
         this.buildDate = "2026-10-26";
 
         this.canvas = document.getElementById('gameCanvas');
@@ -661,7 +661,7 @@ class Game {
         this.startLevel();
         this.enterGameMode(true);
         const d = DIFFICULTIES[this.diff];
-        this.banner(d.k > 1 ? `${d.icon} ${d.name.toUpperCase()} HUNT!` : 'HUNT!', d.k > 1 ? `monsters ×${d.k} HP · ×${d.k} drops` : `${this.biome.name} · fill the bar to clear the level`);
+        this.banner(d.k > 1 ? `${d.icon} ${d.name.toUpperCase()} HUNT!` : 'HUNT!', d.k > 1 ? d.blurb : `${this.biome.name} · fill the bar to clear the level`);
         Sfx.arpeggio([392, 523, 659], 0.08, { type: 'triangle', volume: 0.12 });
         Leaderboard.startRun().then(token => {
             if (this.runId === runId) this.runToken = token;

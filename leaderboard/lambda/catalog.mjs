@@ -59,4 +59,6 @@ export const reachedLevel = (level, bosses) => (level % 10 === 0 && (bosses || 0
 // Difficulty (v3.15): Mastery I unlocks Hard (2), Mastery II Hell (3); a run on it has ×2/×3 monster HP
 // and drops. Must match GameUtils.maxDifficulty.
 export const maxDifficulty = best => Math.min(3, 1 + masteryTier(best));
+// HP and drop multiplier per difficulty (v3.16: Hell ×4). Must match DIFFICULTIES[n].k in config-data.js.
+export const DIFF_K = { 1: 1, 2: 2, 3: 4 };
 export const WHEEL_WIN = 0.5; // chance to double the pot; at 0.5 average gold is unchanged

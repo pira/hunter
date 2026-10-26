@@ -35,7 +35,7 @@
 import { createHmac, createHash, randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
 import {
     PETS, MERGE_GEMS, MAX_SLOTS, SLOT_UNLOCK, petKey, EGG_PRICE, NESTS, MAX_NESTS, NEST_UNLOCK, HATCH_MS, HURRY_GEMS_PER_HOUR, EGG_ODDS,
-    ART_REFUND_GOLD, ART_REFUND_GEMS, SKINS, SKIN_PRICES, WHEEL_WIN, PET_LEVEL_MAX, FEED_COST, masteryTier, reachedLevel, maxDifficulty
+    ART_REFUND_GOLD, ART_REFUND_GEMS, SKINS, SKIN_PRICES, WHEEL_WIN, PET_LEVEL_MAX, FEED_COST, masteryTier, reachedLevel, maxDifficulty, DIFF_K
 } from './catalog.mjs';
 
 export const BOARD = 'board#v2';
@@ -319,7 +319,7 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
                 if (!isInt(body.bossEggs, 0, 10_000)) throw new HttpError(400, 'invalid eggs');
                 out.bossEggs = body.bossEggs;
             }
-            // difficulty (v3.15): 2 = Hard, 3 = Hell — ×2/×3 monster HP and drops
+            // difficulty (v3.15): 2 = Hard, 3 = Hell — ×2/×4 monster HP and drops (DIFF_K)
             if (body.diff !== undefined) {
                 if (!isInt(body.diff, 1, 3)) throw new HttpError(400, 'invalid difficulty');
                 if (body.diff > 1) out.diff = body.diff;
@@ -333,9 +333,10 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
         const { score, level, kills, combo, duration, bosses, coins, gems, eggCards, bossEggs, diff = 1 } = run;
         if (level > 2 + Math.floor(duration / MIN_LEVEL_SECONDS)) throw new HttpError(422, 'implausible level');
         if (score > 1000 + duration * 4000 || kills > 60 + duration * 25 || combo > kills) throw new HttpError(422, 'implausible score');
-        // Hard/Hell drop ×2/×3
-        if (coins !== undefined && coins > coinCap(kills, bosses, level) * diff) throw new HttpError(422, 'implausible coins');
-        if (gems !== undefined && gems > gemCap(kills, bosses, level) * diff) throw new HttpError(422, 'implausible gems');
+        // Hard/Hell drop ×2/×4
+        const k = DIFF_K[diff] || 1;
+        if (coins !== undefined && coins > coinCap(kills, bosses, level) * k) throw new HttpError(422, 'implausible coins');
+        if (gems !== undefined && gems > gemCap(kills, bosses, level) * k) throw new HttpError(422, 'implausible gems');
         if (eggCards && eggCards > 1 + Math.floor(level / 5)) throw new HttpError(422, 'implausible eggs');
         if (bossEggs && bossEggs > bosses) throw new HttpError(422, 'implausible eggs');
     }

@@ -190,12 +190,63 @@ extendGame({
         const enc = this.encounter;
         if (!enc) return;
         enc.t++;
+        this.updateMinions(enc);
         if (enc.kind === 'gatekeeper' || enc.kind === 'wave') {
             this.updateWave(enc); // runs the scheduled spawns of waves and of gatekeepers with escorts
-            const alive = this.monsters.some(m => m.enc === enc && !m.dead);
+            // Hard/Hell: once the last gatekeeper falls its minions run (the gate doesn't wait for them)
+            if (enc.kind === 'gatekeeper' && !this.monsters.some(m => m.enc === enc && m.gk && !m.dead)) {
+                for (const m of this.monsters) if (m.enc === enc && m.minion && !m.dead) m.behavior = 'flee';
+            }
+            const alive = this.monsters.some(m => m.enc === enc && !m.dead && !(m.minion && m.behavior === 'flee'));
             if (!alive && !enc.queue.length && enc.t > 30) this.encounterWon();
         }
         // bosses call encounterWon() from bossDefeated()
+    },
+
+    // ------------------------------------------------------------------ Hard / Hell bosses (v3.16)
+
+    /** Hell attacks come quicker: boss and gatekeeper cooldowns × this (Normal and Hard: 1). */
+    get bossRate() {
+        return this.diff >= 3 ? 0.7 : 1;
+    },
+
+    /** A boss/gatekeeper cooldown in steps for this difficulty (≥ 1, so `t % n` keeps working). */
+    cd(steps) {
+        return Math.max(1, Math.round(steps * this.bossRate));
+    },
+
+    /** Hard/Hell: gatekeepers and bosses keep calling minions while they stand — two grunts every 8 s, and
+     *  on Hell past level 10 three soldiers every 5.5 s. Those that summon anyway (Totem, Broodmother, Lich)
+     *  summon more instead. Minions pay little, and run once their master falls. */
+    updateMinions(enc) {
+        if (this.diff < 2 || enc.done) return;
+        const boss = enc.kind === 'smallBoss' || enc.kind === 'bigBoss';
+        if (!boss && enc.kind !== 'gatekeeper') return;
+        if (boss ? enc.def && (enc.def.pattern === 'summon' || enc.def.pattern === 'lich') : enc.id === 'totem') return;
+        const hosts = this.monsters.filter(m => m.enc === enc && !m.dead && !m.dying && !m.hidden && (boss ? m.boss : m.gk) && m.mode !== 'enter');
+        if (!hosts.length) return;
+        // Hell goes all out once past the first big boss; before that it calls like Hard (its grunts have
+        // ×4 HP already — v3.16 sims: a fresh wizard drowned in a full Hell stream on level 1)
+        const hell = this.diff >= 3 && this.level > 10;
+        if (enc.minionT === undefined) enc.minionT = Math.round(3 * 60 * GAME_SPEED); // the first call 3 s in
+        if (--enc.minionT > 0) return;
+        enc.minionT = Math.round((hell ? 5.5 : 8) * 60 * GAME_SPEED);
+        const alive = this.monsters.filter(m => m.enc === enc && m.minion && !m.dead).length;
+        this.callMinions(hosts[Math.floor(Math.random() * hosts.length)], Math.min((hell ? 10 : 6) - alive, hell ? 3 : 2), hell ? 'medium' : 'small');
+    },
+
+    callMinions(host, n, tier) {
+        if (n <= 0) return;
+        this.bossPose(host, 30);
+        const r = (host.size || 30) + 18;
+        for (let i = 0; i < n; i++) {
+            const a = (i / n) * TAU + Math.random();
+            const m = this.makeMonster(this.pickType(tier), U.clamp(host.x + Math.cos(a) * r, 20, this.W - 20), U.clamp(host.y + Math.sin(a) * r, 30, this.H - 60), 'chase');
+            Object.assign(m, { enc: host.enc, minion: true, spawnT: 40, points: 5 });
+            this.monsters.push(m);
+        }
+        this.ring(host.x, host.y, (host.size || 30) * 2.2, this.diff >= 3 ? '#ef4444' : '#fb923c', 22);
+        Sfx.tone(196, { duration: 0.25, type: 'sawtooth', volume: 0.07, slide: -60, bus: 'sfx' });
     },
 
     encounterWon() {
@@ -356,10 +407,15 @@ extendGame({
             case 'bomber': {
                 if (m.y < m.homeY) m.y += 1.5;
                 m.x = this.W / 2 + Math.sin(m.t * 0.012) * (this.roadRight - this.roadLeft) * 0.42;
-                if (m.t % m.every === 0 && m.y >= m.homeY - 5) {
+                if (m.t % this.cd(m.every) === 0 && m.y >= m.homeY - 5) {
                     this.bossPose(m, 24);
-                    for (let i = 0; i < m.mines; i++) {
-                        this.hazards.push({ type: 'mine', x: m.x + (i - (m.mines - 1) / 2) * 30, y: m.y + 10, r: 9, arm: 40, life: 520, grounded: true, t: 0 });
+                    const n = m.mines + (this.diff >= 3 ? 1 : 0);
+                    for (let i = 0; i < n; i++) {
+                        this.hazards.push({ type: 'mine', x: m.x + (i - (n - 1) / 2) * 30, y: m.y + 10, r: 9, arm: 40, life: 520, grounded: true, t: 0 });
+                    }
+                    // Hell: every other drop it also lobs one right where you stand (it arms a beat after landing)
+                    if (this.diff >= 3 && (m.lobs = (m.lobs || 0) + 1) % 2 === 0) {
+                        this.hazards.push({ type: 'mine', x: m.x, y: m.y + 10, tx: p.x, ty: p.y, fly: 36, fly0: 36, r: 9, arm: 50, life: 520, grounded: true, t: 0 });
                     }
                     Sfx.tone(330, { duration: 0.08, type: 'square', volume: 0.06, bus: 'sfx' });
                 }
@@ -374,9 +430,10 @@ extendGame({
                 } else if (m.mode === 'aim') {
                     if (m.t < 0) break;
                     const a = Math.atan2(p.y - m.y, p.x - m.x);
-                    if (m.t < 50) m.dir = a; // the line locks 25 steps before the charge
+                    const aim = this.cd(75); // Hell aims quicker; the line still locks 25 steps before
+                    if (m.t < aim - 25) m.dir = a; // the line locks 25 steps before the charge
                     m.lane = m.t > 8;
-                    if (m.t > 75) {
+                    if (m.t > aim) {
                         m.mode = 'charge';
                         m.t = 0;
                         m.run = 0;
@@ -401,16 +458,21 @@ extendGame({
                     }
                 } else if (m.mode === 'dizzy') {
                     m.lane = false;
-                    if (m.t > 80) { m.mode = 'aim'; m.t = 0; }
+                    if (m.t > this.cd(80)) { m.mode = 'aim'; m.t = 0; }
                 }
                 break;
             }
             case 'totem': {
-                if (m.t % 150 === 0) {
+                // its helpers are its minions: past level 10 Hard calls one more (cap 10), Hell one more and a bit
+                // quicker (cap 12) (v3.16 sims: more helpers on the first levels walled the wizard at level 3 —
+                // their ×2/×4 HP is plenty there)
+                const late = this.diff >= 2 && this.level > 10;
+                if (m.t % (late && this.diff >= 3 ? 125 : 150) === 0) {
                     this.bossPose(m, 36);
                     const kids = this.monsters.filter(o => o.totemKid === m && !o.dead).length;
-                    for (let i = 0; i < 2 && kids + i < 8; i++) {
-                        const k = this.escort('small', m.x + (i ? 24 : -24), m.y + 10);
+                    const more = late ? 1 : 0;
+                    for (let i = 0; i < 2 + more && kids + i < (late ? [0, 8, 10, 12][this.diff] : 8); i++) {
+                        const k = this.escort('small', m.x + (i % 2 ? 24 : -24) + (i > 1 ? (i - 2.5) * 20 : 0), m.y + 10 + (i > 1 ? 18 : 0));
                         k.totemKid = m;
                         k.spawnT = 20;
                     }
@@ -435,10 +497,12 @@ extendGame({
                 const top = Math.max(this.H * 0.12, this.topSafe);
                 const span = this.H * 0.45;
                 m.y = top + span * (0.5 + 0.5 * Math.sin(m.t * 0.01 + (m.side > 0 ? 2 : 0)));
-                if (m.t % 100 === 0) {
+                if (m.t % this.cd(100) === 0) {
                     const lead = 18;
                     const a = Math.atan2(p.y + p.vy * lead - m.y, p.x + p.vx * lead - m.x);
                     this.enemyShot(m.x, m.y, a, 4.2, 'arrow');
+                    // Hell past the first big boss: a fan of three
+                    if (this.diff >= 3 && this.level > 10) for (const da of [-0.14, 0.14]) this.enemyShot(m.x, m.y, a + da, 4.2, 'arrow');
                     m.drawT = 12;
                 }
                 if (m.drawT > 0) m.drawT--;
@@ -618,6 +682,14 @@ extendGame({
         for (const h of this.hazards) {
             h.t++;
             if (h.type === 'mine') {
+                if (h.fly > 0) {
+                    // a lobbed mine (Hell Bomber) flies to its spot first, then starts arming
+                    h.x += (h.tx - h.x) / h.fly;
+                    h.y += (h.ty - h.y) / h.fly;
+                    h.fly--;
+                    h.t = 0;
+                    continue;
+                }
                 const armed = h.t > h.arm;
                 const near = U.distanceSquared(h.x, h.y, p.x, p.y) < 34 * 34;
                 if ((armed && near) || h.t > h.life) {
@@ -643,6 +715,9 @@ extendGame({
             if (h.type === 'mine') {
                 const blink = h.t > h.arm && Math.floor(h.t / 8) % 2 === 0;
                 this.drawShadow(ctx, h.x, h.y + 6, 9);
+                const lift = h.fly > 0 ? Math.sin(Math.PI * (1 - h.fly / h.fly0)) * 38 : 0;
+                ctx.save();
+                ctx.translate(0, -lift);
                 ctx.fillStyle = '#1f2937';
                 ctx.strokeStyle = '#000';
                 ctx.lineWidth = 2;
@@ -666,6 +741,16 @@ extendGame({
                     ctx.beginPath();
                     ctx.arc(h.x, h.y, 34, 0, TAU);
                     ctx.stroke();
+                }
+                ctx.restore();
+                if (h.fly > 0) {
+                    // where it will land
+                    ctx.strokeStyle = 'rgba(239,68,68,0.6)';
+                    ctx.setLineDash([4, 4]);
+                    ctx.beginPath();
+                    ctx.arc(h.tx, h.ty, 34, 0, TAU);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
                 }
             } else if (h.type === 'ringWarn') {
                 const a = 0.4 + 0.4 * Math.sin(h.t * 0.4);

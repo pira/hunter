@@ -135,7 +135,7 @@ extendGame({
         if (pattern === 'charge') {
             if (b.mode === 'fight' || b.mode === 'recover') {
                 chase(b.mode === 'recover' ? 0.3 : 1);
-                if (b.modeT > (b.mode === 'recover' ? 40 : enraged ? 100 : 150)) {
+                if (b.modeT > this.cd(b.mode === 'recover' ? 40 : enraged ? 100 : 150)) {
                     b.mode = 'windup';
                     b.modeT = 0;
                 }
@@ -158,7 +158,7 @@ extendGame({
                     b.mode = 'recover';
                     b.modeT = 0;
                     this.shake(8);
-                    if (enraged || b.cycle > 0) this.radial(b, 10, 2.6, b.boss.accent);
+                    if (enraged || b.cycle > 0 || this.diff >= 3) this.radial(b, this.diff >= 3 ? 14 : 10, 2.6, b.boss.accent);
                 }
             } else {
                 b.mode = 'fight';
@@ -171,7 +171,7 @@ extendGame({
             const n = U.normalizeVector(b.wp.x - b.x, b.wp.y - b.y);
             b.x += n.x * b.speed * freeze;
             b.y += n.y * b.speed * freeze;
-            const every = enraged ? 80 : 120;
+            const every = this.cd(enraged ? 80 : 120);
             if (b.t % every === 0) {
                 b.volley++;
                 this.bossPose(b);
@@ -179,16 +179,16 @@ extendGame({
                     const a = Math.atan2(p.y - b.y, p.x - b.x);
                     for (let i = -2; i <= 2; i++) this.enemyShot(b.x, b.y, a + i * 0.18, 3.4, b.boss.accent);
                 } else {
-                    this.radial(b, enraged ? 18 : 14, 2.4, b.boss.accent, b.volley * 0.2);
+                    this.radial(b, (enraged ? 18 : 14) + (this.diff >= 3 ? 4 : 0), 2.4, b.boss.accent, b.volley * 0.2);
                 }
             }
             if (enraged && b.t % 9 === 0) this.enemyShot(b.x, b.y, b.t * 0.07, 2.2, '#d7bde2');
         } else {
             chase(enraged ? 0.9 : 0.6);
-            const every = enraged ? 160 : 220;
+            const every = this.cd(enraged ? 160 : 220);
             if (b.t % every === 0) {
                 this.bossPose(b, 40);
-                const count = enraged ? 6 : 4;
+                const count = (enraged ? 6 : 4) + Math.max(0, this.diff - 1); // Hard +1, Hell +2
                 for (let i = 0; i < count; i++) {
                     const a = (i / count) * TAU;
                     const m = this.makeMonster(this.pickType('small'), b.x + Math.cos(a) * (b.size + 14), b.y + Math.sin(a) * (b.size + 14), 'chase');
@@ -200,7 +200,7 @@ extendGame({
                 }
                 this.ring(b.x, b.y, b.size * 2, b.boss.accent, 20);
             }
-            if (b.t % 300 === 150) {
+            if (b.t % this.cd(300) === this.cd(150)) {
                 this.bossPose(b);
                 const a = Math.atan2(p.y - b.y, p.x - b.x);
                 for (let i = -1; i <= 1; i++) this.enemyShot(b.x, b.y, a + i * 0.25, 2.8, b.boss.accent);
@@ -240,7 +240,7 @@ extendGame({
                         this.later(32, () => this.shockwave(b, plan2));
                     }
                 }
-            } else if (b.atkT > (b.enraged ? 150 : 210)) {
+            } else if (b.atkT > this.cd(b.enraged ? 150 : 210)) {
                 b.atkT = 0;
                 b.volley++;
                 if (b.volley % 2) {
@@ -250,7 +250,7 @@ extendGame({
                     this.floater(b.x, b.y - b.size - 14, 'SLAM!', '#fb923c', 20);
                 } else {
                     this.bossPose(b, 36);
-                    this.boulders(b.enraged ? 3 : 2);
+                    this.boulders((b.enraged ? 3 : 2) + (this.diff >= 3 ? 1 : 0));
                 }
             }
         } else if (pat === 'stormcaller') {
@@ -270,14 +270,14 @@ extendGame({
                 return;
             }
             drift(b.wp ? b.wp.x : b.x, b.wp ? b.wp.y : b.y, b.speed);
-            if (b.modeT > 380 && !this.hazards.some(h => h.type === 'laser')) {
+            if (b.modeT > this.cd(380) && !this.hazards.some(h => h.type === 'laser')) {
                 b.modeT = 0;
                 b.tele = { t: 0 };
                 b.invulnerable = true;
                 Sfx.tone(880, { duration: 0.3, type: 'sine', volume: 0.08, slide: -600, bus: 'sfx' });
                 return;
             }
-            if (b.atkT > (b.enraged ? 130 : 190)) {
+            if (b.atkT > this.cd(b.enraged ? 130 : 190)) {
                 b.atkT = 0;
                 b.volley++;
                 this.bossPose(b, 40);
@@ -303,8 +303,8 @@ extendGame({
             b.shielded = adds.length > 0;
             if (!adds.length && --b.summonT <= 0) {
                 this.bossPose(b, 40);
-                this.lichAdds(b, b.enraged ? 6 : 4);
-                b.summonT = Math.round((b.enraged ? 8 : 12) * 60 * GAME_SPEED);
+                this.lichAdds(b, (b.enraged ? 6 : 4) + Math.max(0, this.diff - 1)); // Hard +1, Hell +2
+                b.summonT = this.cd((b.enraged ? 8 : 12) * 60 * GAME_SPEED);
             }
             if (b.vortex > 0) {
                 b.vortex--;
@@ -316,7 +316,7 @@ extendGame({
                     const r = 140 + Math.random() * 60;
                     this.particle({ x: b.x + Math.cos(a) * r, y: b.y + Math.sin(a) * r, vx: -Math.cos(a - 0.6) * 4, vy: -Math.sin(a - 0.6) * 4, life: 30, size: 3, color: '#c4b5fd', kind: 'spark', drag: 0.98 });
                 }
-            } else if (b.modeT > 9 * 60 * GAME_SPEED) {
+            } else if (b.modeT > this.cd(9 * 60 * GAME_SPEED)) {
                 b.modeT = 0;
                 b.vortex = 110;
                 this.floater(b.x, b.y - b.size - 14, 'VORTEX!', '#c4b5fd', 20);
@@ -327,7 +327,7 @@ extendGame({
                     k.normalize(d, 0.7);
                 }, { volume: 0.4 });
             }
-            if (b.atkT > (b.enraged ? 80 : 110)) {
+            if (b.atkT > this.cd(b.enraged ? 80 : 110)) {
                 b.atkT = 0;
                 this.bossPose(b);
                 const a = Math.atan2(p.y - b.y, p.x - b.x);
@@ -661,7 +661,7 @@ extendGame({
         const restX = b.x + (m.idx - 1) * 92 + Math.sin(m.t * 0.04 + m.idx) * 10;
         const restY = b.y + 78 - Math.abs(m.idx - 1) * 14 + Math.cos(m.t * 0.05 + m.idx) * 8;
         if (m.mouth > 0) m.mouth--;
-        const period = b.enraged ? 120 : 165;
+        const period = this.cd(b.enraged ? 120 : 165);
         if (m.idx === 2 && m.lunge > 0) {
             // bite: dart towards where the player was, then pull back
             m.lunge--;

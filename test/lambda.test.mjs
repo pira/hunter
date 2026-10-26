@@ -417,6 +417,8 @@ describe('lambda: banking, wheel and meta shop', () => {
         assert.ok(!(await board()).some(s => s.score === 1300));
         assert.equal((await api.call('GET', `/player/${PID}`)).body.runs[0].diff, 3);
         assert.equal((await finishRun(api, 4000, { diff: 2 })).status, 422); // over Hard's ×2 cap
+        assert.equal((await finishRun(api, 5800, { diff: 3, score: 1310 })).status, 200); // Hell pays ×4
+        assert.equal((await finishRun(api, 6200, { diff: 3 })).status, 422);
         res = await finishRun(api, 0, { diff: 2, score: 1250, cls: 'wizard' });
         assert.deepEqual((await board(2)).map(s => s.score), [1250]);
         // the goblin has no mastery: Normal board

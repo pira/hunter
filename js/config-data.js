@@ -251,11 +251,12 @@ const FEED_COST = [500, 900, 1600, 2900, 5200, 9400, 17000, 30000, 55000, 100000
 const MASTERY_COLORS = [null, '#cd7f32', '#d1d5db', '#facc15', '#7dd3fc', '#e879f9'];
 // Difficulty (v3.15): Hard needs Mastery I, Hell Mastery II (U.maxDifficulty). `k` multiplies monster,
 // gatekeeper and boss HP, the damage the level bar needs (so a level has as many kills as on Normal)
-// and every drop: coin/gem/powerup/heart chances, encounter and boss coins, boss gems and egg chance.
+// and every drop: coin/gem/powerup/heart chances, encounter and boss coins, boss gems and egg chance
+// (v3.16: Hell ×4, must match catalog.mjs DIFF_K). The UI never shows the numbers: it's just harder.
 const DIFFICULTIES = [null,
-    { k: 1, name: 'Normal', icon: '⚔️', color: '#e5e7eb' },
-    { k: 2, name: 'Hard', icon: '🔥', color: '#fb923c' },
-    { k: 3, name: 'Hell', icon: '😈', color: '#ef4444' }];
+    { k: 1, name: 'Normal', icon: '⚔️', color: '#e5e7eb', blurb: 'The road as it was made' },
+    { k: 2, name: 'Hard', icon: '🔥', color: '#fb923c', blurb: 'Tougher monsters, meaner bosses, richer loot' },
+    { k: 4, name: 'Hell', icon: '😈', color: '#ef4444', blurb: 'No mercy. The richest loot on the road' }];
 const HATCH_MS = 6 * 3600 * 1000;
 const HURRY_GEMS_PER_HOUR = 1;
 const EGG_ODDS = [80, 16, 3.5, 0.5]; // one kind of egg, bought or dropped by a boss
