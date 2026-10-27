@@ -448,13 +448,18 @@ extendGame({
                     actions += `<button class="buy merge" data-merge="${id}" data-tier="${mergeTier + 1}" ${gems < cost || !online ? 'disabled' : ''}>3→1 ${TIERS[mergeTier + 1].label} · ${GEM}${cost}</button>`;
                 }
             }
-            // v3.17.1: how far each tier is from merging into the next (3 of a kind); full sets have the merge button
-            const progress = mine && best ? [1, 2, 3].filter(t => owned[t - 1] > 0 && owned[t - 1] < 3).map(t => {
-                const n = owned[t - 1];
-                return `<span class="mprog" style="--t:${TIERS[t + 1].color}" title="${n} of 3 ${TIERS[t].label} — ${3 - n} more to merge into a ${TIERS[t + 1].label}">` +
-                    `<span class="mbar">${[0, 1, 2].map(k => `<i class="${k < n ? 'on' : ''}" style="--c:${TIERS[t].color}"></i>`).join('')}</span>` +
-                    `${n}/3 → <b>${TIERS[t + 1].label}</b></span>`;
-            }).join('') : '';
+            // v3.17.2: one bar per pet, in hatches (a basic = 1, rare = 3, legendary = 9, mythic = 27): how many
+            // more it takes to reach the tier above its best (rare → legendary 6 more, legendary → mythic 18 more)
+            let progress = '';
+            if (mine && best && best < 4) {
+                const have = owned.reduce((n, c, i) => n + c * 3 ** i, 0);
+                const need = 3 ** best;
+                const more = Math.max(0, need - have);
+                const next = TIERS[best + 1];
+                progress = `<span class="mprog" style="--t:${next.color}" title="${Math.min(have, need)} of ${need} hatches to a ${next.label} ${def.name}">` +
+                    `<span class="mbar"><i style="width:${Math.min(100, (have / need) * 100).toFixed(1)}%"></i></span>` +
+                    (more ? `${more} more ${more > 1 ? 'hatches' : 'hatch'} → <b>${next.label}</b>` : `merge for <b>${next.label}</b>`) + '</span>';
+            }
             return `<li class="${best ? '' : 'unhatched'}"><span class="ai">${this.petImg(id, best)}</span><span class="an"><b>${def.name}${lv ? ` <em class="plv">Lv ${lv}</em>` : ''}</b><small>${def.what}</small>${pips}<span class="chips">${chips}</span>${progress ? `<span class="mprogs">${progress}</span>` : ''}</span><span class="acts">${actions}</span></li>`;
         }).join('');
 
