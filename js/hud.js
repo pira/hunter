@@ -57,7 +57,7 @@ extendGame({
         const ready = this.superMeter >= 100 && !running && this.state === 'playing';
         let pct = this.superMeter;
         if (this.whirl > 0) pct = (this.whirl / WHIRLWIND_STEPS) * 100;
-        else if (running) pct = this.barrage && this.barrage.left > 0 ? Math.min(100, this.barrage.left * 5) : Math.min(100, (this.bombRain.left / 50) * 100);
+        else if (running) pct = this.barrage && this.barrage.left > 0 ? Math.min(100, this.barrage.left * 5) : Math.min(100, (this.bombRain.left / (this.bombRain.total || 50)) * 100);
         const pr = Math.round(pct);
         if (this.hud.superPct !== pr) {
             this.hud.superPct = pr;

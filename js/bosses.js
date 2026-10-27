@@ -195,6 +195,7 @@ extendGame({
                     m.enc = b.enc;
                     m.spawnT = 40;
                     m.minion = true;
+                    this.quickMinion(m);
                     m.points = 5;
                     this.monsters.push(m);
                 }
@@ -702,6 +703,7 @@ extendGame({
             const m = this.makeMonster({ name: 'Skeleton', family: 'undead', rank: 1, shape: 'skull', color: '#e7e5e4', size: 12, speed: 1.1, speedVariation: 0.3, health: 3, points: 20, tier: 'medium' }, b.x + Math.cos(a) * 70, b.y + Math.sin(a) * 70, 'chase');
             const hp = Math.round(3 * U.hpStep(this.level) * this.diffK);
             Object.assign(m, { lichAdd: b, minion: true, spawnT: 30, enc: b.enc, hp, maxHp: hp });
+            this.quickMinion(m);
             this.monsters.push(m);
         }
         this.ring(b.x, b.y, 90, '#a78bfa', 22);

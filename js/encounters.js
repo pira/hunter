@@ -243,10 +243,20 @@ extendGame({
             const a = (i / n) * TAU + Math.random();
             const m = this.makeMonster(this.pickType(tier), U.clamp(host.x + Math.cos(a) * r, 20, this.W - 20), U.clamp(host.y + Math.sin(a) * r, 30, this.H - 60), 'chase');
             Object.assign(m, { enc: host.enc, minion: true, spawnT: 40, points: 5 });
-            this.monsters.push(m);
+            this.monsters.push(this.quickMinion(m));
         }
         this.ring(host.x, host.y, (host.size || 30) * 2.2, this.diff >= 3 ? '#ef4444' : '#fb923c', 22);
         Sfx.tone(196, { duration: 0.25, type: 'sawtooth', volume: 0.07, slide: -60, bus: 'sfx' });
+    },
+
+    /** Hard/Hell minions are fast and fragile: Normal HP, quicker legs (×1.25 Hard, ×1.4 Hell). Hard should be
+     *  fun, not tedious — speed and reaction over long grinds (v3.16.1). Boss summons, lich guards and Totem
+     *  helpers too. */
+    quickMinion(m) {
+        if (this.diff < 2) return m;
+        m.hp = m.maxHp = Math.max(1, Math.round(m.maxHp / this.diffK));
+        m.speed *= this.diff >= 3 ? 1.4 : 1.25;
+        return m;
     },
 
     encounterWon() {
@@ -475,6 +485,7 @@ extendGame({
                         const k = this.escort('small', m.x + (i % 2 ? 24 : -24) + (i > 1 ? (i - 2.5) * 20 : 0), m.y + 10 + (i > 1 ? 18 : 0));
                         k.totemKid = m;
                         k.spawnT = 20;
+                        this.quickMinion(k);
                     }
                     this.ring(m.x, m.y, 50, '#fde047', 18);
                 }
@@ -484,7 +495,8 @@ extendGame({
                         // heals its little helpers, not the other totem (twin totems were unkillable for slow hitters)
                         if (o === m || o.dead || o.gk || o.enc !== m.enc || o.hp >= o.maxHp) continue;
                         if (U.distanceSquared(o.x, o.y, m.x, m.y) < 170 * 170) {
-                            o.hp = Math.min(o.maxHp, o.hp + Math.max(1, o.maxHp * 0.06));
+                            // Hard/Hell heal ÷2 / ÷4: its helpers are quick now, not a wall to grind through
+                            o.hp = Math.min(o.maxHp, o.hp + Math.max(1, o.maxHp * 0.06) / this.diffK);
                             m.beams.push(o);
                         }
                     }

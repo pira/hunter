@@ -379,11 +379,11 @@ extendGame({
                 k.normalize(d, 0.7);
             }, { volume: 0.4 });
         } else {
-            // Bombardment: 10× a normal throw rains down at random spots over 5 s
-            const bombs = 10 * Math.min(4, 2 + this.stack('cluster'));
+            // Bombardment: 20× a normal throw rains down at random spots over 5 s (v3.16.1: was 10×, the weakest super)
+            const bombs = 20 * Math.min(4, 2 + this.stack('cluster'));
             this.bombRain = this.bombRain && this.bombRain.left > 0
-                ? { ...this.bombRain, left: this.bombRain.left + bombs, every: this.bombRain.every }
-                : { left: bombs, t: 0, every: (5 * 60 * GAME_SPEED) / bombs };
+                ? { ...this.bombRain, left: this.bombRain.left + bombs, total: this.bombRain.left + bombs, every: this.bombRain.every }
+                : { left: bombs, total: bombs, t: 0, every: (5 * 60 * GAME_SPEED) / bombs };
             this.bombRainSting();
         }
     },
