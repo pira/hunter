@@ -5,28 +5,8 @@
 const PET_STEP = 60 * GAME_SPEED; // simulation steps per real second
 const PET_SPOTS = [[-30, 20], [30, 20], [-50, -2], [50, -2]];
 
-/* v3.11: pet pictures (img/pets/<id>_<tier>.webp), one look per rarity: basic is two flat colours,
-   rare adds shading and a trinket, legendary gear and highlights, mythic gold, glow and sparkles. */
-const PET_SPRITE_BASE = (typeof window !== 'undefined' && window.PET_SPRITE_BASE) || 'img/pets/';
-// drawn size in the field (fits w × h, feet on the ground)
-const PET_BOX = { any: [32, 28], bees: [28, 26], eagle: [36, 28], donkey: [34, 30], turtle: [34, 22] };
-const PetSprites = {
-    list: {},
-    load(base = PET_SPRITE_BASE) {
-        if (typeof Image === 'undefined') return;
-        for (const id of Object.keys(PETS)) {
-            for (let t = 1; t <= 4; t++) {
-                const img = new Image();
-                img.onload = () => (this.list[`${id}_${t}`] = img);
-                img.src = `${base}${id}_${t}.webp`;
-            }
-        }
-    },
-    get(id, tier) {
-        return this.list[`${id}_${tier}`] || this.list[`${id}_1`] || null;
-    }
-};
-PetSprites.load();
+/* v3.18: pets are vector rigs in the heroes' style (js/petart.js), one look per rarity: basic plain,
+   rare a blue trinket, legendary gear with gold trim, mythic gold, a crown, a glow and twinkles. */
 
 extendGame({
     /** Build the pets for this run from the cached profile (called from loadArtefacts at run start). */
@@ -153,7 +133,8 @@ extendGame({
             return;
         }
         pool.sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp);
-        pet.act = { m: pool[0], t: 0, sx: pet.x, sy: pet.y };
+        // lx/ly from the start: a target killed before the first swoop step used to send the eagle to NaN (gone for the run)
+        pet.act = { m: pool[0], t: 0, sx: pet.x, sy: pet.y, lx: pool[0].x, ly: pool[0].y };
         pet.cd = 3 * PET_STEP;
         Sfx.tone(1400, { duration: 0.25, type: 'sine', volume: 0.04, slide: -600, bus: 'sfx' });
     },
@@ -233,10 +214,12 @@ extendGame({
 
     // ------------------------------------------------------------------ drawing
 
-    /** A pet's picture for the profile (its tier's look; the emoji if the image is missing). */
+    /** A pet's picture for the profile: its rig at rest, rendered once (the emoji if a canvas can't be had). */
     petImg(id, tier = 1, cls = 'pimg') {
         const def = PETS[id];
-        return `<img class="${cls}" src="${PET_SPRITE_BASE}${id}_${U.clamp(tier || 1, 1, 4)}.webp" alt="${def ? this.petEmoji(def) : ''}" draggable="false">`;
+        const alt = def ? this.petEmoji(def) : '';
+        const url = def ? Game.petIconURL(id, U.clamp(tier || 1, 1, 4)) : '';
+        return url ? `<img class="${cls}" src="${url}" alt="${alt}" draggable="false">` : alt;
     },
 
     petEmoji(def) {
@@ -254,7 +237,6 @@ extendGame({
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         for (const pet of list) {
-            const hop = pet.act ? 0 : Math.abs(Math.sin(pet.t * 0.12)) * (p.moveT > 0 ? 4 : 1.5);
             if (this.petMult > 1) {
                 // boosted: a warm golden glow
                 const g = ctx.createRadialGradient(pet.x, pet.y - 6, 2, pet.x, pet.y - 6, 22);
@@ -275,13 +257,18 @@ extendGame({
                     a.lx = a.m.x;
                     a.ly = a.m.y;
                 }
-                ctx.strokeStyle = '#f472b6';
-                ctx.lineWidth = 4;
+                // an outlined tongue, like the rigs' tubes
+                const mx = pet.x + (p.facing < 0 ? -7 : 7);
+                const my = pet.y + 5;
                 ctx.lineCap = 'round';
-                ctx.beginPath();
-                ctx.moveTo(pet.x, pet.y);
-                ctx.lineTo(pet.x + (a.lx - pet.x) * k, pet.y + (a.ly - pet.y) * k);
-                ctx.stroke();
+                for (const [w, c] of [[5.6, OUTLINE], [3.4, '#f472b6']]) {
+                    ctx.strokeStyle = c;
+                    ctx.lineWidth = w;
+                    ctx.beginPath();
+                    ctx.moveTo(mx, my);
+                    ctx.lineTo(mx + (a.lx - mx) * k, my + (a.ly - my) * k);
+                    ctx.stroke();
+                }
                 ctx.lineCap = 'butt';
             }
             if (pet.id === 'donkey' && pet.act) {
@@ -291,36 +278,21 @@ extendGame({
                 ctx.fillText('💥', pet.act.x, pet.act.y);
                 ctx.globalAlpha = 1;
             }
-            const sp = PetSprites.get(pet.id, pet.tier);
+            // the rig (js/petart.js): walks or hops while the hero moves, the eagle dives, the frog licks,
+            // the donkey kicks, the turtle pulls its head in once its shell is cracked
+            const hide = pet.id === 'turtle' && !(p.greenHp > 0);
+            const act = pet.act ? { eagle: 'dive', frog: 'lick', donkey: 'kick' }[pet.id] || null : null;
+            let face = p.facing < 0 ? -1 : 1;
+            if (act === 'dive' && pet.act.m) face = pet.act.m.x < pet.x ? -1 : 1;
+            if (act === 'kick') face = pet.act.x < pet.x ? 1 : -1; // its back legs kick at the monster
             ctx.save();
-            ctx.translate(pet.x, pet.y - hop + (flying ? -8 : 0));
-            if (pet.id === 'turtle' && !(p.greenHp > 0)) ctx.globalAlpha = 0.45; // hiding in its shell
-            if (sp) {
-                // the art faces right: turn with the hero, lean a little on each hop
-                const box = PET_BOX[pet.id] || PET_BOX.any;
-                const k = Math.min(box[0] / sp.width, box[1] / sp.height);
-                const w = sp.width * k;
-                const h = sp.height * k;
-                if (p.facing < 0) ctx.scale(-1, 1);
-                ctx.rotate(pet.act ? 0 : Math.sin(pet.t * 0.12) * (p.moveT > 0 ? 0.08 : 0.03));
-                ctx.drawImage(sp, -w / 2, 12 - h, w, h);
-            } else {
-                const size = pet.id === 'bees' ? 18 : 24;
-                ctx.font = `${size}px ${EMOJI_FONT}`;
-                ctx.fillStyle = '#000'; // emoji take the fill's alpha: keep it opaque
-                if (pet.id !== 'eagle' && p.facing < 0) ctx.scale(-1, 1);
-                ctx.fillText(pet.id === 'bees' ? '🪺' : this.petEmoji(pet.def), 0, 0);
-            }
+            ctx.translate(pet.x, pet.y + 12);
+            if (face < 0) ctx.scale(-1, 1);
+            if (hide) ctx.globalAlpha = 0.7;
+            Game.drawPetRig(ctx, pet.id, pet.tier, { t: pet.t, walk: p.moveT > 0 ? 1 : 0, ph: pet.t * 0.2, act, k: act === 'kick' ? pet.act.t / 14 : 0, hide }, true);
             ctx.restore();
             ctx.globalAlpha = 1;
             if (pet.id === 'bees') this.drawBees(ctx, pet);
-            // rarity sparkle under rare and better pets
-            if (pet.tier > 1 && pet.t % 30 < 15) {
-                ctx.fillStyle = TIERS[pet.tier].color;
-                ctx.beginPath();
-                ctx.arc(pet.x + 10, pet.y - 12 - hop, 2, 0, TAU);
-                ctx.fill();
-            }
         }
     },
 
@@ -338,17 +310,7 @@ extendGame({
                 x += ((f.lx ?? x) - x) * k + Math.sin(f.t * 1.7) * 3;
                 y += ((f.ly ?? y) - y) * k;
             }
-            ctx.fillStyle = 'rgba(255,255,255,0.7)';
-            ctx.beginPath();
-            ctx.ellipse(x - 1, y - 3, 2.6, 1.6, -0.5, 0, TAU);
-            ctx.ellipse(x + 2, y - 3, 2.6, 1.6, 0.5, 0, TAU);
-            ctx.fill();
-            ctx.fillStyle = '#facc15';
-            ctx.beginPath();
-            ctx.ellipse(x, y, 3.6, 2.6, 0, 0, TAU);
-            ctx.fill();
-            ctx.fillStyle = '#1c1917';
-            ctx.fillRect(x - 0.8, y - 2.4, 1.6, 4.8);
+            Game.drawWorkerBee(ctx, x, y, pet.tier, pet.t + b.a * 9);
         }
     }
 });

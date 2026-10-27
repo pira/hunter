@@ -1,0 +1,47 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Pet lineup</title>
+<!-- Every pet and rarity as the game draws it (js/petart.js), animated, next to the heroes. ?zoom=3 to enlarge,
+     ?walk to see them on the move, ?still for a fixed frame, ?icons for the profile pictures. -->
+<style>body { margin: 0; background: #222; color: #ddd; font: 12px sans-serif; } canvas { display: block; } img { width: 80px; margin: 4px; background: #1e293b; border-radius: 8px; }</style>
+<canvas id="c"></canvas>
+<div id="icons"></div>
+<script>const extendGame = o => Object.assign(window, o); const Game = {};</script>
+<script src="../../config.js"></script>
+<script src="../../game-utils.js"></script>
+<script src="../../js/config-data.js"></script>
+<script src="../../js/gfx.js"></script>
+<script src="../../js/sprites.js"></script>
+<script src="../../js/petart.js"></script>
+<script>
+const q = new URLSearchParams(location.search);
+const zoom = Number(q.get('zoom') || 2.5);
+const ids = Object.keys(PETS);
+const cellW = 46 * zoom, cellH = 40 * zoom;
+const W = 120 * zoom + cellW * 4, H = 20 + cellH * ids.length;
+const cv = document.getElementById('c');
+const dpr = window.devicePixelRatio || 1;
+cv.width = W * dpr; cv.height = H * dpr; cv.style.width = W + 'px'; cv.style.height = H + 'px';
+const ctx = cv.getContext('2d');
+let t = 40;
+function frame() {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = '#7cc56b'; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#d9b77e'; ctx.fillRect(120 * zoom + cellW * 2, 0, cellW * 2, H);
+    ['wizard', 'barbarian', 'goblin'].forEach((c, i) => {
+        ctx.save(); ctx.translate(40 * zoom, 40 + (i + 0.8) * cellH * 1.6); ctx.scale(zoom, zoom);
+        Game.drawCharacter(ctx, c, PALETTES[c], q.has('walk') ? Math.floor(t / 8) % 4 : 0, { tier: 2 }); ctx.restore();
+    });
+    ids.forEach((id, row) => [1, 2, 3, 4].forEach(tier => {
+        ctx.save();
+        ctx.translate(120 * zoom + cellW * (tier - 0.5), 14 + cellH * (row + 0.85));
+        ctx.scale(zoom, zoom);
+        Game.drawPetRig(ctx, id, tier, { t, walk: q.has('walk') ? 1 : 0, ph: t * 0.2, face: 1, act: null }, true);
+        ctx.restore();
+    }));
+    if (!q.has('still')) { t++; requestAnimationFrame(frame); }
+}
+frame();
+if (q.has('icons')) document.getElementById('icons').innerHTML = ids.map(id => [1, 2, 3, 4].map(tr => `<img src="${Game.petIconURL(id, tr)}">`).join('')).join('<br>');
+document.title = 'Pet lineup ready';
+</script>
