@@ -413,7 +413,8 @@ describe('lambda: banking, wheel and meta shop', () => {
         assert.equal(res.body.diff, 3);
         assert.deepEqual(res.body.scores.map(s => s.score), [1300]); // the Hell board
         assert.equal(res.body.rank, 1);
-        assert.deepEqual((await board(3)).map(s => [s.score, s.diff, s.mastery]), [[1300, 3, 2]]);
+        // the Hell board shows Hell mastery (none yet: the run reached level 5)
+        assert.deepEqual((await board(3)).map(s => [s.score, s.diff, s.mastery]), [[1300, 3, undefined]]);
         assert.ok(!(await board()).some(s => s.score === 1300));
         assert.equal((await api.call('GET', `/player/${PID}`)).body.runs[0].diff, 3);
         assert.equal((await finishRun(api, 4000, { diff: 2 })).status, 422); // over Hard's ×2 cap
@@ -426,6 +427,33 @@ describe('lambda: banking, wheel and meta shop', () => {
         assert.equal(res.body.diff, 1);
         assert.ok((await board()).some(s => s.score === 1100));
         assert.equal((await t.call('GET', '/scores', undefined, '1.2.3.4', { board: 'v3', diff: '__proto__' })).status, 200);
+    });
+
+    it('keeps mastery per difficulty: a run counts for its own and every easier one (v3.17)', async () => {
+        const api = rigged();
+        const long = async extra => {
+            const token = (await api.call('POST', '/run')).body.token;
+            api.advance(400_000);
+            return api.call('POST', '/scores', { ...run({ level: 21, bosses: 4, score: 9000, duration: 390 }), board: 'v3', cls: 'wizard', coins: 0, token, playerId: PID, secret: SECRET, ...extra });
+        };
+        await finishRun(api, 0, { level: 11, bosses: 2, score: 3000 }); // Normal Mastery I: Hard unlocked
+        let res = await long({ diff: 2, score: 9100 }); // Hard to level 21
+        assert.equal(res.status, 200);
+        let p = res.body.player;
+        assert.deepEqual([p.classBest.wizard, p.classBestHard.wizard, p.classBestHell.wizard], [21, 21, undefined]);
+        assert.equal(res.body.scores.find(s => s.score === 9100).mastery, 2); // Hard Mastery II on the Hard board
+        res = await finishRun(api, 0, { diff: 3, score: 1400 }); // Hell is unlocked now (Normal Mastery II)
+        assert.equal(res.body.diff, 3);
+        p = res.body.player;
+        assert.deepEqual([p.classBest.wizard, p.classBestHard.wizard, p.classBestHell.wizard], [21, 21, 5]);
+        assert.equal(res.body.scores.find(s => s.score === 1400).mastery, undefined);
+        // profiles from before v3.17: Hard/Hell mastery comes from the run history
+        const m = t.db.get(`player#${PID}`, 'meta');
+        delete m.classBestHard;
+        delete m.classBestHell;
+        await t.db.send('Put', { Item: m });
+        p = (await api.call('GET', `/player/${PID}`)).body.player;
+        assert.deepEqual([p.classBestHard, p.classBestHell], [{ wizard: 21 }, { wizard: 5 }]);
     });
 
     it('works out mastery for profiles from before v3.7 from their run history', async () => {

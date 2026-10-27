@@ -149,9 +149,9 @@ extendGame({
     showGameOver() {
         this.state = 'gameover';
         this.clearSavedRun();
-        this.noteClassBest(this.cls, this.reachedLevel());
-        const tierNow = U.masteryTier(this.classBest(this.cls));
-        if (tierNow > (this.runMasteryTier || 0)) this.masteryUp = { cls: this.cls, tier: tierNow };
+        this.noteClassBest(this.cls, this.reachedLevel(), this.diff || 1);
+        const tierNow = U.masteryTier(this.classBest(this.cls, this.diff || 1));
+        if (tierNow > (this.runMasteryTier || 0)) this.masteryUp = { cls: this.cls, tier: tierNow, diff: this.diff || 1 };
         this.releaseWakeLock();
         Sfx.setActive(false);
         this.timeScale = 1;
@@ -199,7 +199,10 @@ extendGame({
         if (this.diff > 1) stats.push(['Difficulty', `${DIFFICULTIES[this.diff].icon} ${DIFFICULTIES[this.diff].name}`]);
         this.dressPlayButton(this.el.againBtn, this.pickedDiff(this.cls), ['', '↻ PLAY AGAIN', '🔥 HARD AGAIN', '😈 BACK TO HELL']);
         if (this.gems > 0) stats.push(['Gems', `${GEM} ${this.gems}`]);
-        if (this.masteryUp && this.masteryUp.cls === this.cls) stats.push(['Mastery', `${this.masteryBadge(this.masteryUp.tier)} new!`]);
+        if (this.masteryUp && this.masteryUp.cls === this.cls) {
+            const D = DIFFICULTIES[this.masteryUp.diff] || DIFFICULTIES[1];
+            stats.push([D.k > 1 ? `${D.name} mastery` : 'Mastery', `${this.masteryBadge(this.masteryUp.tier)} new!`]);
+        }
         this.masteryUp = null;
         if (this.eggCards + this.bossEggs > 0) stats.push(['Eggs', '🥚'.repeat(Math.min(6, this.eggCards + this.bossEggs))]);
         this.el.finalStats.innerHTML = stats.map(([k2, v]) => `<div><span>${k2}</span><b>${v}</b></div>`).join('');
@@ -271,7 +274,7 @@ extendGame({
         $('bsTrophies').innerHTML = (r && (r.coins || r.gems || r.eggs)
             ? `👑 Road trophies back: <b>${COIN} ${r.coins}</b>${r.gems ? ` · <b>${GEM} ${r.gems}</b>` : ''}${r.eggs ? ` · <b>🥚 ${r.eggs}</b>` : ''}`
             : '✨ The road kept nothing — perfect collecting!') +
-            (k.mastery ? `<br>${this.masteryBadge(k.mastery)} <b>${CLASSES[this.cls].name} Mastery ${Game.roman(k.mastery)}</b> — next hunt: ${this.masteryText(this.level + 1)}` : '');
+            (k.mastery ? `<br>${this.masteryBadge(k.mastery)} <b>${CLASSES[this.cls].name} ${k.masteryDiff > 1 ? `${DIFFICULTIES[k.masteryDiff].name} ` : ''}Mastery ${Game.roman(k.mastery)}</b> — next ${k.masteryDiff > 1 ? `${DIFFICULTIES[k.masteryDiff].name} ` : ''}hunt: ${this.masteryText(this.level + 1)}` : '');
         const hearts = d('hearts');
         const green = d('green');
         const stats = [

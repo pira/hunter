@@ -253,6 +253,8 @@ const MASTERY_COLORS = [null, '#cd7f32', '#d1d5db', '#facc15', '#7dd3fc', '#e879
 // gatekeeper and boss HP, the damage the level bar needs (so a level has as many kills as on Normal)
 // and every drop: coin/gem/powerup/heart chances, encounter and boss coins, boss gems and egg chance
 // (v3.16: Hell ×4, must match catalog.mjs DIFF_K). The UI never shows the numbers: it's just harder.
+// Mastery per difficulty (v3.17): profile field and this device's localStorage key. Server: DIFF_BEST.
+const MASTERY_KEYS = [null, ['classBest', 'hunter.classBest'], ['classBestHard', 'hunter.classBest.hard'], ['classBestHell', 'hunter.classBest.hell']];
 const DIFFICULTIES = [null,
     { k: 1, name: 'Normal', icon: '⚔️', color: '#e5e7eb', blurb: 'The road as it was made' },
     { k: 2, name: 'Hard', icon: '🔥', color: '#fb923c', blurb: 'Tougher monsters, meaner bosses, richer loot' },

@@ -129,13 +129,20 @@ extendGame({
     /** The boss of a tenth level fell: that counts as reaching the next level (a new mastery tier). */
     masteryCheck(b) {
         if (!b.boss.big || this.level % 10 !== 0) return;
-        const before = U.masteryTier(this.classBest(this.cls));
-        this.noteClassBest(this.cls, this.level + 1);
+        // mastery of this run's difficulty (and every easier one: a Hell run counts for Hard and Normal too)
+        const d = this.diff || 1;
+        const before = U.masteryTier(this.classBest(this.cls, d));
+        const normalBefore = U.masteryTier(this.classBest(this.cls));
+        this.noteClassBest(this.cls, this.level + 1, d);
         const tier = U.masteryTier(this.level + 1);
         if (tier > before) {
             this.bossKill.mastery = tier;
-            const unlock = DIFFICULTIES[tier + 1];
-            this.banner(`${CLASSES[this.cls].name.toUpperCase()} MASTERY ${Game.roman(tier)}!`, `next hunt: ${this.masteryText(this.level + 1)}${unlock ? ` · ${unlock.icon} ${unlock.name} unlocked` : ''}`, 'super');
+            this.bossKill.masteryDiff = d;
+            const D = DIFFICULTIES[d];
+            const normalNow = U.masteryTier(this.classBest(this.cls));
+            const unlock = normalNow > normalBefore ? DIFFICULTIES[normalNow + 1] : null;
+            this.banner(`${CLASSES[this.cls].name.toUpperCase()} ${d > 1 ? `${D.name.toUpperCase()} ` : ''}MASTERY ${Game.roman(tier)}!`,
+                `next ${d > 1 ? `${D.name} ` : ''}hunt: ${this.masteryText(this.level + 1)}${unlock ? ` · ${unlock.icon} ${unlock.name} unlocked` : ''}`, 'super');
             Sfx.arpeggio([523, 659, 784, 1046, 1318], 0.07, { type: 'triangle', volume: 0.13 });
         }
     },

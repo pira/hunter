@@ -42,6 +42,8 @@ export const BOARD = 'board#v2';
 export const BOARD_V3 = 'board#v3';
 // v3.15: Hard and Hell runs have boards of their own
 export const DIFF_BOARDS = { 2: 'board#v3#hard', 3: 'board#v3#hell' };
+// v3.17: class mastery is kept per difficulty (a run counts for its difficulty and every easier one)
+export const DIFF_BEST = { 1: 'classBest', 2: 'classBestHard', 3: 'classBestHell' };
 export const CLASSES = ['wizard', 'barbarian', 'goblin'];
 export const MIN_LEVEL_SECONDS = 12; // no level (fight + encounter + travel) is faster than this
 export const MAX_SCORE = 50_000_000;
@@ -50,7 +52,7 @@ export const MAX_TOKEN_MS = 7 * 24 * 3600 * 1000; // a run may be paused (and sa
 export const SUBMITS_PER_MINUTE = 6;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const SECRET_RE = /^[A-Za-z0-9_-]{32,128}$/;
-const PUBLIC_META = ['name', 'bestScore', 'bestLevel', 'runs', 'kills', 'bosses', 'playSeconds', 'createdAt', 'updatedAt', 'gold', 'gems', 'pets', 'petSlots', 'petSlotCount', 'eggs', 'nests', 'nestCount', 'artRefund', 'icon', 'skins', 'equipped', 'classBest', 'petLevels'];
+const PUBLIC_META = ['name', 'bestScore', 'bestLevel', 'runs', 'kills', 'bosses', 'playSeconds', 'createdAt', 'updatedAt', 'gold', 'gems', 'pets', 'petSlots', 'petSlotCount', 'eggs', 'nests', 'nestCount', 'artRefund', 'icon', 'skins', 'equipped', 'classBest', 'classBestHard', 'classBestHell', 'petLevels'];
 const POT_RE = /^[A-Za-z0-9_-]{6,40}$/;
 const POT_TTL = 24 * 3600;
 
@@ -126,7 +128,7 @@ export function upgradeMeta(meta) {
     m.nestCount = Math.max(NESTS, m.nestCount || 0);
     m.petLevels = { ...(m.petLevels || {}) };
     // best level per class (mastery); profiles from before v3.7 get it from their run history
-    if (m.classBest) m.classBest = { ...m.classBest };
+    for (const k of Object.values(DIFF_BEST)) if (m[k]) m[k] = { ...m[k] };
     if (m.icon === undefined) m.icon = null;
     m.version = m.version || 0;
     return m;
@@ -238,29 +240,35 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
     }
 
     /** Best level per class from a player's whole run history (profiles from before v3.7). */
+    /** Best level per class and difficulty from the run history: { classBest, classBestHard, classBestHell }. */
     async function historyClassBest(pid) {
-        const best = {};
+        const best = { 1: {}, 2: {}, 3: {} };
         let ExclusiveStartKey;
         let pages = 0;
         do {
             const out = await send('Query', {
                 KeyConditionExpression: 'pk = :pk AND begins_with(sk, :run)',
                 ExpressionAttributeValues: { ':pk': `player#${pid}`, ':run': 'run#' },
-                ProjectionExpression: 'cls, #l, bosses', ExpressionAttributeNames: { '#l': 'level' },
+                ProjectionExpression: 'cls, #l, bosses, #d', ExpressionAttributeNames: { '#l': 'level', '#d': 'diff' },
                 Limit: 500, ExclusiveStartKey
             });
             for (const r of out.Items || []) {
                 const lvl = reachedLevel(r.level, r.bosses);
-                if (CLASSES.includes(r.cls) && lvl > (best[r.cls] || 0)) best[r.cls] = lvl;
+                if (!CLASSES.includes(r.cls)) continue;
+                for (let d = 1; d <= (DIFF_BEST[r.diff] ? r.diff : 1); d++) if (lvl > (best[d][r.cls] || 0)) best[d][r.cls] = lvl;
             }
             ExclusiveStartKey = out.LastEvaluatedKey;
         } while (ExclusiveStartKey && ++pages < 40);
-        return best;
+        return Object.fromEntries(Object.entries(DIFF_BEST).map(([d, k]) => [k, best[d]]));
     }
 
+    /** Fills in the mastery maps a profile doesn't have yet (pre-v3.7: none; pre-v3.17: Hard/Hell). */
     async function withClassBest(pid, meta) {
-        if (!meta || meta.classBest) return meta;
-        return { ...meta, classBest: await historyClassBest(pid) };
+        if (!meta || Object.values(DIFF_BEST).every(k => meta[k])) return meta;
+        const hist = await historyClassBest(pid);
+        const out = { ...meta };
+        for (const k of Object.values(DIFF_BEST)) if (!out[k]) out[k] = hist[k];
+        return out;
     }
 
     async function getMeta(pid) {
@@ -370,11 +378,14 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
         // the class mastery badge, including what this run just earned
         let mastery = 0;
         if (pid && run.cls) {
-            const best = Math.max((meta && meta.classBest && meta.classBest[run.cls]) || 0, reachedLevel(run.level, run.bosses));
-            mastery = masteryTier(best);
-            // Hard/Hell only when the class's mastery allows it (the caps above trust the claim); otherwise
-            // the run is kept as a Normal one
+            const reached = reachedLevel(run.level, run.bosses);
+            const best = Math.max((meta && meta.classBest && meta.classBest[run.cls]) || 0, reached);
+            // Hard/Hell only when the class's (Normal) mastery allows it (the caps above trust the claim);
+            // otherwise the run is kept as a Normal one
             if (run.diff > maxDifficulty(best)) delete run.diff;
+            // the badge is the mastery of the board's own difficulty (v3.17)
+            const key = DIFF_BEST[run.diff || 1];
+            mastery = masteryTier(Math.max((meta && meta[key] && meta[key][run.cls]) || 0, reached));
         } else delete run.diff;
 
         const ts = now();
@@ -432,8 +443,11 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
             next.playSeconds += run.duration;
             next.bestScore = Math.max(next.bestScore || 0, run.score);
             next.bestLevel = Math.max(next.bestLevel || 0, run.level);
-            next.classBest = { ...(next.classBest || {}) };
-            if (run.cls) next.classBest[run.cls] = Math.max(next.classBest[run.cls] || 0, reachedLevel(run.level, run.bosses));
+            // mastery per difficulty: a run counts for its own difficulty and every easier one
+            for (const [d, k] of Object.entries(DIFF_BEST)) {
+                next[k] = { ...(next[k] || {}) };
+                if (run.cls && Number(d) <= (run.diff || 1)) next[k][run.cls] = Math.max(next[k][run.cls] || 0, reachedLevel(run.level, run.bosses));
+            }
             next.version = (meta ? meta.version || 0 : 0) + 1;
             // Unspent gold is banked 100% at death (D5); the pot lets it ride on the wheel.
             next.gold += unspent;
@@ -468,7 +482,7 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
     function newMeta(pid, secret, ts) {
         return {
             pk: `player#${pid}`, sk: 'meta', secretHash: sha256(secret), createdAt: ts, runs: 0, kills: 0, bosses: 0, playSeconds: 0,
-            bestScore: 0, bestLevel: 0, gold: 0, gems: 0, pets: {}, petSlots: [], petSlotCount: 1, eggs: 0, nests: [], nestCount: NESTS, icon: null, skins: {}, equipped: {}, classBest: {}, petLevels: {}, version: 0
+            bestScore: 0, bestLevel: 0, gold: 0, gems: 0, pets: {}, petSlots: [], petSlotCount: 1, eggs: 0, nests: [], nestCount: NESTS, icon: null, skins: {}, equipped: {}, classBest: {}, classBestHard: {}, classBestHell: {}, petLevels: {}, version: 0
         };
     }
 

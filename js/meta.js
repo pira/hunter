@@ -9,32 +9,40 @@ extendGame({
         const perk = this.skin && skinPerk(this.skin);
         if (perk) for (const [k, v] of Object.entries(perk.bonus)) bonus[k] = (bonus[k] || 0) + v;
         this.artefacts = { mult: key => 1 + (bonus[key] || 0) };
-        // class mastery: how far this class has got (decides which early levels run faster)
-        this.masteryBest = this.fastLaneOn() ? this.classBest(this.cls) : 0;
+        // class mastery on this run's difficulty: how far this class has got there (decides which early
+        // levels run faster — Normal mastery doesn't speed up Hard or Hell, v3.17)
+        this.masteryBest = this.fastLaneOn() ? this.classBest(this.cls, this.diff) : 0;
+        this.runMasteryTier = U.masteryTier(this.classBest(this.cls, this.diff)); // to tell a new tier at game over
         if (this.loadPets) this.loadPets();
     },
 
     // ------------------------------------------------------------------ class mastery (v3.7)
 
-    /** Best level reached with a class: the server's (from checked runs) or this device's, whichever is higher. */
-    classBest(cls) {
+    /** Best level reached with a class on a difficulty (1 Normal, 2 Hard, 3 Hell; v3.17 keeps them apart):
+     *  the server's (from checked runs) or this device's, whichever is higher. */
+    classBest(cls, diff = 1) {
+        const [field, key] = MASTERY_KEYS[diff] || MASTERY_KEYS[1];
         const cache = Leaderboard.cachedProfile() || {};
         let local = {};
         try {
-            local = JSON.parse(localStorage.getItem('hunter.classBest')) || {};
+            local = JSON.parse(localStorage.getItem(key)) || {};
         } catch (e) { /* storage unavailable */ }
-        return Math.max(((cache.classBest || {})[cls]) || 0, local[cls] || 0);
+        return Math.max(((cache[field] || {})[cls]) || 0, local[cls] || 0);
     },
 
-    /** Remember the level a run reached (the server keeps its own count from submitted runs). */
-    noteClassBest(cls, level) {
-        try {
-            const local = JSON.parse(localStorage.getItem('hunter.classBest')) || {};
-            if (level > (local[cls] || 0)) {
-                local[cls] = level;
-                localStorage.setItem('hunter.classBest', JSON.stringify(local));
-            }
-        } catch (e) { /* storage unavailable */ }
+    /** Remember the level a run reached (the server keeps its own count from submitted runs). A run counts
+     *  for its own difficulty and every easier one. */
+    noteClassBest(cls, level, diff = 1) {
+        for (let d = 1; d <= diff; d++) {
+            const key = (MASTERY_KEYS[d] || MASTERY_KEYS[1])[1];
+            try {
+                const local = JSON.parse(localStorage.getItem(key)) || {};
+                if (level > (local[cls] || 0)) {
+                    local[cls] = level;
+                    localStorage.setItem(key, JSON.stringify(local));
+                }
+            } catch (e) { /* storage unavailable */ }
+        }
     },
 
     fastLaneOn() {
@@ -58,17 +66,24 @@ extendGame({
         return parts.length ? `levels ${parts.map(p => `${p.from}–${p.to} ×${p.k}`).join(', ')}` : '';
     },
 
-    /** The class card's mastery line: what is mastered, the fast-lane switch, and the next goal. */
+    /** The class card's mastery line for the difficulty picked: what is mastered there, the fast-lane
+     *  switch, and the next goal (each difficulty has its own mastery, v3.17). */
     masteryLine(cls) {
-        const best = this.classBest(cls);
+        const name = CLASSES[cls].name;
+        if (!U.masteryTier(this.classBest(cls))) return `<br><span class="mline">🏅 Beat the level 10 boss as ${name}: levels 1–10 run twice as fast and 🔥 Hard unlocks</span>`;
+        const d = this.pickedDiff(cls);
+        const D = DIFFICULTIES[d];
+        const on = D.k > 1 ? `${D.icon} ${D.name} ` : '';
+        const best = this.classBest(cls, d);
         const tier = U.masteryTier(best);
         const next = 10 * (tier + 1);
-        const name = CLASSES[cls].name;
-        if (!tier) return `<br><span class="mline">🏅 Beat the level ${next} boss as ${name}: levels 1–10 run twice as fast and 🔥 Hard unlocks</span>`;
-        const on = this.fastLaneOn();
-        return `<br><span class="mline">${this.masteryBadge(tier)} <b>Mastery ${Game.roman(tier)}</b> · ${this.masteryText(best)}` +
-            ` <button class="lane ${on ? 'on' : ''}" data-lane="1" title="Fast lane: mastered levels fill their bar faster">⚡ ${on ? 'ON' : 'OFF'}</button>` +
-            `<small>next: beat the level ${next} boss${tier < 2 ? ' (unlocks 😈 Hell)' : ''}</small></span>` + this.diffLine(cls);
+        const where = d > 1 ? ` on ${D.name}` : '';
+        const unlock = d === 1 && tier < 2 ? ' (unlocks 😈 Hell)' : '';
+        if (!tier) return `<br><span class="mline">🏅 <b>${on}Mastery</b> · beat the level ${next} boss${where}: its levels 1–10 run twice as fast</span>` + this.diffLine(cls);
+        const lane = this.fastLaneOn();
+        return `<br><span class="mline">${this.masteryBadge(tier)} <b>${on}Mastery ${Game.roman(tier)}</b> · ${this.masteryText(best)}` +
+            ` <button class="lane ${lane ? 'on' : ''}" data-lane="1" title="Fast lane: mastered levels fill their bar faster">⚡ ${lane ? 'ON' : 'OFF'}</button>` +
+            `<small>next: beat the level ${next} boss${where}${unlock}</small></span>` + this.diffLine(cls);
     },
 
     masteryBadge(tier) {
