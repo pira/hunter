@@ -71,7 +71,8 @@ extendGame({
             dir: Math.PI / 2 + (Math.random() - 0.5) * 1.6,
             dirT: 0, dirRate: 100 + Math.random() * 100,
             healT: 0, spawnT: 75, flash: 0, contactCd: 0,
-            phase: Math.random() * TAU, dead: false
+            phase: Math.random() * TAU, dead: false,
+            ...(this.memeMode ? this.memeLook(type) : {})
         };
     },
 

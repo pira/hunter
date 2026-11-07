@@ -14,6 +14,16 @@ const MEME_FONT = '"Comic Sans MS", "Comic Sans", "Chalkboard SE", cursive';
 // where the shades sit, relative to the hero's feet (rig units, before scale)
 const MEME_SHADES_Y = { wizard: 34, barbarian: 34, goblin: 31 };
 const MEME_SHADES_X = 1;
+// Meme mode turns about a third of the regular monsters into emoji memes (by family).
+const MEME_MOBS = {
+    beasts: { e: '🐶', name: 'Doge' },
+    bugs: { e: '🐸', name: 'Meme Frog' },
+    undead: { e: '💀', name: 'Skull Emoji' },
+    fantasy: { e: '🗿', name: 'Moai' },
+    bandits: { e: '🤡', name: 'Clown' }
+};
+const MEME_MOB_CHANCE = 0.35;
+const RICK_LINES = ['GET ROLLED!', 'ROLL OUT!', 'YOU JUST GOT ROLLED', 'ROLLIN\' ROLLIN\''];
 const CODE_LOCAL = new Set(['meme']); // codes that work without the server
 
 extendGame({
@@ -122,7 +132,11 @@ extendGame({
     },
 
     memeKill(m) {
-        if (m.boss) {
+        if (m.ai === 'rickroll') {
+            this.memeFloater(m.x, m.y - m.size - 60, 'YOU ROLLED THE ROLL', 30);
+            this.spark(m.x, m.y, '#fbbf24', 12);
+            this.airhorn();
+        } else if (m.boss) {
             this.memeFloater(m.x, m.y - m.size - 60, 'GG EZ', 40);
             this.airhorn();
         } else if (Math.random() < (m.gk ? 1 : 0.18)) {
@@ -130,9 +144,9 @@ extendGame({
         }
     },
 
-    memeHurt() {
+    memeHurt(source) {
         const p = this.player;
-        this.memeFloater(p.x, p.y - 58, this.memePick(MEME_HURT), 24);
+        this.memeFloater(p.x, p.y - 58, this.memePick(source && source.ai === 'rickroll' ? RICK_LINES : MEME_HURT), 24);
         // a sad trombone, more or less
         [392, 370, 349, 294].forEach((f, i) => Sfx.tone(f, { duration: i === 3 ? 0.45 : 0.18, delay: i * 0.18, type: 'sawtooth', volume: 0.05 }));
     },
@@ -147,6 +161,146 @@ extendGame({
             const delay = i * 0.16;
             const duration = i === 2 ? 0.5 : 0.12;
             [466, 470, 587].forEach(f => Sfx.tone(f, { duration, delay, type: 'sawtooth', volume: 0.05 }));
+        }
+    },
+
+    // ------------------------------------------------------------------ meme monsters
+
+    /** Extra fields for a new monster in meme mode: an emoji look and a meme name (or nothing). */
+    memeLook(type) {
+        const look = type && type.family && type.rank <= 3 && MEME_MOBS[type.family];
+        if (!look || Math.random() >= MEME_MOB_CHANCE) return {};
+        return { meme: look.e, name: look.name };
+    },
+
+    /** Emoji drawn once per kind into a small canvas, then blitted (fillText of emoji every frame is slow). */
+    memeEmojiCanvas(e) {
+        this.memeEmoji = this.memeEmoji || new Map();
+        let cv = this.memeEmoji.get(e);
+        if (!cv) {
+            cv = document.createElement('canvas');
+            cv.width = cv.height = 72;
+            const g = cv.getContext('2d');
+            g.font = '58px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
+            g.textAlign = 'center';
+            g.textBaseline = 'middle';
+            g.fillText(e, 36, 40);
+            this.memeEmoji.set(e, cv);
+        }
+        return cv;
+    },
+
+    drawMemeEmoji(ctx, e, x, y, size) {
+        ctx.drawImage(this.memeEmojiCanvas(e), x - size / 2, y - size / 2, size, size);
+    },
+
+    drawMemeMob(ctx, m) {
+        const s = m.size * 2.3;
+        const bob = Math.sin(m.phase) * m.size * 0.08;
+        const lean = Math.sin(m.phase * 0.5) * 0.12;
+        ctx.save();
+        ctx.translate(m.x, m.y + bob);
+        ctx.rotate(lean);
+        if (m.spawnT > 0) ctx.globalAlpha = U.clamp(1 - m.spawnT / 75, 0.2, 1);
+        this.drawMemeEmoji(ctx, m.meme, 0, 0, s);
+        if (m.flash > 0) {
+            ctx.globalAlpha = 0.55;
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(0, 0, m.size * 1.05, 0, TAU);
+            ctx.fill();
+        }
+        ctx.restore();
+        if (m.poison > 0 || m.stun > 0 || m.iced) {
+            ctx.globalAlpha = 0.4;
+            ctx.fillStyle = m.stun > 0 ? '#fde047' : m.iced ? '#7dd3fc' : '#84cc16';
+            ctx.beginPath();
+            ctx.arc(m.x, m.y, m.size, 0, TAU);
+            ctx.fill();
+            ctx.globalAlpha = 1;
+        }
+    },
+
+    // ------------------------------------------------------------------ the Rick Roll (meme mode, end of level 1)
+
+    startRickRoll() {
+        const def = GATEKEEPERS.rickroll;
+        this.banner(`⚠ ${def.name.toUpperCase()} ⚠`, def.title, 'danger meme');
+        this.makeGatekeeper('rickroll', this.W / 2, -50, { mode: 'enter', t: 0, dir: Math.PI / 2, spin: 0 });
+        this.airhorn();
+    },
+
+    /** After every roll it stops, dizzy, and sings: a ring of music notes. */
+    rickNotes(m) {
+        const n = 8;
+        const off = Math.random() * TAU;
+        for (let i = 0; i < n; i++) this.enemyShot(m.x, m.y, off + (i * TAU) / n, 2.2, 'note', 6);
+        if (Math.random() < 0.6) this.memeFloater(m.x, m.y - m.size - 30, this.memePick(RICK_LINES), 20);
+        [523, 659, 784].forEach((f, i) => Sfx.tone(f, { duration: 0.1, delay: i * 0.09, type: 'square', volume: 0.05 }));
+    },
+
+    /** A giant bread roll in shades with a microphone. Drawn at the origin (the caller translates). */
+    drawRickRoll(ctx, m) {
+        const s = m.size;
+        const rolling = m.mode === 'charge';
+        m.spin = (m.spin || 0) + (rolling ? 0.35 : 0);
+        const dance = rolling ? 0 : Math.sin((m.t || 0) * 0.25) * 0.18;
+        ctx.save();
+        ctx.rotate(rolling ? m.spin : dance);
+        ctx.lineJoin = 'round';
+        // the roll: a fat golden loaf with a darker crust and three scores
+        const g = ctx.createRadialGradient(-s * 0.3, -s * 0.4, s * 0.2, 0, 0, s * 1.2);
+        g.addColorStop(0, m.flash > 0 ? '#ffffff' : '#fde68a');
+        g.addColorStop(0.6, m.flash > 0 ? '#ffffff' : '#f59e0b');
+        g.addColorStop(1, m.flash > 0 ? '#ffffff' : '#b45309');
+        ctx.fillStyle = g;
+        ctx.strokeStyle = '#451a03';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, s * 1.15, s * 0.85, 0, 0, TAU);
+        ctx.fill();
+        ctx.stroke();
+        ctx.strokeStyle = '#92400e';
+        ctx.lineWidth = 2.5;
+        ctx.lineCap = 'round';
+        for (let i = -1; i <= 1; i++) {
+            ctx.beginPath();
+            ctx.moveTo(i * s * 0.42 - s * 0.12, -s * 0.72);
+            ctx.quadraticCurveTo(i * s * 0.42 + s * 0.05, -s * 0.55, i * s * 0.42 + s * 0.12, -s * 0.38);
+            ctx.stroke();
+        }
+        // shades
+        ctx.fillStyle = '#0f172a';
+        ctx.beginPath();
+        ctx.roundRect(-s * 0.72, -s * 0.2, s * 0.62, s * 0.34, s * 0.1);
+        ctx.roundRect(s * 0.1, -s * 0.2, s * 0.62, s * 0.34, s * 0.1);
+        ctx.fill();
+        ctx.fillRect(-s * 0.12, -s * 0.15, s * 0.24, s * 0.08);
+        ctx.fillStyle = 'rgba(255,255,255,0.7)';
+        ctx.fillRect(-s * 0.6, -s * 0.14, s * 0.14, s * 0.07);
+        ctx.fillRect(s * 0.22, -s * 0.14, s * 0.14, s * 0.07);
+        // a big grin
+        ctx.strokeStyle = '#451a03';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.arc(0, s * 0.28, s * 0.32, 0.15 * Math.PI, 0.85 * Math.PI);
+        ctx.stroke();
+        // the microphone in a little hand
+        ctx.translate(s * 1.05, s * 0.25);
+        ctx.rotate(-0.5 + dance);
+        ctx.fillStyle = '#334155';
+        ctx.fillRect(-s * 0.07, -s * 0.05, s * 0.14, s * 0.5);
+        ctx.fillStyle = '#cbd5e1';
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(0, -s * 0.12, s * 0.17, 0, TAU);
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+        // when it stops, notes float up from it
+        if (!rolling && (m.t || 0) % 24 === 0 && this.particle && this.state === 'playing') {
+            this.particle({ x: (m.x || 0) + (Math.random() - 0.5) * s, y: (m.y || 0) - s, vx: (Math.random() - 0.5) * 0.6, vy: -0.8, life: 40, size: 3, color: this.memePick(MEME_COLORS), kind: 'spark' });
         }
     },
 

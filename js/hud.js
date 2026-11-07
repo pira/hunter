@@ -170,7 +170,12 @@ extendGame({
         const size = killer.boss ? killer.boss.size : killer.size;
         const k = Math.min(2.2, 30 / size);
         icon.scale(k, k);
-        if (killer.boss) {
+        if (killer.meme) {
+            this.drawMemeEmoji(icon, killer.meme, 0, -size * 0.2, size * 2.2);
+        } else if (killer.ai === 'rickroll') {
+            icon.translate(0, -size * 0.8);
+            this.drawRickRoll(icon, { ...killer, flash: 0, t: 0, mode: 'aim' });
+        } else if (killer.boss) {
             const fake = { ...killer, x: 0, y: 0, mode: 'fight', flash: 0 };
             const save = this.player;
             this.player = { x: 0, y: 80 };

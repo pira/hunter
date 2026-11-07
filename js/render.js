@@ -518,6 +518,7 @@ extendGame({
     },
 
     drawMonster(ctx, m) {
+        if (m.meme) return this.drawMemeMob(ctx, m);
         if (m.family) return this.drawFamilyMob(ctx, m);
         const squash = 1 + Math.sin(m.phase) * 0.06;
         const fill = m.flash > 0 ? '#ffffff' : m.color;
@@ -999,6 +1000,18 @@ extendGame({
         // Enemy shots: magenta orbs by default (never confused with your own violet bolts), plus styles.
         const pulse = 1 + 0.15 * Math.sin(this.frameNo * 0.3);
         for (const s of this.enemyShots) {
+            if (s.style === 'note') {
+                // meme mode: the Rick Roll sings at you
+                ctx.font = `bold ${Math.round(s.r * 3.2)}px ${DISPLAY_FONT}`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.lineWidth = 3;
+                ctx.strokeStyle = '#1e1b4b';
+                ctx.strokeText('♪', s.x, s.y);
+                ctx.fillStyle = MEME_COLORS[Math.floor(this.frameNo / 5 + s.r) % MEME_COLORS.length];
+                ctx.fillText('♪', s.x, s.y);
+                continue;
+            }
             if (s.style === 'arrow') {
                 ctx.save();
                 ctx.translate(s.x, s.y);
