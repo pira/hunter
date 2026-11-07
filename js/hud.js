@@ -171,7 +171,7 @@ extendGame({
         const k = Math.min(2.2, 30 / size);
         icon.scale(k, k);
         if (killer.meme) {
-            this.drawMemeEmoji(icon, killer.meme, 0, -size * 0.2, size * 2.2);
+            this.drawMemeArt(icon, killer.meme, 0, -size * 0.2, size * 2.8);
         } else if (killer.ai === 'rickroll') {
             icon.translate(0, -size * 0.8);
             this.drawRickRoll(icon, { ...killer, flash: 0, t: 0, mode: 'aim' });

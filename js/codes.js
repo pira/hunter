@@ -14,36 +14,36 @@ const MEME_FONT = '"Comic Sans MS", "Comic Sans", "Chalkboard SE", cursive';
 // where the shades sit, relative to the hero's feet (rig units, before scale)
 const MEME_SHADES_Y = { wizard: 34, barbarian: 34, goblin: 31 };
 const MEME_SHADES_X = 1;
-// Meme mode turns about a third of the regular monsters into emoji memes (by family).
-// Only memes nobody owns: generic ideas and standard emoji (no owned characters, no real people).
+// Meme mode turns about a third of the regular monsters into drawn memes (by family).
+// Only memes nobody owns: generic ideas, drawn in the game's style (no owned characters, no real people).
 const MEME_MOBS = {
-    beasts: [{ e: '🐶', name: 'Doge' }, { e: '🦍', name: 'Return to Monke' }],
-    bugs: [{ e: '🐸', name: 'Meme Frog' }, { e: '🦗', name: '*crickets*' }],
-    undead: [{ e: '💀', name: 'I\'m Dead' }, { e: '👻', name: 'Ghosted' }],
-    fantasy: [{ e: '🗿', name: 'Moai' }, { e: '🧢', name: 'Cap' }],
-    bandits: [{ e: '🤡', name: 'Clown' }, { e: '📈', name: 'Stonks' }]
+    beasts: [{ e: 'doge', name: 'Doge' }, { e: 'monke', name: 'Return to Monke' }],
+    bugs: [{ e: 'frog', name: 'Meme Frog' }, { e: 'cricket', name: '*crickets*' }],
+    undead: [{ e: 'skull', name: 'I\'m Dead' }, { e: 'ghost', name: 'Ghosted' }],
+    fantasy: [{ e: 'moai', name: 'Moai' }, { e: 'cap', name: 'Cap' }],
+    bandits: [{ e: 'clown', name: 'Clown' }, { e: 'stonks', name: 'Stonks' }]
 };
 // the cucumber (the "cat scared of a cucumber" meme) can turn up in any family
-const MEME_CUCUMBER = { e: '🥒', name: 'Cat\'s Worst Nightmare' };
+const MEME_CUCUMBER = { e: 'cucumber', name: 'Cat\'s Worst Nightmare' };
 const MEME_CUCUMBER_CHANCE = 0.25; // share of the small/medium/large meme monsters
 // the heavy tiers (elite and up) get the big memes
 const MEME_HEAVIES = {
-    beasts: { e: '🐐', name: 'The GOAT' },
-    bugs: { e: '🧠', name: 'Big Brain' },
-    undead: { e: '🥶', name: 'Ice Cold' },
-    fantasy: { e: '👽', name: 'Area 51 Raider' },
-    bandits: { e: '💯', name: 'Hundred Percent' }
+    beasts: { e: 'goat', name: 'The GOAT' },
+    bugs: { e: 'brain', name: 'Big Brain' },
+    undead: { e: 'icecold', name: 'Ice Cold' },
+    fantasy: { e: 'alien', name: 'Area 51 Raider' },
+    bandits: { e: 'hundred', name: 'Hundred Percent' }
 };
-// meme bosses: same attacks, a meme name and a giant emoji face, no voice lines
+// meme bosses: same attacks, a meme name and a big drawn face, no voice lines
 const MEME_BOSSES = {
-    Bonecrusher: { name: 'Ohio Final Boss', title: 'Only in Ohio', face: '🌽' },
-    Hexweaver: { name: 'The Loading Circle', title: 'Buffering… 99%', face: '⏳' },
-    Broodmother: { name: 'Reply Guy', title: 'Summons the comment section', face: '💬' },
-    Voidmaw: { name: 'Error 404', title: 'Boss not found', face: '🚫' },
-    Gravelord: { name: 'Giga Moai', title: 'Stone-faced sigma', face: '🗿' },
-    Stormcaller: { name: 'Stonks Lord', title: 'Line goes up', face: '📈' },
-    Hydra: { name: 'Triple Ratio', title: 'Three heads, zero rizz', face: '😬' },
-    Lich: { name: 'Final Boss of the Internet', title: 'Touch grass or perish', face: '💀' }
+    Bonecrusher: { name: 'Ohio Final Boss', title: 'Only in Ohio', face: 'corn' },
+    Hexweaver: { name: 'The Loading Circle', title: 'Buffering… 99%', face: 'hourglass' },
+    Broodmother: { name: 'Reply Guy', title: 'Summons the comment section', face: 'reply' },
+    Voidmaw: { name: 'Error 404', title: 'Boss not found', face: 'notfound' },
+    Gravelord: { name: 'Giga Moai', title: 'Stone-faced sigma', face: 'moai' },
+    Stormcaller: { name: 'Stonks Lord', title: 'Line goes up', face: 'stonks' },
+    Hydra: { name: 'Triple Ratio', title: 'Three heads, zero rizz', face: 'grimace' },
+    Lich: { name: 'Final Boss of the Internet', title: 'Touch grass or perish', face: 'skull' }
 };
 const MEME_MOB_CHANCE = 0.35;
 const RICK_LINES = ['GET ROLLED!', 'ROLL OUT!', 'YOU JUST GOT ROLLED', 'ROLLIN\' ROLLIN\''];
@@ -191,7 +191,7 @@ extendGame({
 
     // ------------------------------------------------------------------ meme monsters
 
-    /** Extra fields for a new monster in meme mode: an emoji look and a meme name (or nothing). */
+    /** Extra fields for a new monster in meme mode: a drawn look and a meme name (or nothing). */
     memeLook(type) {
         if (!type || !type.family || Math.random() >= MEME_MOB_CHANCE) return {};
         const small = type.rank <= 3;
@@ -200,36 +200,39 @@ extendGame({
         return look ? { meme: look.e, name: look.name } : {};
     },
 
-    /** Emoji drawn once per kind into a small canvas, then blitted (fillText of emoji every frame is slow). */
-    memeEmojiCanvas(e) {
-        this.memeEmoji = this.memeEmoji || new Map();
-        let cv = this.memeEmoji.get(e);
+    /** Each meme look is drawn once into a small canvas (js/memeart.js), then blitted. */
+    memeArtCanvas(key) {
+        this.memeArt = this.memeArt || new Map();
+        let cv = this.memeArt.get(key);
         if (!cv) {
             cv = document.createElement('canvas');
-            cv.width = cv.height = 72;
+            cv.width = cv.height = 128;
             const g = cv.getContext('2d');
-            g.font = '58px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
-            g.textAlign = 'center';
-            g.textBaseline = 'middle';
-            g.fillText(e, 36, 40);
-            this.memeEmoji.set(e, cv);
+            if (g && MemeArt[key]) {
+                g.translate(64, 64);
+                g.scale(1.2, 1.2);
+                g.lineJoin = 'round';
+                g.ow = 3.5;
+                MemeArt[key](g);
+            }
+            this.memeArt.set(key, cv);
         }
         return cv;
     },
 
-    drawMemeEmoji(ctx, e, x, y, size) {
-        ctx.drawImage(this.memeEmojiCanvas(e), x - size / 2, y - size / 2, size, size);
+    drawMemeArt(ctx, key, x, y, size) {
+        ctx.drawImage(this.memeArtCanvas(key), x - size / 2, y - size / 2, size, size);
     },
 
     drawMemeMob(ctx, m) {
-        const s = m.size * 2.3;
+        const s = m.size * 2.9;
         const bob = Math.sin(m.phase) * m.size * 0.08;
         const lean = Math.sin(m.phase * 0.5) * 0.12;
         ctx.save();
         ctx.translate(m.x, m.y + bob);
         ctx.rotate(lean);
         if (m.spawnT > 0) ctx.globalAlpha = U.clamp(1 - m.spawnT / 75, 0.2, 1);
-        this.drawMemeEmoji(ctx, m.meme, 0, 0, s);
+        this.drawMemeArt(ctx, m.meme, 0, 0, s);
         if (m.flash > 0) {
             ctx.globalAlpha = 0.55;
             ctx.fillStyle = '#ffffff';
@@ -266,16 +269,16 @@ extendGame({
         return mm ? { ...def, name: mm.name, title: mm.title, memeFace: mm.face, mute: true } : def;
     },
 
-    /** A giant emoji face over the boss's body; it shrinks away while the boss crumbles. */
+    /** A big drawn face over the boss's body; it shrinks away while the boss crumbles. */
     drawMemeBossFace(ctx, b) {
         const q = b.dying ? b.deathT / b.deathMax : 0;
-        const s = b.size * (b.boss.big ? 1.9 : 1.7) * (1 - 0.5 * q);
+        const s = b.size * (b.boss.big ? 2.4 : 2.1) * (1 - 0.5 * q);
         const wob = Math.sin((b.t || 0) * 0.12) * 0.12;
         ctx.save();
         ctx.globalAlpha = 1 - q;
         ctx.translate(b.x, b.y - b.size * (b.boss.big ? 0.55 : 0.2));
         ctx.rotate(wob);
-        this.drawMemeEmoji(ctx, b.boss.memeFace, 0, 0, s);
+        this.drawMemeArt(ctx, b.boss.memeFace, 0, 0, s);
         if (b.flash > 0) {
             ctx.globalAlpha = 0.45 * (1 - q);
             ctx.fillStyle = '#fff';
