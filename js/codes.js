@@ -15,12 +15,35 @@ const MEME_FONT = '"Comic Sans MS", "Comic Sans", "Chalkboard SE", cursive';
 const MEME_SHADES_Y = { wizard: 34, barbarian: 34, goblin: 31 };
 const MEME_SHADES_X = 1;
 // Meme mode turns about a third of the regular monsters into emoji memes (by family).
+// Only memes nobody owns: generic ideas and standard emoji (no owned characters, no real people).
 const MEME_MOBS = {
-    beasts: { e: '🐶', name: 'Doge' },
-    bugs: { e: '🐸', name: 'Meme Frog' },
-    undead: { e: '💀', name: 'Skull Emoji' },
-    fantasy: { e: '🗿', name: 'Moai' },
-    bandits: { e: '🤡', name: 'Clown' }
+    beasts: [{ e: '🐶', name: 'Doge' }, { e: '🦍', name: 'Return to Monke' }],
+    bugs: [{ e: '🐸', name: 'Meme Frog' }, { e: '🦗', name: '*crickets*' }],
+    undead: [{ e: '💀', name: 'I\'m Dead' }, { e: '👻', name: 'Ghosted' }],
+    fantasy: [{ e: '🗿', name: 'Moai' }, { e: '🧢', name: 'Cap' }],
+    bandits: [{ e: '🤡', name: 'Clown' }, { e: '📈', name: 'Stonks' }]
+};
+// the cucumber (the "cat scared of a cucumber" meme) can turn up in any family
+const MEME_CUCUMBER = { e: '🥒', name: 'Cat\'s Worst Nightmare' };
+const MEME_CUCUMBER_CHANCE = 0.25; // share of the small/medium/large meme monsters
+// the heavy tiers (elite and up) get the big memes
+const MEME_HEAVIES = {
+    beasts: { e: '🐐', name: 'The GOAT' },
+    bugs: { e: '🧠', name: 'Big Brain' },
+    undead: { e: '🥶', name: 'Ice Cold' },
+    fantasy: { e: '👽', name: 'Area 51 Raider' },
+    bandits: { e: '💯', name: 'Hundred Percent' }
+};
+// meme bosses: same attacks, a meme name and a giant emoji face, no voice lines
+const MEME_BOSSES = {
+    Bonecrusher: { name: 'Ohio Final Boss', title: 'Only in Ohio', face: '🌽' },
+    Hexweaver: { name: 'The Loading Circle', title: 'Buffering… 99%', face: '⏳' },
+    Broodmother: { name: 'Reply Guy', title: 'Summons the comment section', face: '💬' },
+    Voidmaw: { name: 'Error 404', title: 'Boss not found', face: '🚫' },
+    Gravelord: { name: 'Giga Moai', title: 'Stone-faced sigma', face: '🗿' },
+    Stormcaller: { name: 'Stonks Lord', title: 'Line goes up', face: '📈' },
+    Hydra: { name: 'Triple Ratio', title: 'Three heads, zero rizz', face: '😬' },
+    Lich: { name: 'Final Boss of the Internet', title: 'Touch grass or perish', face: '💀' }
 };
 const MEME_MOB_CHANCE = 0.35;
 const RICK_LINES = ['GET ROLLED!', 'ROLL OUT!', 'YOU JUST GOT ROLLED', 'ROLLIN\' ROLLIN\''];
@@ -139,6 +162,8 @@ extendGame({
         } else if (m.boss) {
             this.memeFloater(m.x, m.y - m.size - 60, 'GG EZ', 40);
             this.airhorn();
+        } else if (m.meme === MEME_CUCUMBER.e) {
+            this.memeFloater(m.x, m.y - m.size - 18, this.memePick(['*CAT SCREAMS*', 'PICKLED', 'NOT TODAY, CUCUMBER']), 18);
         } else if (Math.random() < (m.gk ? 1 : 0.18)) {
             this.memeFloater(m.x, m.y - m.size - 18, this.memePick(MEME_KILL), m.gk ? 26 : 18);
         }
@@ -168,9 +193,11 @@ extendGame({
 
     /** Extra fields for a new monster in meme mode: an emoji look and a meme name (or nothing). */
     memeLook(type) {
-        const look = type && type.family && type.rank <= 3 && MEME_MOBS[type.family];
-        if (!look || Math.random() >= MEME_MOB_CHANCE) return {};
-        return { meme: look.e, name: look.name };
+        if (!type || !type.family || Math.random() >= MEME_MOB_CHANCE) return {};
+        const small = type.rank <= 3;
+        const look = small && Math.random() < MEME_CUCUMBER_CHANCE ? MEME_CUCUMBER
+            : small ? MEME_MOBS[type.family] && this.memePick(MEME_MOBS[type.family]) : MEME_HEAVIES[type.family];
+        return look ? { meme: look.e, name: look.name } : {};
     },
 
     /** Emoji drawn once per kind into a small canvas, then blitted (fillText of emoji every frame is slow). */
@@ -211,6 +238,16 @@ extendGame({
             ctx.fill();
         }
         ctx.restore();
+        if (m.glow) {
+            // the heavy tiers keep their glow ring
+            ctx.globalAlpha = 0.5 + 0.2 * Math.sin(m.phase * 2);
+            ctx.strokeStyle = m.glow;
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            ctx.arc(m.x, m.y + bob, m.size * 1.2, 0, TAU);
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+        }
         if (m.poison > 0 || m.stun > 0 || m.iced) {
             ctx.globalAlpha = 0.4;
             ctx.fillStyle = m.stun > 0 ? '#fde047' : m.iced ? '#7dd3fc' : '#84cc16';
@@ -219,6 +256,34 @@ extendGame({
             ctx.fill();
             ctx.globalAlpha = 1;
         }
+    },
+
+    // ------------------------------------------------------------------ meme bosses
+
+    /** The meme version of a boss def (a copy: the shared def stays as it is). */
+    memeBoss(def) {
+        const mm = def && MEME_BOSSES[def.name];
+        return mm ? { ...def, name: mm.name, title: mm.title, memeFace: mm.face, mute: true } : def;
+    },
+
+    /** A giant emoji face over the boss's body; it shrinks away while the boss crumbles. */
+    drawMemeBossFace(ctx, b) {
+        const q = b.dying ? b.deathT / b.deathMax : 0;
+        const s = b.size * (b.boss.big ? 1.9 : 1.7) * (1 - 0.5 * q);
+        const wob = Math.sin((b.t || 0) * 0.12) * 0.12;
+        ctx.save();
+        ctx.globalAlpha = 1 - q;
+        ctx.translate(b.x, b.y - b.size * (b.boss.big ? 0.55 : 0.2));
+        ctx.rotate(wob);
+        this.drawMemeEmoji(ctx, b.boss.memeFace, 0, 0, s);
+        if (b.flash > 0) {
+            ctx.globalAlpha = 0.45 * (1 - q);
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.arc(0, 0, s * 0.42, 0, TAU);
+            ctx.fill();
+        }
+        ctx.restore();
     },
 
     // ------------------------------------------------------------------ the Rick Roll (meme mode, end of level 1)

@@ -104,8 +104,10 @@ extendGame({
             if (m.hidden) return;
             // one monster failing to draw must not take the rest (and the hero) with it
             this.guardDraw(ctx, () => {
-                if (m.boss) this.drawBoss(ctx, m);
-                else if (m.gk) this.drawGatekeeper(ctx, m);
+                if (m.boss) {
+                    this.drawBoss(ctx, m);
+                    if (m.boss.memeFace) this.drawMemeBossFace(ctx, m);
+                } else if (m.gk) this.drawGatekeeper(ctx, m);
                 else this.drawMonster(ctx, m);
             });
         });

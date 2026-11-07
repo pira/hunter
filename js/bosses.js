@@ -6,7 +6,7 @@ extendGame({
 
     /** Fetches the voice index once and pre-loads the clips of the boss coming up this level. */
     async preloadBossVoice(def) {
-        if (!def || !def.voice) return;
+        if (!def || !def.voice || def.mute) return;
         try {
             if (!this.voiceIndex) this.voiceIndex = fetch('sfx/voice/index.json').then(r => r.json()).catch(() => ({}));
             const index = await this.voiceIndex;
@@ -19,7 +19,7 @@ extendGame({
 
     /** A boss says something: speech bubble (works muted) + the recorded clip when loaded. */
     async bossSay(b, event) {
-        if (!b || !b.boss || !b.boss.voice || b.dead) return;
+        if (!b || !b.boss || !b.boss.voice || b.boss.mute || b.dead) return;
         const index = this.voiceIndex ? await this.voiceIndex : {};
         const clips = ((index[b.boss.voice] || {})[event]) || [];
         if (!clips.length) return;

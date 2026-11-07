@@ -173,6 +173,7 @@ extendGame({
         if (kind === 'bigBoss' || kind === 'smallBoss') {
             // L100 would bring the super boss; until it exists it falls back to a big boss.
             enc.def = this.nextBossDef(kind);
+            if (this.memeMode) enc.def = this.memeBoss(enc.def); // js/codes.js
             if (kind === 'bigBoss') this.bigCount++;
             else this.smallCount++;
             this.startBossWarning(enc.def);
