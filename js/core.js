@@ -3,8 +3,8 @@
 class Game {
     constructor() {
         // Version system (bumped by the pre-commit hook, see VERSION-README.md)
-        this.version = "3.18.0";
-        this.buildDate = "2026-10-27";
+        this.version = "3.19.0";
+        this.buildDate = "2026-11-07";
 
         this.canvas = document.getElementById('gameCanvas');
         this.ctx = this.canvas.getContext('2d');
@@ -110,6 +110,7 @@ class Game {
             this.activateSuper();
         });
         this.bindIdentity();
+        this.bindCodes();
         this.bindClassPicker();
         this.boardSel = { board: Leaderboard.board, cls: '' };
         document.getElementById('boardTabs').addEventListener('click', e => {

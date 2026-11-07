@@ -22,6 +22,7 @@
 //   POST /player/{id}/nest           unlock the next hatchery nest { secret }
 //   POST /player/{id}/icon           public profile icon { secret, cls, skin ('' = class default) }
 //   POST /player/{id}/equip          wear an owned skin { secret, cls, skin ('' = none) }
+//   POST /player/{id}/redeem         enter a code from the menu's code bar { secret, code, name? } (see CODES)
 //
 // Items (single table):
 //   pk="board#v2"      sk="<inverted score>#<ts>#<id>"   Classic score rows, best first
@@ -52,9 +53,17 @@ export const MAX_TOKEN_MS = 7 * 24 * 3600 * 1000; // a run may be paused (and sa
 export const SUBMITS_PER_MINUTE = 6;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const SECRET_RE = /^[A-Za-z0-9_-]{32,128}$/;
-const PUBLIC_META = ['name', 'bestScore', 'bestLevel', 'runs', 'kills', 'bosses', 'playSeconds', 'createdAt', 'updatedAt', 'gold', 'gems', 'pets', 'petSlots', 'petSlotCount', 'eggs', 'nests', 'nestCount', 'artRefund', 'icon', 'skins', 'equipped', 'classBest', 'classBestHard', 'classBestHell', 'petLevels'];
+const PUBLIC_META = ['name', 'bestScore', 'bestLevel', 'runs', 'kills', 'bosses', 'playSeconds', 'createdAt', 'updatedAt', 'gold', 'gems', 'pets', 'petSlots', 'petSlotCount', 'eggs', 'nests', 'nestCount', 'artRefund', 'icon', 'skins', 'equipped', 'classBest', 'classBestHard', 'classBestHell', 'petLevels', 'unlocks'];
 const POT_RE = /^[A-Za-z0-9_-]{6,40}$/;
 const POT_TTL = 24 * 3600;
+
+// Codes for the menu's code bar. `once` codes can be redeemed one time per profile; the others
+// (unlocks) can be entered again and again. `codes` (which were used, when) stays private.
+export const CODES = {
+    gold: { gold: 5, once: true },
+    gems: { gems: 1, once: true },
+    meme: { unlock: 'meme' }
+};
 
 export class HttpError extends Error {
     constructor(status, message) {
@@ -130,6 +139,8 @@ export function upgradeMeta(meta) {
     // best level per class (mastery); profiles from before v3.7 get it from their run history
     for (const k of Object.values(DIFF_BEST)) if (m[k]) m[k] = { ...m[k] };
     if (m.icon === undefined) m.icon = null;
+    m.codes = { ...(m.codes || {}) };
+    m.unlocks = Array.isArray(m.unlocks) ? [...m.unlocks] : [];
     m.version = m.version || 0;
     return m;
 }
@@ -755,6 +766,31 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
         });
     }
 
+    /** The code bar: grants gold/gems once per profile, or unlocks something (repeatable). */
+    async function redeem(pid, body) {
+        const code = typeof body.code === 'string' ? body.code.trim().toLowerCase() : '';
+        const def = Object.hasOwn(CODES, code) && CODES[code];
+        if (!def) throw new HttpError(400, 'unknown code');
+        const name = sanitizeName(body.name);
+        if (name && !(await authorize(pid, body.secret))) {
+            // a hunter who hasn't finished a run yet: claim the profile now (like a rename does)
+            const ts = now();
+            try {
+                await send('Put', { Item: { ...newMeta(pid, body.secret, ts), name, updatedAt: ts }, ConditionExpression: 'attribute_not_exists(pk)' });
+            } catch (e) {
+                if (e.name !== 'ConditionalCheckFailedException') throw e;
+            }
+        }
+        return mutateMeta(pid, body, m => {
+            if (def.once && m.codes[code]) throw new HttpError(409, 'code already used');
+            if (def.gold) m.gold += def.gold;
+            if (def.gems) m.gems += def.gems;
+            if (def.unlock && !m.unlocks.includes(def.unlock)) m.unlocks.push(def.unlock);
+            if (!m.codes[code]) m.codes[code] = now();
+            return { redeemed: { code, gold: def.gold || 0, gems: def.gems || 0, unlock: def.unlock || null } };
+        });
+    }
+
     async function getPlayer(pid) {
         if (!UUID.test(pid || '')) throw new HttpError(400, 'invalid player id');
         const meta = await withClassBest(pid, await getMeta(pid));
@@ -872,6 +908,10 @@ export function createApp({ send, tokenSecret, now = () => Date.now(), random = 
                 if (method === 'POST' && action === '/icon') return json(200, await setIcon(pid, parseBody(event)));
                 if (method === 'POST' && action === '/feed') return json(200, await feed(pid, parseBody(event)));
                 if (method === 'POST' && action === '/nest') return json(200, await unlockNest(pid, parseBody(event)));
+                if (method === 'POST' && action === '/redeem') {
+                    if (await rateLimited(ip, 'redeem', 10)) throw new HttpError(429, 'slow down');
+                    return json(200, await redeem(pid, parseBody(event)));
+                }
             }
             return json(404, { error: 'not found' });
         } catch (e) {

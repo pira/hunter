@@ -329,6 +329,18 @@
         .btn.primary.d2:active, .btn.primary.d3:active { box-shadow: 0 1px 0 #000, 0 0 18px rgba(239,68,68,.6); }
         @keyframes fireGlow { from { box-shadow: 0 4px 0 #7c2d12, 0 0 14px rgba(249,115,22,.45); } to { box-shadow: 0 4px 0 #7c2d12, 0 0 30px rgba(251,146,60,.85); } }
         @keyframes hellPulse { 50% { box-shadow: 0 4px 0 #1f0404, 0 0 46px rgba(239,68,68,1), inset 0 0 0 2px rgba(254,202,202,.8), inset 0 -14px 26px rgba(248,113,113,.55); } }
+        /* code bar + meme mode */
+        .code-row { display: flex; gap: 8px; max-width: 20em; margin: .9em auto 0; }
+        #codeInput { flex: 1; min-width: 0; font: inherit; font-size: .95em; padding: .45em .7em; border-radius: 10px; border: 2px solid #475569; background: #0b1220; color: #fff; outline: none; -webkit-user-select: text; user-select: text; touch-action: auto; }
+        #codeInput:focus { border-color: var(--gold); }
+        .code-row .btn.small { font-size: .85em; padding: .45em .9em; }
+        .code-msg { min-height: 1.2em; margin: .35em 0 0; font-size: .8em; color: var(--muted); }
+        .code-msg.ok { color: #86efac; }
+        .code-msg.bad { color: #fca5a5; }
+        .meme-toggle { display: block; margin: .55em auto 0; padding: .3em .9em; border-radius: 1em; font: 700 .85em/1.3 "Comic Sans MS", "Comic Sans", "Chalkboard SE", cursive; border: 1px dashed rgba(255,255,255,.4); background: rgba(255,255,255,.06); color: #fff; cursor: pointer; }
+        .meme-toggle.on { border-style: solid; border-color: transparent; color: #1c1917; background: linear-gradient(90deg, #f87171, #fbbf24, #a3e635, #22d3ee, #a78bfa, #f472b6); background-size: 300% 100%; animation: memeShift 3s linear infinite; }
+        @keyframes memeShift { to { background-position: 300% 0; } }
+        #banner.meme .title, #banner.meme .sub { font-family: "Comic Sans MS", "Comic Sans", "Chalkboard SE", cursive; }
         .class-info { min-height: 2.6em; margin: 0 0 .9em; font-size: .82em; line-height: 1.45; color: #cbd5e1; }
         .class-info .sup { color: #fde047; }
         /* profile */
@@ -566,11 +578,17 @@
                 <p id="classInfo" class="class-info"></p>
                 <button id="resumeBtn" class="btn primary resume" hidden>⏯ RESUME</button>
                 <button id="playBtn" class="btn primary">▶ PLAY</button>
+                <button id="memeBtn" class="meme-toggle" type="button" hidden></button>
                 <div class="howto desktop-only">
                     <kbd>WASD</kbd> move · you attack on your own · hold <kbd>click</kbd> to aim<br>
                     <kbd>Space</kbd> SUPER when the bar is full · <kbd>P</kbd> pause · <kbd>M</kbd> mute
                 </div>
                 <div class="howto touch-only">Drag anywhere to move · you attack on your own<br>Tap ⚡ SUPER when the bar is full</div>
+                <form id="codeForm" class="code-row" autocomplete="off">
+                    <input id="codeInput" maxlength="24" placeholder="🎟️ Got a code?" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="done">
+                    <button id="codeBtn" class="btn small" type="submit">Redeem</button>
+                </form>
+                <p id="codeMsg" class="code-msg" aria-live="polite"></p>
                 <div id="iosHint" class="hint" hidden>📲 Tap <b>Share</b> → <b>Add to Home Screen</b> to play fullscreen <button id="iosHintClose" aria-label="Dismiss">✕</button></div>
                 <h3 id="menuBoardTitle">🏆 Top Hunters</h3>
                 <div class="board-tabs" id="boardTabs"><button data-board="v3" class="on">Monster Road</button><button data-board="hard">🔥 Hard</button><button data-board="hell">😈 Hell</button><button data-board="v2">Classic</button></div>
@@ -691,6 +709,7 @@
     <script src="js/bossart.js"></script>
     <script src="js/profile.js"></script>
     <script src="js/meta.js"></script>
+    <script src="js/codes.js"></script>
     <script src="js/pets.js"></script>
     <script src="js/save.js"></script>
 </body>

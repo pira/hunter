@@ -491,4 +491,32 @@ describe('lambda: banking, wheel and meta shop', () => {
         assert.equal((await post('warm')).status, 200);
         assert.equal((await post('nest')).status, 409); // all nests built
     });
+
+    it('redeems codes: gold and gems once per profile, meme as often as you like', async () => {
+        const api = rigged();
+        const post = (route, body = {}) => api.call('POST', `/player/${PID}/${route}`, { secret: SECRET, ...body });
+        assert.equal((await post('redeem', { code: 'gold' })).status, 404); // no profile and no name
+        assert.equal((await post('redeem', { code: 'meme', name: 'Newbie' })).status, 200); // a name claims the profile
+        assert.equal(t.db.get(`player#${PID}`, 'meta').name, 'Newbie');
+        await finishRun(api, 0);
+        const gold0 = t.db.get(`player#${PID}`, 'meta').gold;
+        let res = await post('redeem', { code: ' GOLD ' });
+        assert.equal(res.status, 200);
+        assert.equal(res.body.player.gold, gold0 + 5);
+        assert.deepEqual(res.body.redeemed, { code: 'gold', gold: 5, gems: 0, unlock: null });
+        assert.equal((await post('redeem', { code: 'gold' })).status, 409);
+        res = await post('redeem', { code: 'gems' });
+        assert.equal(res.body.player.gems, 1);
+        assert.equal((await post('redeem', { code: 'gems' })).status, 409);
+        res = await post('redeem', { code: 'meme' });
+        assert.deepEqual(res.body.player.unlocks, ['meme']);
+        res = await post('redeem', { code: 'meme' });
+        assert.equal(res.status, 200);
+        assert.deepEqual(res.body.player.unlocks, ['meme']);
+        assert.equal(res.body.player.codes, undefined); // which codes were used stays private
+        assert.equal((await post('redeem', { code: 'nope' })).status, 400);
+        assert.equal((await post('redeem', { code: 'toString' })).status, 400);
+        assert.equal((await api.call('POST', `/player/${PID}/redeem`, { secret: 'b'.repeat(43), code: 'meme' })).status, 403);
+        assert.equal(t.db.get(`player#${PID}`, 'meta').gold, gold0 + 5);
+    });
 });
