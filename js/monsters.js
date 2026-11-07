@@ -383,6 +383,7 @@ extendGame({
             const big = m.gk || (m.tier !== 'small' && m.tier !== 'medium');
             Sfx.mobDeath(m.family || (m.gk ? 'fantasy' : 'beasts'), m.size, { volume: big ? 0.7 : 0.55, big });
         }
+        if (this.memeMode) this.memeKill(m);
         if (m.onDeath) m.onDeath(m);
         this.dropLoot(m);
     },

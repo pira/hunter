@@ -802,6 +802,7 @@ extendGame({
         // v3.13: the vector rig picks its own pose (walk, cast/throw/swing, supers; js/sprites.js).
         // While swinging, the barbarian's axe is drawn separately along the arc (drawCleaves).
         this.drawHero(ctx, p.x, feetY, scale);
+        if (this.memeMode) this.drawMemeShades(ctx, p.x, feetY, scale);
         if (this.superShielded && !(this.whirl > 0)) {
             // super running: a shimmering shield bubble (nothing can hurt you)
             const a = this.frameNo * 0.12;
@@ -1102,6 +1103,18 @@ extendGame({
                 ctx.lineJoin = 'round';
                 ctx.strokeStyle = 'rgba(0,0,0,0.75)';
                 ctx.lineWidth = 4;
+                continue;
+            }
+            if (f.meme) {
+                // meme mode: Comic Sans, a wobble and a rainbow that cycles
+                ctx.save();
+                ctx.translate(f.x, f.y);
+                ctx.rotate(Math.sin((f.max - f.life) * 0.25) * 0.15);
+                ctx.font = `bold ${Math.round(f.size * pop)}px ${MEME_FONT}`;
+                ctx.strokeText(f.text, 0, 0);
+                ctx.fillStyle = MEME_COLORS[Math.floor((this.frameNo + f.max) / 4) % MEME_COLORS.length];
+                ctx.fillText(f.text, 0, 0);
+                ctx.restore();
                 continue;
             }
             ctx.strokeText(f.text, f.x, f.y);

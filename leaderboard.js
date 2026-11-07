@@ -250,6 +250,7 @@
         bank(pot) { return this.meta('bank', { pot }); },
         buy(item, id) { return this.meta('buy', { item, id }); },
         equip(cls, skin) { return this.meta('equip', { cls, skin }); },
+        redeem(code) { return this.meta('redeem', { code, name: this.getName() }); },
 
         /** Refresh the cached own profile (gold, artefacts, skins) in the background. */
         async refreshOwn() {

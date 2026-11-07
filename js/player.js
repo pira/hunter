@@ -192,6 +192,7 @@ extendGame({
         this.hitStop = 5;
         this.hurtFlash = 1;
         if (this.combo >= 5) this.floater(p.x, p.y - 40, 'COMBO LOST', '#ff5252', 20);
+        if (this.memeMode) this.memeHurt();
         this.combo = 0;
         this.comboTimer = 0;
 

@@ -3,6 +3,10 @@
 extendGame({
     banner(title, sub = '', cls = '') {
         const el = this.el.banner;
+        if (this.memeMode && this.state === 'playing' && cls !== 'danger') {
+            sub = sub ? `${sub} · ${this.memeSub()}` : this.memeSub(); // meme mode: every banner gets a caption
+            cls = `${cls} meme`;
+        }
         el.className = '';
         el.innerHTML = `<div class="title">${title}</div>${sub ? `<div class="sub">${sub}</div>` : ''}`;
         void el.offsetWidth; // restart the CSS animation
