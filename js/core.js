@@ -3,7 +3,7 @@
 class Game {
     constructor() {
         // Version system (bumped by the pre-commit hook, see VERSION-README.md)
-        this.version = "3.23.0";
+        this.version = "3.24.0";
         this.buildDate = "2026-11-08";
 
         this.canvas = document.getElementById('gameCanvas');
@@ -529,6 +529,9 @@ class Game {
         this.bossWarning = 0;
         this.pendingBoss = null;
         this.bossParts = [];
+        this.stalker = null; // meme mode's Stalker (js/codes.js)
+        this.stalkerLevel = 0;
+        this._stalkerDark = 0;
         this.smallCount = 0;
         this.bigCount = 0;
         this.regularCount = 0;

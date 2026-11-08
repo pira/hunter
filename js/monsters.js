@@ -142,6 +142,7 @@ extendGame({
     updateSpawning() {
         if (this.edgeWarn && --this.edgeWarn.t <= 0) this.edgeWarn = null;
         if (this.phase !== 'fight') return;
+        if (this.memeMode) this.maybeStalker(); // js/codes.js
         const alive = this.monsters.length;
         const cap = Math.min(70, 40 + this.level);
         const interval = U.spawnInterval(this.level);

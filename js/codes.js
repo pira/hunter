@@ -157,7 +157,10 @@ extendGame({
     },
 
     memeKill(m) {
-        if (m.ai === 'rickroll') {
+        if (m.stalker) {
+            this.memeFloater(m.x, m.y - m.size * 2.6, 'IT\'S GONE… for now', 24);
+            this.stalker = null;
+        } else if (m.ai === 'rickroll') {
             this.memeFloater(m.x, m.y - m.size - 60, 'YOU ROLLED THE ROLL', 30);
             this.spark(m.x, m.y, '#fbbf24', 12);
             this.airhorn();
@@ -363,6 +366,141 @@ extendGame({
             ctx.arc(0, 0, s * 0.42, 0, TAU);
             ctx.fill();
         }
+        ctx.restore();
+    },
+
+    // ------------------------------------------------------------------ The Stalker (meme mode horror)
+
+    /** At most one per level (from level 2, about 60% of levels), a third of the way through the fight. */
+    maybeStalker() {
+        if (this.level < 2 || this.stalkerLevel === this.level || this.progress < this.target * 0.35) return;
+        this.stalkerLevel = this.level;
+        if (Math.random() < 0.6) this.spawnStalker();
+    },
+
+    spawnStalker() {
+        const p = this.player;
+        const left = p.x > this.W / 2; // the far side of the road
+        const x = left ? Math.max(30, this.roadLeft - 24) : Math.min(this.W - 30, this.roadRight + 24);
+        const type = { name: 'The Stalker', shape: 'circle', color: '#0a0a0a', size: 22, speed: 0, speedVariation: 0, health: 8, points: 150, tier: 'large' };
+        const m = this.makeMonster(type, x, this.H * (0.22 + Math.random() * 0.2), 'chase');
+        Object.assign(m, { ai: 'stalker', stalker: true, mode: 'stare', t: 0, spawnT: 40, heavy: true, meme: undefined, name: 'The Stalker' });
+        this.monsters.push(m);
+        this.stalker = m;
+        this.floater(m.x, m.y - 70, '. . .', '#e5e7eb', 22);
+        Sfx.tone(55, { duration: 2.2, type: 'sine', volume: 0.08, bus: 'sfx' });
+    },
+
+    /** Stares, flickers with static, teleports closer; lunges once it's close. Gone when the fight ends. */
+    updateStalker(m, freeze) {
+        const p = this.player;
+        m.t += freeze > 0 ? 1 : 0;
+        if (this.phase !== 'fight' && this.phase !== 'clear') {
+            // it slips away when the encounter starts: no loot, no kill
+            m.dead = true;
+            m.escaped = true;
+            this.stalker = null;
+            this.stalkerStatic(m, 18);
+            return;
+        }
+        if (m.t % 130 === 0) Sfx.tone(52 + Math.random() * 6, { duration: 2, type: 'sine', volume: 0.06, bus: 'sfx' }); // the drone
+        const d = Math.hypot(p.x - m.x, p.y - m.y);
+        if (m.mode === 'stare') {
+            m.y -= ROAD_SPEED * 0.9; // it doesn't ride the road: it stands where it chose to
+            if (m.t > this.cd(150)) {
+                m.mode = 'flicker';
+                m.t = 0;
+            }
+        } else if (m.mode === 'flicker') {
+            m.y -= ROAD_SPEED * 0.9;
+            if (m.t % 3 === 0) this.stalkerStatic(m, 2);
+            if (m.t % 4 === 0) Sfx.tone(800 + Math.random() * 2400, { duration: 0.03, type: 'square', volume: 0.025, bus: 'sfx' });
+            if (m.t > 22) {
+                // blink: a step closer, from a slightly different angle
+                const a = Math.atan2(m.y - p.y, m.x - p.x) + (Math.random() - 0.5) * 1.2;
+                const nd = Math.max(70, d * 0.6);
+                m.x = U.clamp(p.x + Math.cos(a) * nd, 20, this.W - 20);
+                m.y = U.clamp(p.y + Math.sin(a) * nd, this.topSafe * 0.7, this.H - 30);
+                this.stalkerStatic(m, 10);
+                m.mode = nd <= 110 ? 'lunge' : 'stare';
+                m.t = 0;
+                if (m.mode === 'lunge') {
+                    const n = U.normalizeVector(p.x - m.x, p.y - m.y);
+                    m.lx = n.x;
+                    m.ly = n.y;
+                    Sfx.tone(90, { duration: 0.4, type: 'sawtooth', volume: 0.09, slide: -40, bus: 'sfx' });
+                }
+            }
+        } else if (m.mode === 'lunge') {
+            if (m.t > 18 && m.t < 46) {
+                m.x += m.lx * 6.5 * freeze;
+                m.y += m.ly * 6.5 * freeze;
+            }
+            if (m.t > 70) {
+                // back off into the dark and start over
+                const left = p.x > this.W / 2;
+                m.x = left ? Math.max(30, this.roadLeft - 24) : Math.min(this.W - 30, this.roadRight + 24);
+                m.y = this.H * (0.2 + Math.random() * 0.25);
+                this.stalkerStatic(m, 10);
+                m.mode = 'stare';
+                m.t = 0;
+            }
+        }
+    },
+
+    stalkerStatic(m, n) {
+        for (let i = 0; i < n; i++) {
+            this.particle({ x: m.x + (Math.random() - 0.5) * 30, y: m.y - 20 + (Math.random() - 0.5) * 60, vx: (Math.random() - 0.5) * 2, vy: 0, life: 10 + Math.random() * 8, size: 1.5 + Math.random() * 2.5, color: Math.random() < 0.5 ? '#e5e7eb' : '#111827', kind: 'spark' });
+        }
+    },
+
+    /** The screen darkens around you while it's here (eases in and out). */
+    get stalkerDark() {
+        const want = this.stalker && !this.stalker.dead ? 1 : 0;
+        this._stalkerDark = (this._stalkerDark || 0) + (want - (this._stalkerDark || 0)) * 0.03;
+        return this._stalkerDark > 0.01 ? this._stalkerDark : 0;
+    },
+
+    drawStalkerDark(ctx) {
+        const k = this._stalkerDark;
+        const p = this.player;
+        const g = ctx.createRadialGradient(p.x, p.y, 90, p.x, p.y, Math.max(this.W, this.H) * 0.8);
+        g.addColorStop(0, 'rgba(0,0,0,0)');
+        g.addColorStop(1, `rgba(0,0,0,${0.72 * k})`);
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, this.W, this.H);
+    },
+
+    /** A tall blocky shadow with long arms and glowing white square eyes, in its own fog. */
+    drawStalker(ctx, m) {
+        const u = m.size * 0.17;
+        const flick = m.mode === 'flicker' || m.spawnT > 0;
+        if (flick && Math.random() < 0.35) return; // it blinks in and out
+        const x0 = m.x - 5 * u + (flick ? (Math.random() - 0.5) * 6 : 0);
+        const y0 = m.y - 13 * u;
+        // fog around its feet
+        const fog = ctx.createRadialGradient(m.x, m.y + 6 * u, 4, m.x, m.y + 6 * u, 9 * u);
+        fog.addColorStop(0, 'rgba(203,213,225,0.45)');
+        fog.addColorStop(1, 'rgba(203,213,225,0)');
+        ctx.fillStyle = fog;
+        ctx.beginPath();
+        ctx.ellipse(m.x, m.y + 6 * u, 9 * u, 4 * u, 0, 0, TAU);
+        ctx.fill();
+        const block = (c, r) => (r < 6 && c >= 2 && c <= 7) || (r >= 6 && r < 14 && c >= 2 && c <= 7) ||
+            (r === 6 && (c === 1 || c === 8)) || ((c === 0 || c === 9) && r >= 7 && r < 17) || (r >= 14 && r < 20 && (c === 3 || c === 6));
+        ctx.save();
+        if (m.flash > 0) ctx.globalAlpha = 0.6;
+        for (let r = 0; r < 20; r++) for (let c = 0; c < 10; c++) {
+            if (!block(c, r)) continue;
+            ctx.fillStyle = m.flash > 0 ? '#9ca3af' : c === 7 || c === 9 || c === 6 && r >= 14 ? '#1e1b2e' : '#050507';
+            ctx.fillRect(Math.floor(x0 + c * u), Math.floor(y0 + r * u), Math.ceil(u) + 0.5, Math.ceil(u) + 0.5);
+        }
+        // the eyes
+        ctx.shadowColor = '#ffffff';
+        ctx.shadowBlur = 10;
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(x0 + 3 * u, y0 + 3 * u, u, u * 0.9);
+        ctx.fillRect(x0 + 6 * u, y0 + 3 * u, u, u * 0.9);
         ctx.restore();
     },
 

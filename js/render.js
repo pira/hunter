@@ -122,6 +122,7 @@ extendGame({
         this.drawLightning(ctx);
         this.drawParticles(ctx);
         this.drawSackFlights(ctx);
+        if (this.stalkerDark > 0) this.drawStalkerDark(ctx);
         this.drawFloaters(ctx);
         this.drawScreenFx(ctx);
         this.drawStick(ctx);
@@ -520,6 +521,7 @@ extendGame({
     },
 
     drawMonster(ctx, m) {
+        if (m.stalker) return this.drawStalker(ctx, m);
         if (m.meme) return this.drawMemeMob(ctx, m);
         if (m.family) return this.drawFamilyMob(ctx, m);
         const squash = 1 + Math.sin(m.phase) * 0.06;

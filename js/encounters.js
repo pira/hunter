@@ -448,6 +448,9 @@ extendGame({
                 }
                 break;
             }
+            case 'stalker':
+                this.updateStalker(m, freeze); // js/codes.js
+                break;
             case 'rickroll': // rolls like the Charger (js/codes.js adds the notes and the looks)
             case 'charger': {
                 // Aims from wherever it stands, charges half the map, stops (dizzy — your chance,
