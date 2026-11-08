@@ -44,10 +44,10 @@ const MEME_BOSSES = {
     Bonecrusher: { name: 'Ohio Final Boss', title: 'Only in Ohio', face: 'corn', photo: 'ohio' },
     Hexweaver: { name: 'The Loading Circle', title: 'Buffering… 99%', face: 'hourglass', photo: 'loading', spin: true },
     Broodmother: { name: 'Reply Guy', title: 'Summons the comment section', face: 'reply', photo: 'reply' },
-    Voidmaw: { name: 'Error 404', title: 'Boss not found', face: 'notfound' },
+    Voidmaw: { name: 'Error 404', title: 'Boss not found', face: 'notfound', photo: 'notfound' },
     Gravelord: { name: 'Giga Moai', title: 'Stone-faced sigma', face: 'moai', photo: 'moai' },
     Stormcaller: { name: 'Stonks Lord', title: 'Line goes up', face: 'stonks', photo: 'stonks' },
-    Hydra: { name: 'Triple Ratio', title: 'Three heads, zero rizz', face: 'grimace' },
+    Hydra: { name: 'Triple Ratio', title: 'Three heads, zero rizz', face: 'grimace', photo: 'ratio' },
     Lich: { name: 'Final Boss of the Internet', title: 'Touch grass or perish', face: 'skull' }
 };
 const MEME_MOB_CHANCE = 1; // every monster is a meme…
