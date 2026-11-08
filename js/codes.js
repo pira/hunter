@@ -281,6 +281,17 @@ extendGame({
         return mm ? { ...def, name: mm.name, title: mm.title, memeFace: mm.face, mute: true } : def;
     },
 
+    /** Meme mode's mini bosses for the levels without a real boss: all eight meme bosses in turn, plus
+     *  Sigma Cat now and then. Mini = gatekeeper loot and no boss kill (see bossDefeated), and less HP. */
+    nextMiniBoss() {
+        const list = [...BOSSES, ...BIG_BOSSES, null]; // null = Sigma Cat
+        const i = (this.miniCount = (this.miniCount || 0) + 1) - 1;
+        const base = list[i % list.length];
+        if (!base) return { ...this.sigmaBoss(), title: 'Well, actually… (again)' };
+        const def = this.memeBoss(base);
+        return { ...def, mini: true, hp: Math.round(base.hp * (base.big ? 0.2 : 0.5)), title: `${def.title} · mini boss` };
+    },
+
     /** Sigma Cat, meme mode's level-1 mini boss: the ring-shooting boss's moves at half its HP, throwing
      *  "well, actually" and "shh" hands. Mini: gatekeeper loot, not counted as a boss (see bossDefeated). */
     sigmaBoss() {

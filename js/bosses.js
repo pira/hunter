@@ -64,7 +64,8 @@ extendGame({
         // and on a mastered level (beaten before with this class) the boss has less HP: ÷√(level speed)
         // Hard/Hell: ×2/×3 HP like every monster
         const hp = Math.round(def.hp * (1 + (big ? 0.5 : 0.4) * (n - 1)) * (1 + 0.4 * cycle) * late * this.diffK / Math.sqrt(this.levelSpeed));
-        const b = this.makeBossBody(def, hp, cycle, this.W / 2, -def.size * 2);
+        // a mini boss (meme mode) grows with the level like a gatekeeper, from a smaller base
+        const b = this.makeBossBody(def, def.mini ? Math.round(hp * (1 + 0.12 * (this.level - 1))) : hp, cycle, this.W / 2, -def.size * 2);
         this.boss = b;
         this.bossParts = [b];
         this.bossTrailPct = 1;

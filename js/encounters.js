@@ -192,6 +192,13 @@ extendGame({
             this.startRickRoll();
             return;
         }
+        if (this.memeMode) {
+            // meme mode: every other level ends with a mini boss too (gatekeeper loot; js/codes.js)
+            this.regularCount++;
+            Object.assign(enc, { kind: 'smallBoss', def: this.nextMiniBoss() });
+            this.startBossWarning(enc.def);
+            return;
+        }
         const gk = this.regularCount++ % 2 === 0;
         if (gk) {
             const [id, variant] = this.drawFromDeck('gk', Object.keys(GATEKEEPERS).filter(k => !GATEKEEPERS[k].meme));
