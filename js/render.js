@@ -522,6 +522,7 @@ extendGame({
 
     drawMonster(ctx, m) {
         if (m.stalker) return this.drawStalker(ctx, m);
+        if (m.respawner) return this.drawRespawner(ctx, m);
         if (m.meme) return this.drawMemeMob(ctx, m);
         if (m.family) return this.drawFamilyMob(ctx, m);
         const squash = 1 + Math.sin(m.phase) * 0.06;

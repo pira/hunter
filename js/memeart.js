@@ -297,6 +297,30 @@ const MemeArt = (() => {
                 g.stroke();
             }
         },
+        /** The Respawner: a puffy blue raincoat with the hood pulled tight; only the eyes show. */
+        respawner(g) {
+            A.rrect(g, -15, 30, 12, 9, 4, '#dc2626'); // boots
+            A.rrect(g, 3, 30, 12, 9, 4, '#dc2626');
+            A.shape(g, '#3b82f6', () => { // the coat
+                g.moveTo(-24, 34);
+                g.quadraticCurveTo(-30, 8, -18, -2);
+                g.lineTo(18, -2);
+                g.quadraticCurveTo(30, 8, 24, 34);
+                g.closePath();
+            });
+            line(g, 2.5, [[0, 2], [0, 32]], '#1d4ed8');
+            [8, 18, 28].forEach(y => A.dot(g, 4, y, 1.8, '#1e3a8a'));
+            A.ellipse(g, -25, 18, 7, 11, '#3b82f6', 0.2); // mittens-arms
+            A.ellipse(g, 25, 18, 7, 11, '#3b82f6', -0.2);
+            A.circle(g, 0, -18, 26, '#3b82f6'); // the hood
+            A.ellipse(g, 0, -15, 15, 13, '#0f172a'); // pulled tight: a small dark opening
+            A.dot(g, -6, -16, 4, '#fff');
+            A.dot(g, 6, -16, 4, '#fff');
+            A.dot(g, -5, -16, 2, O);
+            A.dot(g, 7, -16, 2, O);
+            line(g, 2, [[-6, -2], [-8, 8]], '#e2e8f0'); // drawstrings
+            line(g, 2, [[6, -2], [8, 8]], '#e2e8f0');
+        },
         // ------------------------------------------------------------ the heavy tiers
         goat(g) {
             line(g, 9, [[-12, -24], [-24, -42], [-36, -36]], O);

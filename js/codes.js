@@ -162,7 +162,9 @@ extendGame({
     },
 
     memeKill(m) {
-        if (m.stalker) {
+        if (m.respawner) {
+            // its own lines (onDeath)
+        } else if (m.stalker) {
             this.memeFloater(m.x, m.y - m.size * 2.6, 'IT\'S GONE… for now', 24);
             this.stalker = null;
         } else if (m.ai === 'rickroll') {
@@ -369,6 +371,65 @@ extendGame({
             ctx.fillStyle = '#fff';
             ctx.beginPath();
             ctx.arc(0, 0, s * 0.42, 0, TAU);
+            ctx.fill();
+        }
+        ctx.restore();
+    },
+
+    // ------------------------------------------------------------------ The Respawner (meme mode)
+
+    /** About half the levels get one, early in the fight. */
+    maybeRespawner() {
+        if (this.respawnerLevel === this.level || this.progress < this.target * 0.15) return;
+        this.respawnerLevel = this.level;
+        if (Math.random() < 0.5) {
+            const pt = this.spawnPoint();
+            this.spawnRespawner(pt.x, pt.y, 2);
+        }
+    },
+
+    /** It goes down with "RIP" and pops back up twice; only the last time drops loot. */
+    spawnRespawner(x, y, lives, back = false) {
+        const type = { name: 'The Respawner', shape: 'circle', color: '#3b82f6', size: 13, speed: 1.3, speedVariation: 0.2, health: 3, points: 25, tier: 'medium' };
+        const m = this.makeMonster(type, x, y, 'chase');
+        Object.assign(m, {
+            respawner: true, lives, spawnT: back ? 14 : m.spawnT,
+            onDeath: mm => {
+                if (mm.lives <= 0) {
+                    this.memeFloater(mm.x, mm.y - 40, 'FINALLY.', 22);
+                    return;
+                }
+                mm.noLoot = true; // the loot comes with the last one
+                this.memeFloater(mm.x, mm.y - 36, 'RIP', 22);
+                const at = { x: mm.x, y: mm.y };
+                this.hazards.push({ type: 'timer', t: 0, update: h => {
+                    if (h.t < 54) return;
+                    h.dead = true;
+                    if (this.state !== 'playing' || this.phase === 'loot' || this.phase === 'travel') return;
+                    this.spawnRespawner(at.x, at.y, mm.lives - 1, true);
+                    this.memeFloater(at.x, at.y - 36, 'RESPAWNED!', 22);
+                    this.ring(at.x, at.y, 30, '#93c5fd', 14);
+                    Sfx.arpeggio([784, 1175], 0.07, { type: 'triangle', volume: 0.1 });
+                } });
+            }
+        });
+        this.monsters.push(m);
+        return m;
+    },
+
+    drawRespawner(ctx, m) {
+        const bob = Math.abs(Math.sin(m.phase * 0.8)) * m.size * 0.15;
+        const lean = Math.sin(m.phase * 0.8) * 0.1;
+        ctx.save();
+        ctx.translate(m.x, m.y - bob);
+        ctx.rotate(lean);
+        if (m.spawnT > 0) ctx.globalAlpha = U.clamp(1 - m.spawnT / 20, 0.2, 1);
+        this.drawMemeArt(ctx, 'respawner', 0, 0, m.size * 3.4);
+        if (m.flash > 0) {
+            ctx.globalAlpha = 0.5;
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.arc(0, 0, m.size * 1.1, 0, TAU);
             ctx.fill();
         }
         ctx.restore();

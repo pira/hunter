@@ -142,7 +142,10 @@ extendGame({
     updateSpawning() {
         if (this.edgeWarn && --this.edgeWarn.t <= 0) this.edgeWarn = null;
         if (this.phase !== 'fight') return;
-        if (this.memeMode) this.maybeStalker(); // js/codes.js
+        if (this.memeMode) {
+            this.maybeStalker(); // js/codes.js
+            this.maybeRespawner();
+        }
         const alive = this.monsters.length;
         const cap = Math.min(70, 40 + this.level);
         const interval = U.spawnInterval(this.level);
@@ -389,7 +392,7 @@ extendGame({
         }
         if (this.memeMode) this.memeKill(m);
         if (m.onDeath) m.onDeath(m);
-        this.dropLoot(m);
+        if (!m.noLoot) this.dropLoot(m);
     },
 
     sweepDead() {
