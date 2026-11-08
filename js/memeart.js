@@ -347,3 +347,217 @@ const MemeArt = (() => {
         }
     };
 })();
+
+// ---------------------------------------------------------------------- meme mode locations
+// Six places the road runs through while meme mode is on (they replace the normal biomes; see
+// biomeFor in js/codes.js). Same shape as BIOMES in js/road.js; `families` = the monsters living there.
+// Items starting with "m_" are meme props painted by Game.paintMemeItem below.
+const MEME_BIOMES = [
+    { id: 'm_ohio', name: 'Ohio Cornfields', ground: ['#a3b545', '#93a53b', '#b5c556'], road: ['#c9a46a', '#b8935c', '#d9b77e'], edge: '#8a6a3d', surface: 'dirt',
+        families: ['beasts', 'bandits'], items: [['m_corn', 30], ['m_sign_ohio', 2], ['tuft', 12]] },
+    { id: 'm_stonks', name: 'Stonks Exchange', ground: ['#1e293b', '#172033', '#26344a'], road: ['#64748b', '#5a687e', '#718198'], edge: '#334155', surface: 'cobble',
+        families: ['bandits', 'fantasy'], items: [['m_candles', 14], ['m_arrow', 5], ['m_coins', 6]] },
+    { id: 'm_grass', name: 'Touch Grass Meadow', ground: ['#4ade80', '#3fcf73', '#6ee79a'], road: ['#d6d3c4', '#c6c2b2', '#e4e1d4'], edge: '#a8a596', surface: 'gravel',
+        families: ['beasts', 'bugs'], items: [['m_tallgrass', 30], ['flowers', 14], ['m_sign_grass', 2]] },
+    { id: 'm_comments', name: 'The Comment Section', ground: ['#cbd5e1', '#bfcad8', '#d8e0ea'], road: ['#f1f5f9', '#e2e8f0', '#f8fafc'], edge: '#94a3b8', surface: 'planks',
+        families: ['bandits', 'undead'], items: [['m_bubble', 12], ['m_heart', 10], ['m_thumb', 6]] },
+    { id: 'm_loading', name: 'Loading Screen', ground: ['#27272a', '#202023', '#323236'], road: ['#3f3f46', '#36363c', '#4a4a52'], edge: '#18181b', surface: 'basalt',
+        families: ['fantasy', 'undead'], items: [['m_spinner', 18], ['m_bar', 9], ['ember', 10]] },
+    { id: 'm_void', name: 'Error 404 Void', ground: ['#0b0b14', '#12101f', '#07070d'], road: ['#2e1065', '#261052', '#3b1580'], edge: '#1e0b45', surface: 'veins',
+        families: ['undead', 'bugs'], items: [['m_glitch', 26], ['m_sign_404', 3]] }
+];
+
+Object.assign(Game, {
+    /** Meme props on the verges, drawn into the biome tile (so they cost nothing per frame). */
+    paintMemeItem(g, kind, x, y, s, seed) {
+        const O = MOB_OUTLINE;
+        const box = (bx, by, w, h, fill, r = 2) => {
+            g.beginPath();
+            g.roundRect(bx, by, w, h, r);
+            g.fillStyle = fill;
+            g.fill();
+            g.strokeStyle = O;
+            g.lineWidth = 1.5;
+            g.stroke();
+        };
+        const text = (t, tx, ty, size, fill) => {
+            g.font = `${Math.round(size)}px ${DISPLAY_FONT}`;
+            g.textAlign = 'center';
+            g.textBaseline = 'middle';
+            g.fillStyle = fill;
+            g.fillText(t, tx, ty);
+        };
+        const shadow = (rx, ry = rx * 0.4) => {
+            g.fillStyle = 'rgba(0,0,0,0.18)';
+            g.beginPath();
+            g.ellipse(x + 2, y + 2, rx, ry, 0, 0, TAU);
+            g.fill();
+        };
+        const sign = (lines, board, ink) => {
+            shadow(16 * s, 5 * s);
+            g.fillStyle = '#6b4423';
+            g.fillRect(x - 2 * s, y - 22 * s, 4 * s, 24 * s);
+            box(x - 22 * s, y - 40 * s, 44 * s, 22 * s, board, 3 * s);
+            lines.forEach((t, i) => text(t, x, y - (lines.length === 1 ? 29 : 34 - i * 10) * s, (lines.length === 1 ? 10 : 8) * s, ink));
+        };
+        g.save();
+        switch (kind) {
+            case 'm_corn': {
+                // a corn stalk: leaves and a cob
+                g.strokeStyle = '#4d7c0f';
+                g.lineWidth = 3 * s;
+                g.lineCap = 'round';
+                g.beginPath();
+                g.moveTo(x, y);
+                g.lineTo(x + (seed - 0.5) * 4 * s, y - 34 * s);
+                g.stroke();
+                g.strokeStyle = '#65a30d';
+                g.lineWidth = 2.5 * s;
+                for (let i = 0; i < 3; i++) {
+                    const ly = y - (8 + i * 9) * s;
+                    const d = i % 2 ? 1 : -1;
+                    g.beginPath();
+                    g.moveTo(x, ly);
+                    g.quadraticCurveTo(x + d * 10 * s, ly - 8 * s, x + d * 15 * s, ly - 2 * s);
+                    g.stroke();
+                }
+                if (seed > 0.35) {
+                    g.fillStyle = '#facc15';
+                    g.strokeStyle = O;
+                    g.lineWidth = 1.2;
+                    g.beginPath();
+                    g.ellipse(x + 4 * s, y - 22 * s, 3 * s, 7 * s, 0.3, 0, TAU);
+                    g.fill();
+                    g.stroke();
+                }
+                break;
+            }
+            case 'm_sign_ohio':
+                sign(['ONLY IN', 'OHIO'], '#fef3c7', '#b91c1c');
+                break;
+            case 'm_sign_grass':
+                sign(['TOUCH', 'GRASS'], '#f0fdf4', '#15803d');
+                break;
+            case 'm_sign_404':
+                sign(['404'], '#18181b', '#f0abfc');
+                break;
+            case 'm_candles':
+                // a little candlestick chart standing in the dark
+                for (let i = 0; i < 4; i++) {
+                    const up = (seed * 10 + i) % 3 > 0.9;
+                    const h = (6 + ((seed * 37 + i * 13) % 1) * 14) * s;
+                    const cx = x + (i - 1.5) * 7 * s;
+                    const top = y - (i * 4 + 6) * s - h;
+                    g.fillStyle = up ? '#22c55e' : '#ef4444';
+                    g.fillRect(cx - 0.6 * s, top - 4 * s, 1.2 * s, h + 8 * s);
+                    g.fillRect(cx - 2.5 * s, top, 5 * s, h);
+                }
+                break;
+            case 'm_arrow':
+                g.fillStyle = 'rgba(34,197,94,0.25)';
+                g.beginPath();
+                g.ellipse(x, y - 14 * s, 16 * s, 16 * s, 0, 0, TAU);
+                g.fill();
+                g.fillStyle = '#22c55e';
+                g.strokeStyle = O;
+                g.lineWidth = 1.5;
+                g.beginPath();
+                g.moveTo(x, y - 30 * s);
+                g.lineTo(x + 11 * s, y - 16 * s);
+                g.lineTo(x + 4 * s, y - 16 * s);
+                g.lineTo(x + 4 * s, y);
+                g.lineTo(x - 4 * s, y);
+                g.lineTo(x - 4 * s, y - 16 * s);
+                g.lineTo(x - 11 * s, y - 16 * s);
+                g.closePath();
+                g.fill();
+                g.stroke();
+                break;
+            case 'm_coins':
+                shadow(10 * s, 4 * s);
+                for (let i = 0; i < 4; i++) {
+                    g.fillStyle = '#facc15';
+                    g.strokeStyle = '#a16207';
+                    g.lineWidth = 1.2;
+                    g.beginPath();
+                    g.ellipse(x + (i % 2 ? 4 : -3) * s, y - i * 3.5 * s, 7 * s, 3 * s, 0, 0, TAU);
+                    g.fill();
+                    g.stroke();
+                }
+                break;
+            case 'm_tallgrass': {
+                g.strokeStyle = ['#15803d', '#16a34a', '#22c55e'][Math.floor(seed * 3)];
+                g.lineWidth = 2 * s;
+                g.lineCap = 'round';
+                for (let i = 0; i < 6; i++) {
+                    const a = (i - 2.5) * 0.22;
+                    g.beginPath();
+                    g.moveTo(x + (i - 2.5) * 2 * s, y);
+                    g.quadraticCurveTo(x + Math.sin(a) * 10 * s, y - 12 * s, x + Math.sin(a) * 16 * s, y - (18 + (i % 2) * 6) * s);
+                    g.stroke();
+                }
+                break;
+            }
+            case 'm_bubble': {
+                shadow(14 * s, 4 * s);
+                g.fillStyle = '#ffffff';
+                g.strokeStyle = '#64748b';
+                g.lineWidth = 1.5;
+                g.beginPath();
+                g.roundRect(x - 16 * s, y - 26 * s, 32 * s, 18 * s, 6 * s);
+                g.moveTo(x - 6 * s, y - 8 * s);
+                g.lineTo(x - 10 * s, y);
+                g.lineTo(x, y - 8 * s);
+                g.fill();
+                g.stroke();
+                const t = ['first!', 'ratio', 'L', 'W', 'lol', 'based', '+1', 'source?'][Math.floor(seed * 8)];
+                text(t, x, y - 17 * s, 8 * s, '#334155');
+                break;
+            }
+            case 'm_heart':
+                g.fillStyle = '#f43f5e';
+                g.strokeStyle = O;
+                g.lineWidth = 1.2;
+                g.beginPath();
+                g.moveTo(x, y - 4 * s);
+                g.bezierCurveTo(x - 12 * s, y - 12 * s, x - 6 * s, y - 22 * s, x, y - 15 * s);
+                g.bezierCurveTo(x + 6 * s, y - 22 * s, x + 12 * s, y - 12 * s, x, y - 4 * s);
+                g.fill();
+                g.stroke();
+                break;
+            case 'm_thumb':
+                box(x - 9 * s, y - 14 * s, 6 * s, 12 * s, '#3b82f6', 1.5);
+                box(x - 3 * s, y - 15 * s, 12 * s, 13 * s, '#fcd34d', 3 * s);
+                box(x - 2 * s, y - 25 * s, 6 * s, 12 * s, '#fcd34d', 3 * s);
+                break;
+            case 'm_spinner': {
+                const r = 9 * s;
+                for (let i = 0; i < 8; i++) {
+                    const a = (i / 8) * TAU;
+                    g.fillStyle = `rgba(255,255,255,${0.15 + (i / 8) * 0.8})`;
+                    g.beginPath();
+                    g.arc(x + Math.cos(a) * r, y - 12 * s + Math.sin(a) * r, 2.2 * s, 0, TAU);
+                    g.fill();
+                }
+                break;
+            }
+            case 'm_bar':
+                box(x - 18 * s, y - 12 * s, 36 * s, 8 * s, '#18181b', 2);
+                g.fillStyle = '#22d3ee';
+                g.fillRect(x - 17 * s, y - 11 * s, 33 * s, 6 * s);
+                text('99%', x, y - 20 * s, 8 * s, '#e4e4e7');
+                break;
+            case 'm_glitch': {
+                const cols = ['#f0abfc', '#22d3ee', '#a3e635', '#f43f5e'];
+                for (let i = 0; i < 3; i++) {
+                    g.globalAlpha = 0.5 + ((seed * 7 + i) % 1) * 0.4;
+                    g.fillStyle = cols[Math.floor((seed * 10 + i) % 4)];
+                    g.fillRect(x + (((seed * 13 + i * 5) % 1) - 0.5) * 20 * s, y - i * 5 * s, (6 + ((seed * 29 + i) % 1) * 16) * s, 2.5 * s);
+                }
+                g.globalAlpha = 1;
+                break;
+            }
+        }
+        g.restore();
+    }
+});

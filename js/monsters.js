@@ -28,10 +28,12 @@ extendGame({
      * so neighbouring levels look different. Fixed per level, so a resumed hunt gets the same ones.
      */
     levelFamilies(level = this.level) {
-        const cache = this.famCache || (this.famCache = [null]);
+        const ck = this.memeMode ? 'famCacheMeme' : 'famCache'; // meme mode's places have their own families
+        const cache = this[ck] || (this[ck] = [null]);
         for (let L = cache.length; L <= level; L++) {
-            const home = BIOME_FAMILIES[this.biomeFor(L).id] || MOB_FAMILY_ORDER.slice(0, 2);
-            const lap = Math.floor((L - 1) / BIOMES.length);
+            const biome = this.biomeFor(L);
+            const home = BIOME_FAMILIES[biome.id] || biome.families || MOB_FAMILY_ORDER.slice(0, 2);
+            const lap = Math.floor((L - 1) / (this.memeMode ? MEME_BIOMES : BIOMES).length);
             let pair = lap % 2 ? [home[1], home[0]] : [home[0], home[1]];
             if (cache[L - 1] && pair[0] === cache[L - 1][0]) pair = [pair[1], pair[0]];
             cache[L] = pair;

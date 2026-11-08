@@ -136,6 +136,8 @@ extendGame({
         btn.hidden = !unlocked;
         btn.classList.toggle('on', this.memeMode);
         btn.textContent = this.memeMode ? '😎 Meme mode: ON' : '🐸 Meme mode: OFF';
+        // the menu's road behind the panel switches to (or from) the meme places right away
+        if (this.state === 'menu' && this.biomeFor) this.biome = this.biomeFor(1);
     },
 
     // ------------------------------------------------------------------ meme mode effects
