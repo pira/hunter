@@ -287,6 +287,77 @@ const MemeArt = (() => {
             line(g, 5, [[-28, 32], [30, 30]], '#ef4444');
             g.restore();
         },
+        // ------------------------------------------------------------ Sigma Cat (meme mode's first boss)
+        /** A cartoon hand with the index finger up: the "well, actually" finger (never the rude one). */
+        hand(g) {
+            const Y = '#facc15';
+            A.rrect(g, -10, -44, 14, 40, 7, Y); // index finger
+            A.rrect(g, -20, -12, 40, 36, 12, Y); // fist
+            line(g, 2.5, [[-12, 4], [12, 4]], '#ca8a04'); // curled fingers
+            line(g, 2.5, [[-12, 13], [12, 13]], '#ca8a04');
+            A.ellipse(g, 20, 4, 8, 14, Y, -0.3); // thumb
+            A.ellipse(g, -3, -38, 4, 3, '#fef9c3'); // fingernail
+        },
+        shush(g) {
+            MemeArt.hand(g);
+            g.font = `bold 20px ${DISPLAY_FONT}`;
+            g.textAlign = 'center';
+            g.textBaseline = 'middle';
+            g.lineWidth = 4;
+            g.strokeStyle = O;
+            g.strokeText('shh', 0, 38);
+            g.fillStyle = '#e0f2fe';
+            g.fillText('shh', 0, 38);
+        },
+        sigma_think(g) {
+            MemeArt.sigmaCat(g, false);
+            g.save();
+            g.translate(-22, 30);
+            g.scale(0.55, 0.55);
+            g.rotate(-0.25);
+            MemeArt.hand(g);
+            g.restore();
+        },
+        sigma_shush(g) {
+            MemeArt.sigmaCat(g, true);
+            g.save();
+            g.translate(2, 40);
+            g.scale(0.55, 0.55);
+            MemeArt.hand(g);
+            g.restore();
+        },
+        /** A grey tabby with huge eyes. `shush` looks straight at you; otherwise it side-eyes, thinking. */
+        sigmaCat(g, shush) {
+            const fur = '#9ca3af';
+            A.poly(g, [[-36, -12], [-30, -46], [-10, -32]], fur);
+            A.poly(g, [[36, -12], [30, -46], [10, -32]], fur);
+            A.poly(g, [[-31, -18], [-28, -38], [-17, -30]], '#f9a8d4');
+            A.poly(g, [[31, -18], [28, -38], [17, -30]], '#f9a8d4');
+            A.ellipse(g, 0, 2, 40, 36, fur);
+            // tabby stripes on the forehead
+            line(g, 3, [[-12, -30], [-8, -20]], '#4b5563');
+            line(g, 3, [[0, -33], [0, -21]], '#4b5563');
+            line(g, 3, [[12, -30], [8, -20]], '#4b5563');
+            line(g, 3, [[-38, 0], [-28, 2]], '#4b5563');
+            line(g, 3, [[38, 0], [28, 2]], '#4b5563');
+            A.ellipse(g, 0, 18, 20, 14, '#f3f4f6'); // muzzle
+            const look = shush ? 0 : 0.5;
+            for (const x of [-15, 15]) {
+                A.circle(g, x, -6, 11, '#fefce8');
+                A.dot(g, x + look * 4, -6 - (shush ? 0 : 2), 8, '#111827');
+                A.dot(g, x + look * 4 - 3, -10, 2.6, '#fff');
+            }
+            A.poly(g, [[-5, 8], [5, 8], [0, 13]], '#f472b6'); // nose
+            g.strokeStyle = 'rgba(255,255,255,0.85)';
+            g.lineWidth = 1.5;
+            for (const d of [-1, 1]) for (let i = 0; i < 3; i++) {
+                g.beginPath();
+                g.moveTo(d * 14, 16 + i * 3);
+                g.lineTo(d * 40, 12 + i * 6);
+                g.stroke();
+            }
+            if (!shush) arc(g, 0, 18, 5, 0.15 * PI, 0.85 * PI, 2.5);
+        },
         // ------------------------------------------------------------ boss faces
         corn(g) {
             A.poly(g, [[-6, 40], [-30, 10], [-20, -10], [-4, 20]], '#16a34a');

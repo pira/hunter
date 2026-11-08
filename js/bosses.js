@@ -177,12 +177,12 @@ extendGame({
                 this.bossPose(b);
                 if (b.volley % 3 === 0) {
                     const a = Math.atan2(p.y - b.y, p.x - b.x);
-                    for (let i = -2; i <= 2; i++) this.enemyShot(b.x, b.y, a + i * 0.18, 3.4, b.boss.accent);
+                    for (let i = -2; i <= 2; i++) this.enemyShot(b.x, b.y, a + i * 0.18, 3.4, (b.boss.shots && b.boss.shots[0]) || b.boss.accent);
                 } else {
                     this.radial(b, (enraged ? 18 : 14) + (this.diff >= 3 ? 4 : 0), 2.4, b.boss.accent, b.volley * 0.2);
                 }
             }
-            if (enraged && b.t % 9 === 0) this.enemyShot(b.x, b.y, b.t * 0.07, 2.2, '#d7bde2');
+            if (enraged && b.t % 9 === 0) this.enemyShot(b.x, b.y, b.t * 0.07, 2.2, (b.boss.shots && b.boss.shots[1]) || '#d7bde2');
         } else {
             chase(enraged ? 0.9 : 0.6);
             const every = this.cd(enraged ? 160 : 220);
@@ -713,7 +713,8 @@ extendGame({
     // ------------------------------------------------------------------ shots
 
     radial(b, count, speed, color, offset = 0) {
-        for (let i = 0; i < count; i++) this.enemyShot(b.x, b.y, offset + (i / count) * TAU, speed);
+        const style = (b.boss && b.boss.shots && b.boss.shots[1]) || undefined; // meme bosses throw their own things
+        for (let i = 0; i < count; i++) this.enemyShot(b.x, b.y, offset + (i / count) * TAU, speed, style);
     },
 
     /** Enemy projectile. style: orb (default) | arrow | fire | acid | spark | skull. */

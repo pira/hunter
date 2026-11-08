@@ -267,8 +267,83 @@ extendGame({
 
     /** The meme version of a boss def (a copy: the shared def stays as it is). */
     memeBoss(def) {
+        if (def && !def.big && this.smallCount === 0) return this.sigmaBoss(); // meme mode's first boss
         const mm = def && MEME_BOSSES[def.name];
         return mm ? { ...def, name: mm.name, title: mm.title, memeFace: mm.face, mute: true } : def;
+    },
+
+    /** Sigma Cat: the ring-shooting boss's moves and HP, throwing "well, actually" and "shh" hands. */
+    sigmaBoss() {
+        const base = BOSSES.find(d => d.pattern === 'rings') || BOSSES[0];
+        return { ...base, name: 'Sigma Cat', title: 'Well, actually…', color: '#9ca3af', accent: '#facc15', shots: ['point', 'shush'], sigma: true, mute: true };
+    },
+
+    /** Sigma Cat's photos (img/meme), loaded on first use; the drawn cat stands in until they arrive. */
+    sigmaPhoto(pose) {
+        this.sigmaPhotos = this.sigmaPhotos || {};
+        let img = this.sigmaPhotos[pose];
+        if (!img) {
+            img = this.sigmaPhotos[pose] = new Image();
+            img.src = `img/meme/sigma-${pose}.webp`;
+        }
+        return img.complete && img.naturalWidth ? img : null;
+    },
+
+    /** Drawn at the boss's spot (the caller translates): it side-eyes after a fan of fingers, shushes
+     *  otherwise. A special boss: its photo in a gold frame with a glow and orbiting sparkles. */
+    drawSigmaCat(ctx, b) {
+        const pose = b.volley % 3 === 0 ? 'think' : 'shush';
+        this.sigmaPhoto(pose === 'think' ? 'shush' : 'think'); // have the other one ready too
+        const photo = this.sigmaPhoto(pose);
+        const t = b.t || 0;
+        const y = Math.sin(t * 0.08) * 3 - b.size * 0.2;
+        const r = b.size * 1.25;
+        if (!photo) {
+            this.drawMemeArt(ctx, pose === 'think' ? 'sigma_think' : 'sigma_shush', 0, y, b.size * 2.9);
+        } else {
+            ctx.save();
+            const glow = ctx.createRadialGradient(0, y, r * 0.8, 0, y, r * 1.6);
+            glow.addColorStop(0, 'rgba(250,204,21,0.55)');
+            glow.addColorStop(1, 'rgba(250,204,21,0)');
+            ctx.fillStyle = glow;
+            ctx.beginPath();
+            ctx.arc(0, y, r * 1.6, 0, TAU);
+            ctx.fill();
+            ctx.drawImage(photo, -r, y - r, r * 2, r * 2);
+            ctx.lineWidth = 5;
+            ctx.strokeStyle = MOB_OUTLINE;
+            ctx.beginPath();
+            ctx.arc(0, y, r, 0, TAU);
+            ctx.stroke();
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = '#facc15';
+            ctx.beginPath();
+            ctx.arc(0, y, r - 1, 0, TAU);
+            ctx.stroke();
+            ctx.fillStyle = '#fef9c3';
+            for (let i = 0; i < 5; i++) {
+                const a = t * 0.04 + (i * TAU) / 5;
+                const sx = Math.cos(a) * r * 1.3;
+                const sy = y + Math.sin(a) * r * 1.3;
+                const k = 3 + Math.sin(t * 0.2 + i) * 1.5;
+                ctx.beginPath();
+                ctx.moveTo(sx, sy - k * 2);
+                ctx.lineTo(sx + k * 0.6, sy);
+                ctx.lineTo(sx, sy + k * 2);
+                ctx.lineTo(sx - k * 0.6, sy);
+                ctx.closePath();
+                ctx.fill();
+            }
+            ctx.restore();
+        }
+        if (b.flash > 0) {
+            ctx.globalAlpha = 0.45;
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.arc(0, y, r, 0, TAU);
+            ctx.fill();
+            ctx.globalAlpha = 1;
+        }
     },
 
     /** A big drawn face over the boss's body; it shrinks away while the boss crumbles. */
