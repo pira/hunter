@@ -40,12 +40,13 @@ const MEME_HEAVIES = {
 };
 // meme bosses: same attacks, a meme name and a big drawn face, no voice lines
 const MEME_BOSSES = {
-    Bonecrusher: { name: 'Ohio Final Boss', title: 'Only in Ohio', face: 'corn' },
-    Hexweaver: { name: 'The Loading Circle', title: 'Buffering… 99%', face: 'hourglass' },
-    Broodmother: { name: 'Reply Guy', title: 'Summons the comment section', face: 'reply' },
+    // photo: a picture the player sent (img/meme/boss-<photo>.webp), shown framed instead of the drawn face
+    Bonecrusher: { name: 'Ohio Final Boss', title: 'Only in Ohio', face: 'corn', photo: 'ohio' },
+    Hexweaver: { name: 'The Loading Circle', title: 'Buffering… 99%', face: 'hourglass', photo: 'loading', spin: true },
+    Broodmother: { name: 'Reply Guy', title: 'Summons the comment section', face: 'reply', photo: 'reply' },
     Voidmaw: { name: 'Error 404', title: 'Boss not found', face: 'notfound' },
-    Gravelord: { name: 'Giga Moai', title: 'Stone-faced sigma', face: 'moai' },
-    Stormcaller: { name: 'Stonks Lord', title: 'Line goes up', face: 'stonks' },
+    Gravelord: { name: 'Giga Moai', title: 'Stone-faced sigma', face: 'moai', photo: 'moai' },
+    Stormcaller: { name: 'Stonks Lord', title: 'Line goes up', face: 'stonks', photo: 'stonks' },
     Hydra: { name: 'Triple Ratio', title: 'Three heads, zero rizz', face: 'grimace' },
     Lich: { name: 'Final Boss of the Internet', title: 'Touch grass or perish', face: 'skull' }
 };
@@ -278,7 +279,7 @@ extendGame({
     /** The meme version of a boss def (a copy: the shared def stays as it is). */
     memeBoss(def) {
         const mm = def && MEME_BOSSES[def.name];
-        return mm ? { ...def, name: mm.name, title: mm.title, memeFace: mm.face, mute: true } : def;
+        return mm ? { ...def, name: mm.name, title: mm.title, memeFace: mm.face, photo: mm.photo, spin: mm.spin, mute: true } : def;
     },
 
     /** Meme mode's mini bosses for the levels without a real boss: all eight meme bosses in turn, plus
@@ -367,8 +368,21 @@ extendGame({
         }
     },
 
-    /** A big drawn face over the boss's body; it shrinks away while the boss crumbles. */
+    /** A boss picture (img/meme/boss-<name>.webp), loaded on first use; null until it has arrived. */
+    memePhoto(name) {
+        this.memePhotos = this.memePhotos || {};
+        let img = this.memePhotos[name];
+        if (!img) {
+            img = this.memePhotos[name] = new Image();
+            img.src = `img/meme/boss-${name}.webp`;
+        }
+        return img.complete && img.naturalWidth ? img : null;
+    },
+
+    /** A big drawn face (or the boss's picture, framed in gold) over the boss's body; it shrinks away while the boss crumbles. */
     drawMemeBossFace(ctx, b) {
+        const photo = b.boss.photo && this.memePhoto(b.boss.photo);
+        if (photo) return this.drawBossPhoto(ctx, b, photo);
         const q = b.dying ? b.deathT / b.deathMax : 0;
         const s = b.size * (b.boss.big ? 2.4 : 2.1) * (1 - 0.5 * q);
         const wob = Math.sin((b.t || 0) * 0.12) * 0.12;
@@ -382,6 +396,61 @@ extendGame({
             ctx.fillStyle = '#fff';
             ctx.beginPath();
             ctx.arc(0, 0, s * 0.42, 0, TAU);
+            ctx.fill();
+        }
+        ctx.restore();
+    },
+
+    /** The boss's picture in a round gold frame with a glow and orbiting sparkles, covering its body
+     *  (attack warnings like charge lines still show around it). */
+    drawBossPhoto(ctx, b, photo) {
+        const q = b.dying ? b.deathT / b.deathMax : 0;
+        const t = b.t || 0;
+        const r = b.size * (b.boss.big ? 1.45 : 1.3) * (1 - 0.45 * q);
+        const y = b.y - b.size * (b.boss.big ? 0.35 : 0.1) + Math.sin(t * 0.08) * 3;
+        ctx.save();
+        ctx.translate(b.x, y);
+        ctx.globalAlpha = 1 - q;
+        const glow = ctx.createRadialGradient(0, 0, r * 0.8, 0, 0, r * 1.6);
+        glow.addColorStop(0, b.enraged ? 'rgba(239,68,68,0.6)' : 'rgba(250,204,21,0.55)');
+        glow.addColorStop(1, 'rgba(250,204,21,0)');
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(0, 0, r * 1.6, 0, TAU);
+        ctx.fill();
+        ctx.save();
+        if (b.boss.spin) ctx.rotate(Math.floor(t / 5) * (TAU / 12)); // the loading spinner ticks round
+        ctx.drawImage(photo, -r, -r, r * 2, r * 2);
+        ctx.restore();
+        ctx.lineWidth = 5;
+        ctx.strokeStyle = MOB_OUTLINE;
+        ctx.beginPath();
+        ctx.arc(0, 0, r, 0, TAU);
+        ctx.stroke();
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = b.enraged ? '#ef4444' : '#facc15';
+        ctx.beginPath();
+        ctx.arc(0, 0, r - 1, 0, TAU);
+        ctx.stroke();
+        ctx.fillStyle = '#fef9c3';
+        for (let i = 0; i < 6; i++) {
+            const a = t * 0.04 + (i * TAU) / 6;
+            const sx = Math.cos(a) * r * 1.3;
+            const sy = Math.sin(a) * r * 1.3;
+            const k = 3 + Math.sin(t * 0.2 + i) * 1.5;
+            ctx.beginPath();
+            ctx.moveTo(sx, sy - k * 2);
+            ctx.lineTo(sx + k * 0.6, sy);
+            ctx.lineTo(sx, sy + k * 2);
+            ctx.lineTo(sx - k * 0.6, sy);
+            ctx.closePath();
+            ctx.fill();
+        }
+        if (b.flash > 0) {
+            ctx.globalAlpha = 0.45 * (1 - q);
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.arc(0, 0, r, 0, TAU);
             ctx.fill();
         }
         ctx.restore();
