@@ -6,22 +6,26 @@
  *   meme  unlocks meme mode         as often as you like (works offline too)
  * Meme mode is cosmetic only (quips, shades, sounds), so scores stay comparable. */
 
-const MEME_KILL = ['BONK', 'OOF', 'YEET', 'NOICE', 'BRUH', 'GG EZ', 'SHEESH', 'STONKS', 'POG', 'WOW', 'SUCH KILL', 'MUCH WOW', 'REKT', 'NO U', 'BIG BRAIN', 'SKILL ISSUE', 'L + RATIO', 'EMOTIONAL DAMAGE', 'TO THE MOON', 'IT\'S OVER 9000'];
-const MEME_HURT = ['OOF', 'BRUH', 'NOT STONKS', 'F', 'SADGE', 'WHY ARE WE STILL HERE'];
-const MEME_SUB = ['stonks 📈', 'much hunt, very wow', 'it\'s free real estate', 'this is fine 🔥', 'let\'s gooo', 'no cap', 'built different', 'ez clap', 'one does not simply walk this road', 'task failed successfully'];
+const MEME_KILL = ['BONK', 'OOF', 'YEET', 'NOICE', 'BRUH', 'GG EZ', 'SHEESH', 'STONKS', 'POG', 'WOW', 'SUCH KILL', 'MUCH WOW', 'REKT', 'NO U', 'BIG BRAIN', 'SKILL ISSUE', 'L + RATIO', 'EMOTIONAL DAMAGE', 'TO THE MOON', 'IT\'S OVER 9000',
+    // brain rot
+    '+1000 AURA', '-1000 AURA', '6 7', 'RIZZ', 'NPC BEHAVIOR', 'MOGGED', 'BUSSIN', 'COOKED', 'LOCK IN', 'DELULU', 'IT\'S GIVING', 'NO SHOT', 'FR FR', 'GOATED'];
+const MEME_HURT = ['OOF', 'BRUH', 'NOT STONKS', 'F', 'SADGE', 'WHY ARE WE STILL HERE', '-1000 AURA', 'I\'M COOKED', 'NPC MOMENT', 'LOCK IN'];
+const MEME_SUB = ['stonks 📈', 'much hunt, very wow', 'it\'s free real estate', 'this is fine 🔥', 'let\'s gooo', 'no cap', 'built different', 'ez clap', 'one does not simply walk this road', 'task failed successfully',
+    'aura farming', 'lock in', 'six seven', 'main character energy', 'no cap fr fr', 'we are so back'];
 const MEME_COLORS = ['#f87171', '#fbbf24', '#a3e635', '#22d3ee', '#a78bfa', '#f472b6'];
 const MEME_FONT = '"Comic Sans MS", "Comic Sans", "Chalkboard SE", cursive';
 // where the shades sit, relative to the hero's feet (rig units, before scale)
 const MEME_SHADES_Y = { wizard: 34, barbarian: 34, goblin: 31 };
 const MEME_SHADES_X = 1;
-// Meme mode turns about a third of the regular monsters into drawn memes (by family).
+// Meme mode turns the regular monsters into drawn memes (by family; see MEME_KEEP for the exceptions).
 // Only memes nobody owns: generic ideas, drawn in the game's style (no owned characters, no real people).
 const MEME_MOBS = {
-    beasts: [{ e: 'doge', name: 'Doge' }, { e: 'monke', name: 'Return to Monke' }],
-    bugs: [{ e: 'frog', name: 'Meme Frog' }, { e: 'cricket', name: '*crickets*' }],
-    undead: [{ e: 'skull', name: 'I\'m Dead' }, { e: 'ghost', name: 'Ghosted' }],
-    fantasy: [{ e: 'moai', name: 'Moai' }, { e: 'cap', name: 'Cap' }],
-    bandits: [{ e: 'clown', name: 'Clown' }, { e: 'stonks', name: 'Stonks' }]
+    // the third look of each family is brain rot
+    beasts: [{ e: 'doge', name: 'Doge' }, { e: 'monke', name: 'Return to Monke' }, { e: 'rizz', name: 'Rizz Lord' }],
+    bugs: [{ e: 'frog', name: 'Meme Frog' }, { e: 'cricket', name: '*crickets*' }, { e: 'sixseven', name: 'Six Seven' }],
+    undead: [{ e: 'skull', name: 'I\'m Dead' }, { e: 'ghost', name: 'Ghosted' }, { e: 'cooked', name: 'Cooked' }],
+    fantasy: [{ e: 'moai', name: 'Moai' }, { e: 'cap', name: 'Cap' }, { e: 'aura', name: 'Aura Farmer' }],
+    bandits: [{ e: 'clown', name: 'Clown' }, { e: 'stonks', name: 'Stonks' }, { e: 'npc', name: 'NPC' }]
 };
 // the cucumber (the "cat scared of a cucumber" meme) can turn up in any family
 const MEME_CUCUMBER = { e: 'cucumber', name: 'Cat\'s Worst Nightmare' };
@@ -45,7 +49,8 @@ const MEME_BOSSES = {
     Hydra: { name: 'Triple Ratio', title: 'Three heads, zero rizz', face: 'grimace' },
     Lich: { name: 'Final Boss of the Internet', title: 'Touch grass or perish', face: 'skull' }
 };
-const MEME_MOB_CHANCE = 0.35;
+const MEME_MOB_CHANCE = 1; // every monster is a meme…
+const MEME_KEEP = { fantasy: 1 }; // …except these (family: rank) — the Trollkin stays itself
 const RICK_LINES = ['GET ROLLED!', 'ROLL OUT!', 'YOU JUST GOT ROLLED', 'ROLLIN\' ROLLIN\''];
 const CODE_LOCAL = new Set(['meme']); // codes that work without the server
 
@@ -198,7 +203,7 @@ extendGame({
 
     /** Extra fields for a new monster in meme mode: a drawn look and a meme name (or nothing). */
     memeLook(type) {
-        if (!type || !type.family || Math.random() >= MEME_MOB_CHANCE) return {};
+        if (!type || !type.family || MEME_KEEP[type.family] === type.rank || Math.random() >= MEME_MOB_CHANCE) return {};
         const small = type.rank <= 3;
         const look = small && Math.random() < MEME_CUCUMBER_CHANCE ? MEME_CUCUMBER
             : small ? MEME_MOBS[type.family] && this.memePick(MEME_MOBS[type.family]) : MEME_HEAVIES[type.family];

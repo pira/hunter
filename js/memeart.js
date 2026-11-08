@@ -205,6 +205,98 @@ const MemeArt = (() => {
             line(g, 3, [[2, -22], [13, -24]]);
             arc(g, 2, 8, 6, 1.15 * PI, 1.85 * PI);
         },
+        // ------------------------------------------------------------ brain rot
+        /** A background character with a quest marker over its blank face. */
+        npc(g) {
+            A.rrect(g, -26, -22, 52, 54, 12, '#d6d3d1');
+            A.dot(g, -10, 0, 3.5, O);
+            A.dot(g, 10, 0, 3.5, O);
+            line(g, 3, [[-9, 16], [9, 16]]);
+            A.rrect(g, -6, -50, 12, 18, 4, '#facc15');
+            A.circle(g, 0, -27, 4.5, '#facc15');
+        },
+        /** Farming aura: smug, glowing, +1000. */
+        aura(g) {
+            for (let i = 3; i > 0; i--) {
+                g.fillStyle = `rgba(250,204,21,${0.12 * i})`;
+                g.beginPath();
+                g.arc(0, 2, 30 + i * 6, 0, 2 * PI);
+                g.fill();
+            }
+            A.circle(g, 0, 2, 30, '#fcd34d');
+            arc(g, -11, -2, 6, 1.1 * PI, 1.9 * PI, 3); // smug closed eyes
+            arc(g, 11, -2, 6, 1.1 * PI, 1.9 * PI, 3);
+            arc(g, 4, 14, 9, 0.1 * PI, 0.6 * PI, 3); // smirk
+            g.font = `bold 15px ${DISPLAY_FONT}`;
+            g.textAlign = 'center';
+            g.textBaseline = 'middle';
+            g.lineWidth = 4;
+            g.strokeStyle = O;
+            g.strokeText('+1000', 0, -40);
+            g.fillStyle = '#fef08a';
+            g.fillText('+1000', 0, -40);
+        },
+        /** "6 7": the digits with eyes, hands weighing it up. */
+        sixseven(g) {
+            g.font = `52px ${DISPLAY_FONT}`;
+            g.textAlign = 'center';
+            g.textBaseline = 'middle';
+            g.lineWidth = 7;
+            g.lineJoin = 'round';
+            g.strokeStyle = O;
+            g.strokeText('67', 0, 4);
+            g.fillStyle = '#c084fc';
+            g.fillText('67', 0, 4);
+            A.dot(g, -12, 6, 3, O);
+            A.dot(g, 15, -8, 3, O);
+            for (const [x, y] of [[-36, -16], [36, 10]]) {
+                g.save();
+                g.translate(x, y);
+                g.scale(0.32, 0.32);
+                g.rotate(x < 0 ? 0 : PI);
+                MemeArt.hand(g);
+                g.restore();
+            }
+        },
+        /** Rizz: one eyebrow up, a wink and a grin. */
+        rizz(g) {
+            A.circle(g, 0, 0, 32, '#fdba74');
+            line(g, 3.5, [[-20, -16], [-6, -22]]);
+            line(g, 3.5, [[6, -16], [20, -13]]);
+            eye(g, -12, -6, 6, 0.3);
+            arc(g, 13, -4, 6, 0.1 * PI, 0.9 * PI, 3); // wink
+            A.shape(g, '#fff', () => {
+                g.moveTo(-14, 10);
+                g.quadraticCurveTo(0, 26, 16, 8);
+                g.closePath();
+            });
+            A.poly(g, [[22, -30], [26, -22], [34, -22], [28, -17], [30, -9], [22, -14], [14, -9], [16, -17], [10, -22], [18, -22]], '#fde047');
+        },
+        /** You're cooked: an egg in a frying pan, looking worried. */
+        cooked(g) {
+            line(g, 9, [[26, 10], [46, 30]], O);
+            line(g, 5, [[26, 10], [46, 30]], '#78350f');
+            A.circle(g, 0, 0, 32, '#374151');
+            A.circle(g, 0, 0, 26, '#4b5563');
+            A.shape(g, '#fafaf9', () => {
+                g.moveTo(-20, -4);
+                g.bezierCurveTo(-24, -24, 6, -28, 14, -16);
+                g.bezierCurveTo(28, -6, 18, 20, 0, 18);
+                g.bezierCurveTo(-18, 20, -16, 8, -20, -4);
+            });
+            A.circle(g, -1, -2, 9, '#f59e0b');
+            A.dot(g, -4, -3, 1.8, O);
+            A.dot(g, 3, -3, 1.8, O);
+            arc(g, -0.5, 4, 3, 1.15 * PI, 1.85 * PI, 1.8);
+            g.strokeStyle = 'rgba(255,255,255,0.6)';
+            g.lineWidth = 2;
+            for (const x of [-12, 0, 12]) {
+                g.beginPath();
+                g.moveTo(x, -34);
+                g.bezierCurveTo(x - 5, -40, x + 5, -44, x, -50);
+                g.stroke();
+            }
+        },
         // ------------------------------------------------------------ the heavy tiers
         goat(g) {
             line(g, 9, [[-12, -24], [-24, -42], [-36, -36]], O);
