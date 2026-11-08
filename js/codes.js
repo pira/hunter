@@ -270,15 +270,15 @@ extendGame({
 
     /** The meme version of a boss def (a copy: the shared def stays as it is). */
     memeBoss(def) {
-        if (def && !def.big && this.smallCount === 0) return this.sigmaBoss(); // meme mode's first boss
         const mm = def && MEME_BOSSES[def.name];
         return mm ? { ...def, name: mm.name, title: mm.title, memeFace: mm.face, mute: true } : def;
     },
 
-    /** Sigma Cat: the ring-shooting boss's moves and HP, throwing "well, actually" and "shh" hands. */
+    /** Sigma Cat, meme mode's level-1 mini boss: the ring-shooting boss's moves at half its HP, throwing
+     *  "well, actually" and "shh" hands. Mini: gatekeeper loot, not counted as a boss (see bossDefeated). */
     sigmaBoss() {
         const base = BOSSES.find(d => d.pattern === 'rings') || BOSSES[0];
-        return { ...base, name: 'Sigma Cat', title: 'Well, actually…', color: '#9ca3af', accent: '#facc15', shots: ['point', 'shush'], sigma: true, mute: true };
+        return { ...base, name: 'Sigma Cat', title: 'Well, actually…', color: '#9ca3af', accent: '#facc15', shots: ['point', 'shush'], sigma: true, mute: true, mini: true, hp: Math.round(base.hp / 2) };
     },
 
     /** Sigma Cat's photos (img/meme), loaded on first use; the drawn cat stands in until they arrive. */
@@ -504,7 +504,7 @@ extendGame({
         ctx.restore();
     },
 
-    // ------------------------------------------------------------------ the Rick Roll (meme mode, end of level 1)
+    // ------------------------------------------------------------------ the Rick Roll (meme mode, end of level 2)
 
     startRickRoll() {
         const def = GATEKEEPERS.rickroll;

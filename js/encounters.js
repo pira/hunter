@@ -8,7 +8,7 @@ const GATEKEEPERS = {
     charger: { name: 'Charger', title: 'Dodge the red lane!', color: '#b91c1c', size: 30, hp: 30 },
     totem: { name: 'Totem', title: 'Smash it before it heals them all', color: '#a16207', size: 26, hp: 42 },
     archers: { name: 'Archers', title: 'Snipers in the bushes!', color: '#047857', size: 18, hp: 18 },
-    // meme mode only (js/codes.js): always the end of level 1, never drawn from the deck
+    // meme mode only (js/codes.js): always the end of level 2, never drawn from the deck
     rickroll: { name: 'The Rick Roll', title: 'Never gonna give you up', color: '#d97706', size: 30, hp: 30, meme: true }
 };
 const WAVES = {
@@ -170,6 +170,12 @@ extendGame({
         const kind = U.encounterKind(this.level);
         this.phase = 'encounter';
         const enc = this.encounter = { kind, t: 0, done: false, queue: [], spawned: 0 };
+        if (this.memeMode && this.level === 1) {
+            // meme mode: level 1 ends with Sigma Cat, a mini boss (js/codes.js)
+            Object.assign(enc, { kind: 'smallBoss', def: this.sigmaBoss() });
+            this.startBossWarning(enc.def);
+            return;
+        }
         if (kind === 'bigBoss' || kind === 'smallBoss') {
             // L100 would bring the super boss; until it exists it falls back to a big boss.
             enc.def = this.nextBossDef(kind);
@@ -179,8 +185,8 @@ extendGame({
             this.startBossWarning(enc.def);
             return;
         }
-        if (this.memeMode && this.level === 1) {
-            // meme mode: level 1 always ends with the Rick Roll (gatekeeper loot, so scores stay fair)
+        if (this.memeMode && this.level === 2) {
+            // meme mode: level 2 always ends with the Rick Roll (gatekeeper loot, so scores stay fair)
             this.regularCount++;
             Object.assign(enc, { kind: 'gatekeeper', id: 'rickroll', variant: 'A' });
             this.startRickRoll();
