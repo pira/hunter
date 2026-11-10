@@ -34,7 +34,8 @@ const BIOMES = [
 
 extendGame({
     biomeFor(level) {
-        return BIOMES[(Math.max(1, level) - 1) % BIOMES.length];
+        const list = this.memeMode ? MEME_BIOMES : BIOMES; // meme mode has places of its own (js/memeart.js)
+        return list[(Math.max(1, level) - 1) % list.length];
     },
 
     get roadLeft() {
@@ -667,6 +668,7 @@ Object.assign(Game, {
     },
 
     paintItem(g, kind, x, y, s, seed, biome) {
+        if (kind.startsWith('m_')) return Game.paintMemeItem(g, kind, x, y, s, seed); // meme props
         const O = 'rgba(20,30,20,0.55)';
         const ell = (cx, cy, rx, ry, fill, stroke) => {
             g.beginPath();

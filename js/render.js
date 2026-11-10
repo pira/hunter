@@ -104,8 +104,10 @@ extendGame({
             if (m.hidden) return;
             // one monster failing to draw must not take the rest (and the hero) with it
             this.guardDraw(ctx, () => {
-                if (m.boss) this.drawBoss(ctx, m);
-                else if (m.gk) this.drawGatekeeper(ctx, m);
+                if (m.boss) {
+                    this.drawBoss(ctx, m);
+                    if (m.boss.memeFace) this.drawMemeBossFace(ctx, m);
+                } else if (m.gk) this.drawGatekeeper(ctx, m);
                 else this.drawMonster(ctx, m);
             });
         });
@@ -120,6 +122,7 @@ extendGame({
         this.drawLightning(ctx);
         this.drawParticles(ctx);
         this.drawSackFlights(ctx);
+        if (this.stalkerDark > 0) this.drawStalkerDark(ctx);
         this.drawFloaters(ctx);
         this.drawScreenFx(ctx);
         this.drawStick(ctx);
@@ -518,6 +521,9 @@ extendGame({
     },
 
     drawMonster(ctx, m) {
+        if (m.stalker) return this.drawStalker(ctx, m);
+        if (m.respawner) return this.drawRespawner(ctx, m);
+        if (m.meme) return this.drawMemeMob(ctx, m);
         if (m.family) return this.drawFamilyMob(ctx, m);
         const squash = 1 + Math.sin(m.phase) * 0.06;
         const fill = m.flash > 0 ? '#ffffff' : m.color;
@@ -702,7 +708,8 @@ extendGame({
                 ctx.stroke();
             }
         }
-        if (!this.drawBossArt(ctx, b, def.voice)) Game.drawShape(ctx, 'circle', s, fill);
+        if (def.sigma) this.drawSigmaCat(ctx, b); // meme mode (js/codes.js)
+        else if (!this.drawBossArt(ctx, b, def.voice)) Game.drawShape(ctx, 'circle', s, fill);
 
         if (b.dying) {
             // Darkening body (a sprite darkens itself), glowing cracks spreading
@@ -999,6 +1006,27 @@ extendGame({
         // Enemy shots: magenta orbs by default (never confused with your own violet bolts), plus styles.
         const pulse = 1 + 0.15 * Math.sin(this.frameNo * 0.3);
         for (const s of this.enemyShots) {
+            if (s.style === 'point' || s.style === 'shush') {
+                // Sigma Cat's hands: "well, actually" fingers fly finger first; "shh" hands spin
+                ctx.save();
+                ctx.translate(s.x, s.y);
+                ctx.rotate(s.style === 'point' ? Math.atan2(s.vy, s.vx) + Math.PI / 2 : Math.sin(this.frameNo * 0.15 + s.x) * 0.4);
+                this.drawMemeArt(ctx, s.style === 'point' ? 'hand' : 'shush', 0, 0, s.r * 4.6);
+                ctx.restore();
+                continue;
+            }
+            if (s.style === 'note') {
+                // meme mode: the Rick Roll sings at you
+                ctx.font = `bold ${Math.round(s.r * 3.2)}px ${DISPLAY_FONT}`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.lineWidth = 3;
+                ctx.strokeStyle = '#1e1b4b';
+                ctx.strokeText('♪', s.x, s.y);
+                ctx.fillStyle = MEME_COLORS[Math.floor(this.frameNo / 5 + s.r) % MEME_COLORS.length];
+                ctx.fillText('♪', s.x, s.y);
+                continue;
+            }
             if (s.style === 'arrow') {
                 ctx.save();
                 ctx.translate(s.x, s.y);

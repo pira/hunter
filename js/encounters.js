@@ -7,7 +7,9 @@ const GATEKEEPERS = {
     bomber: { name: 'Bomber', title: 'Watch out for the mines!', color: '#9a3412', size: 26, hp: 26 },
     charger: { name: 'Charger', title: 'Dodge the red lane!', color: '#b91c1c', size: 30, hp: 30 },
     totem: { name: 'Totem', title: 'Smash it before it heals them all', color: '#a16207', size: 26, hp: 42 },
-    archers: { name: 'Archers', title: 'Snipers in the bushes!', color: '#047857', size: 18, hp: 18 }
+    archers: { name: 'Archers', title: 'Snipers in the bushes!', color: '#047857', size: 18, hp: 18 },
+    // meme mode only (js/codes.js): always the end of level 2, never drawn from the deck
+    rickroll: { name: 'The Rick Roll', title: 'Never gonna give you up', color: '#d97706', size: 30, hp: 30, meme: true }
 };
 const WAVES = {
     vee: { name: 'V-Formation', title: 'Incoming from above!' },
@@ -168,17 +170,38 @@ extendGame({
         const kind = U.encounterKind(this.level);
         this.phase = 'encounter';
         const enc = this.encounter = { kind, t: 0, done: false, queue: [], spawned: 0 };
+        if (this.memeMode && this.level === 1) {
+            // meme mode: level 1 ends with Sigma Cat, a mini boss (js/codes.js)
+            Object.assign(enc, { kind: 'smallBoss', def: this.sigmaBoss() });
+            this.startBossWarning(enc.def);
+            return;
+        }
         if (kind === 'bigBoss' || kind === 'smallBoss') {
             // L100 would bring the super boss; until it exists it falls back to a big boss.
             enc.def = this.nextBossDef(kind);
+            if (this.memeMode) enc.def = this.memeBoss(enc.def); // js/codes.js
             if (kind === 'bigBoss') this.bigCount++;
             else this.smallCount++;
             this.startBossWarning(enc.def);
             return;
         }
+        if (this.memeMode && this.level === 2) {
+            // meme mode: level 2 always ends with the Rick Roll (gatekeeper loot, so scores stay fair)
+            this.regularCount++;
+            Object.assign(enc, { kind: 'gatekeeper', id: 'rickroll', variant: 'A' });
+            this.startRickRoll();
+            return;
+        }
+        if (this.memeMode) {
+            // meme mode: every other level ends with a mini boss too (gatekeeper loot; js/codes.js)
+            this.regularCount++;
+            Object.assign(enc, { kind: 'smallBoss', def: this.nextMiniBoss() });
+            this.startBossWarning(enc.def);
+            return;
+        }
         const gk = this.regularCount++ % 2 === 0;
         if (gk) {
-            const [id, variant] = this.drawFromDeck('gk', Object.keys(GATEKEEPERS));
+            const [id, variant] = this.drawFromDeck('gk', Object.keys(GATEKEEPERS).filter(k => !GATEKEEPERS[k].meme));
             Object.assign(enc, { kind: 'gatekeeper', id, variant });
             const def = GATEKEEPERS[id];
             this.banner(`${variant === 'B' ? 'TWIN ' : ''}${def.name.toUpperCase()}`, def.title, 'danger');
@@ -438,6 +461,10 @@ extendGame({
                 }
                 break;
             }
+            case 'stalker':
+                this.updateStalker(m, freeze); // js/codes.js
+                break;
+            case 'rickroll': // rolls like the Charger (js/codes.js adds the notes and the looks)
             case 'charger': {
                 // Aims from wherever it stands, charges half the map, stops (dizzy — your chance,
                 // melee heroes!), then aims again from the new spot. Never warps back to the top.
@@ -470,6 +497,7 @@ extendGame({
                         m.y = U.clamp(m.y, this.topSafe * 0.6, this.H - pad);
                         m.mode = 'dizzy';
                         m.t = 0;
+                        if (m.ai === 'rickroll') this.rickNotes(m);
                         this.shake(6);
                         this.ring(m.x, m.y, m.size * 2, '#fca5a5', 16);
                     }
@@ -807,7 +835,7 @@ extendGame({
         const def = GATEKEEPERS[m.ai];
         const fill = m.flash > 0 ? '#ffffff' : m.color;
         const s = m.size;
-        if (m.ai === 'charger' && m.lane) {
+        if ((m.ai === 'charger' || m.ai === 'rickroll') && m.lane) {
             // the charge path: half the map, from where it stands
             ctx.save();
             ctx.translate(m.x, m.y);
@@ -821,7 +849,7 @@ extendGame({
             for (let x = 60; x < this.chargeLength; x += 70) ctx.fillText('➤', x, 0);
             ctx.restore();
         }
-        if (m.ai === 'charger' && m.mode === 'dizzy') {
+        if ((m.ai === 'charger' || m.ai === 'rickroll') && m.mode === 'dizzy') {
             ctx.fillStyle = '#fde047';
             for (let i = 0; i < 3; i++) {
                 const a = m.t * 0.2 + (i * TAU) / 3;
@@ -857,6 +885,8 @@ extendGame({
             if (BossSprites.get('charger')) ctx.rotate(shake);
             else ctx.rotate(shake + (m.dir || Math.PI / 2) - Math.PI / 2);
             this.drawBossArt(ctx, m, 'charger');
+        } else if (m.ai === 'rickroll') {
+            this.drawRickRoll(ctx, m);
         } else if (m.ai === 'shield' || m.ai === 'splitter' || m.ai === 'bomber' || m.ai === 'archers') {
             this.drawBossArt(ctx, m, m.ai);
         } else if (m.ai === 'totem' && this.drawBossSprite(ctx, m, 'totem')) {

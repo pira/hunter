@@ -6,7 +6,7 @@ extendGame({
 
     /** Fetches the voice index once and pre-loads the clips of the boss coming up this level. */
     async preloadBossVoice(def) {
-        if (!def || !def.voice) return;
+        if (!def || !def.voice || def.mute) return;
         try {
             if (!this.voiceIndex) this.voiceIndex = fetch('sfx/voice/index.json').then(r => r.json()).catch(() => ({}));
             const index = await this.voiceIndex;
@@ -19,7 +19,7 @@ extendGame({
 
     /** A boss says something: speech bubble (works muted) + the recorded clip when loaded. */
     async bossSay(b, event) {
-        if (!b || !b.boss || !b.boss.voice || b.dead) return;
+        if (!b || !b.boss || !b.boss.voice || b.boss.mute || b.dead) return;
         const index = this.voiceIndex ? await this.voiceIndex : {};
         const clips = ((index[b.boss.voice] || {})[event]) || [];
         if (!clips.length) return;
@@ -40,10 +40,10 @@ extendGame({
     // ------------------------------------------------------------------ spawn
 
     startBossWarning(def) {
-        this.bossCount++;
+        if (!def.mini) this.bossCount++; // a mini boss (meme mode's level 1) isn't counted
         this.pendingBoss = def;
         this.bossWarning = 150;
-        const s = this.roadSack || {};
+        const s = def.mini ? {} : this.roadSack || {};
         this.banner(`⚠ ${def.name.toUpperCase()} ⚠`, s.coins ? `${def.title} · holds the ${s.coins} coins the road took!` : def.title, 'danger');
     },
 
@@ -57,14 +57,15 @@ extendGame({
     spawnBoss(def) {
         this.bossStartTime = this.time;
         const big = Boolean(def.big);
-        const n = big ? this.bigCount : this.smallCount; // how many of this size we have met, incl. this one
+        const n = def.mini ? 1 : big ? this.bigCount : this.smallCount; // how many of this size we have met, incl. this one
         const cycle = Math.floor((n - 1) / 4);
         // v3.6: past level 12 bosses also get part of the monsters' steeper HP climb (×1.4 at L30, ×1.6 at L40)
         const late = Math.pow(U.hpScale(this.level) / U.hpStep(this.level), 0.75);
         // and on a mastered level (beaten before with this class) the boss has less HP: ÷√(level speed)
         // Hard/Hell: ×2/×3 HP like every monster
         const hp = Math.round(def.hp * (1 + (big ? 0.5 : 0.4) * (n - 1)) * (1 + 0.4 * cycle) * late * this.diffK / Math.sqrt(this.levelSpeed));
-        const b = this.makeBossBody(def, hp, cycle, this.W / 2, -def.size * 2);
+        // a mini boss (meme mode) grows with the level like a gatekeeper, from a smaller base
+        const b = this.makeBossBody(def, def.mini ? Math.round(hp * (1 + 0.12 * (this.level - 1))) : hp, cycle, this.W / 2, -def.size * 2);
         this.boss = b;
         this.bossParts = [b];
         this.bossTrailPct = 1;
@@ -177,12 +178,12 @@ extendGame({
                 this.bossPose(b);
                 if (b.volley % 3 === 0) {
                     const a = Math.atan2(p.y - b.y, p.x - b.x);
-                    for (let i = -2; i <= 2; i++) this.enemyShot(b.x, b.y, a + i * 0.18, 3.4, b.boss.accent);
+                    for (let i = -2; i <= 2; i++) this.enemyShot(b.x, b.y, a + i * 0.18, 3.4, (b.boss.shots && b.boss.shots[0]) || b.boss.accent);
                 } else {
                     this.radial(b, (enraged ? 18 : 14) + (this.diff >= 3 ? 4 : 0), 2.4, b.boss.accent, b.volley * 0.2);
                 }
             }
-            if (enraged && b.t % 9 === 0) this.enemyShot(b.x, b.y, b.t * 0.07, 2.2, '#d7bde2');
+            if (enraged && b.t % 9 === 0) this.enemyShot(b.x, b.y, b.t * 0.07, 2.2, (b.boss.shots && b.boss.shots[1]) || '#d7bde2');
         } else {
             chase(enraged ? 0.9 : 0.6);
             const every = this.cd(enraged ? 160 : 220);
@@ -713,7 +714,8 @@ extendGame({
     // ------------------------------------------------------------------ shots
 
     radial(b, count, speed, color, offset = 0) {
-        for (let i = 0; i < count; i++) this.enemyShot(b.x, b.y, offset + (i / count) * TAU, speed);
+        const style = (b.boss && b.boss.shots && b.boss.shots[1]) || undefined; // meme bosses throw their own things
+        for (let i = 0; i < count; i++) this.enemyShot(b.x, b.y, offset + (i / count) * TAU, speed, style);
     },
 
     /** Enemy projectile. style: orb (default) | arrow | fire | acid | spark | skull. */
@@ -750,7 +752,9 @@ extendGame({
         b.dying = true;
         b.deathT = 0;
         b.deathMax = 210; // ~3.9s of falling apart
-        b.coinsTotal = Math.round((25 + 15 * this.bossCount) * (b.boss.big ? 2 : 1) * this.diffK / Math.max(1, (this.bossParts || [b]).length));
+        b.coinsTotal = b.boss.mini
+            ? Math.round((8 + 2 * this.level) * this.diffK) // a mini boss pays like a gatekeeper
+            : Math.round((25 + 15 * this.bossCount) * (b.boss.big ? 2 : 1) * this.diffK / Math.max(1, (this.bossParts || [b]).length));
         b.coinsOut = 0;
         b.lootOut = 0;
         b.cracks = Array.from({ length: 7 }, () => ({ a: Math.random() * TAU, len: 0.5 + Math.random() * 0.5, bend: (Math.random() - 0.5) * 0.8 }));
@@ -817,10 +821,17 @@ extendGame({
             return; // the other half of the lich is still up
         }
         this.boss = null;
-        this.bossesSlain++;
         this.bossKill = { name: b.boss.name, title: b.boss.title, secs: this.time - (this.bossStartTime || this.time) };
-        this.masteryCheck(b);
         this.el.bossBar.hidden = true;
+        if (b.boss.mini) {
+            // meme mode's level-1 mini boss: gatekeeper rewards only (no bonus, gems, egg or boss kill)
+            Sfx.arpeggio([523, 659, 784, 1046], 0.08, { type: 'triangle', volume: 0.12 });
+            this.monsters.forEach(m => { if (m.minion || m.body === b) m.behavior = 'flee'; });
+            this.encounterWon();
+            return;
+        }
+        this.bossesSlain++;
+        this.masteryCheck(b);
         const bonus = 300 * this.bossCount * (b.boss.big ? 2 : 1);
         this.score += bonus;
         this.floater(b.x, b.y - b.size - 10, `BOSS SLAIN +${bonus}`, '#ffd60a', 30);

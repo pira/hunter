@@ -28,10 +28,12 @@ extendGame({
      * so neighbouring levels look different. Fixed per level, so a resumed hunt gets the same ones.
      */
     levelFamilies(level = this.level) {
-        const cache = this.famCache || (this.famCache = [null]);
+        const ck = this.memeMode ? 'famCacheMeme' : 'famCache'; // meme mode's places have their own families
+        const cache = this[ck] || (this[ck] = [null]);
         for (let L = cache.length; L <= level; L++) {
-            const home = BIOME_FAMILIES[this.biomeFor(L).id] || MOB_FAMILY_ORDER.slice(0, 2);
-            const lap = Math.floor((L - 1) / BIOMES.length);
+            const biome = this.biomeFor(L);
+            const home = BIOME_FAMILIES[biome.id] || biome.families || MOB_FAMILY_ORDER.slice(0, 2);
+            const lap = Math.floor((L - 1) / (this.memeMode ? MEME_BIOMES : BIOMES).length);
             let pair = lap % 2 ? [home[1], home[0]] : [home[0], home[1]];
             if (cache[L - 1] && pair[0] === cache[L - 1][0]) pair = [pair[1], pair[0]];
             cache[L] = pair;
@@ -71,7 +73,8 @@ extendGame({
             dir: Math.PI / 2 + (Math.random() - 0.5) * 1.6,
             dirT: 0, dirRate: 100 + Math.random() * 100,
             healT: 0, spawnT: 75, flash: 0, contactCd: 0,
-            phase: Math.random() * TAU, dead: false
+            phase: Math.random() * TAU, dead: false,
+            ...(this.memeMode ? this.memeLook(type) : {})
         };
     },
 
@@ -139,6 +142,10 @@ extendGame({
     updateSpawning() {
         if (this.edgeWarn && --this.edgeWarn.t <= 0) this.edgeWarn = null;
         if (this.phase !== 'fight') return;
+        if (this.memeMode) {
+            this.maybeStalker(); // js/codes.js
+            this.maybeRespawner();
+        }
         const alive = this.monsters.length;
         const cap = Math.min(70, 40 + this.level);
         const interval = U.spawnInterval(this.level);
@@ -385,7 +392,7 @@ extendGame({
         }
         if (this.memeMode) this.memeKill(m);
         if (m.onDeath) m.onDeath(m);
-        this.dropLoot(m);
+        if (!m.noLoot) this.dropLoot(m);
     },
 
     sweepDead() {
