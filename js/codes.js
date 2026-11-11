@@ -41,14 +41,14 @@ const MEME_HEAVIES = {
 // meme bosses: same attacks, a meme name and a big drawn face, no voice lines
 const MEME_BOSSES = {
     // photo: a picture the player sent (img/meme/boss-<photo>.webp), shown framed instead of the drawn face
-    Bonecrusher: { name: 'Ohio Final Boss', title: 'Only in Ohio', face: 'corn', photo: 'ohio' },
-    Hexweaver: { name: 'The Loading Circle', title: 'Buffering… 99%', face: 'hourglass', photo: 'loading', spin: true },
-    Broodmother: { name: 'Reply Guy', title: 'Summons the comment section', face: 'reply', photo: 'reply' },
-    Voidmaw: { name: 'Error 404', title: 'Boss not found', face: 'notfound', photo: 'notfound' },
-    Gravelord: { name: 'Giga Moai', title: 'Stone-faced sigma', face: 'moai', photo: 'moai' },
-    Stormcaller: { name: 'Stonks Lord', title: 'Line goes up', face: 'stonks', photo: 'stonks' },
-    Hydra: { name: 'Triple Ratio', title: 'Three heads, zero rizz', face: 'grimace', photo: 'ratio' },
-    Lich: { name: 'Final Boss of the Internet', title: 'Touch grass or perish', face: 'skull' }
+    Bonecrusher: { name: 'Ohio Final Boss', title: 'Only in Ohio', face: 'corn', photo: 'ohio', shot: 'corn' },
+    Hexweaver: { name: 'The Loading Circle', title: 'Buffering… 99%', face: 'hourglass', photo: 'loading', spin: true, shot: 'hourglass' },
+    Broodmother: { name: 'Reply Guy', title: 'Summons the comment section', face: 'reply', photo: 'reply', shot: 'reply' },
+    Voidmaw: { name: 'Error 404', title: 'Boss not found', face: 'notfound', photo: 'notfound', shot: 'notfound' },
+    Gravelord: { name: 'Giga Moai', title: 'Stone-faced sigma', face: 'moai', photo: 'moai', shot: 'moai' },
+    Stormcaller: { name: 'Stonks Lord', title: 'Line goes up', face: 'stonks', photo: 'stonks', shot: 'stonks' },
+    Hydra: { name: 'Triple Ratio', title: 'Three heads, zero rizz', face: 'grimace', photo: 'ratio', shot: 'grimace' },
+    Lich: { name: 'Final Boss of the Internet', title: 'Touch grass or perish', face: 'skull', shot: 'skull' }
 };
 const MEME_MOB_CHANCE = 1; // every monster is a meme…
 const MEME_KEEP = { fantasy: 1 }; // …except these (family: rank) — the Trollkin stays itself
@@ -279,7 +279,7 @@ extendGame({
     /** The meme version of a boss def (a copy: the shared def stays as it is). */
     memeBoss(def) {
         const mm = def && MEME_BOSSES[def.name];
-        return mm ? { ...def, name: mm.name, title: mm.title, memeFace: mm.face, photo: mm.photo, spin: mm.spin, mute: true } : def;
+        return mm ? { ...def, name: mm.name, title: mm.title, memeFace: mm.face, photo: mm.photo, spin: mm.spin, shotSkin: `meme:${mm.shot}`, mute: true } : def;
     },
 
     /** Meme mode's mini bosses for the levels without a real boss: all eight meme bosses in turn, plus
@@ -384,11 +384,11 @@ extendGame({
         const photo = b.boss.photo && this.memePhoto(b.boss.photo);
         if (photo) return this.drawBossPhoto(ctx, b, photo);
         const q = b.dying ? b.deathT / b.deathMax : 0;
-        const s = b.size * (b.boss.big ? 2.4 : 2.1) * (1 - 0.5 * q);
+        const s = b.size * (b.boss.big ? 3.2 : 2.9) * (1 - 0.5 * q);
         const wob = Math.sin((b.t || 0) * 0.12) * 0.12;
         ctx.save();
         ctx.globalAlpha = 1 - q;
-        ctx.translate(b.x, b.y - b.size * (b.boss.big ? 0.55 : 0.2));
+        ctx.translate(b.x, b.y);
         ctx.rotate(wob);
         this.drawMemeArt(ctx, b.boss.memeFace, 0, 0, s);
         if (b.flash > 0) {
@@ -407,7 +407,7 @@ extendGame({
         const q = b.dying ? b.deathT / b.deathMax : 0;
         const t = b.t || 0;
         const r = b.size * (b.boss.big ? 1.45 : 1.3) * (1 - 0.45 * q);
-        const y = b.y - b.size * (b.boss.big ? 0.35 : 0.1) + Math.sin(t * 0.08) * 3;
+        const y = b.y + Math.sin(t * 0.08) * 3; // centred on its hit area: there's no old body any more
         ctx.save();
         ctx.translate(b.x, y);
         ctx.globalAlpha = 1 - q;

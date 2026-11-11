@@ -720,6 +720,8 @@ extendGame({
 
     /** Enemy projectile. style: orb (default) | arrow | fire | acid | spark | skull. */
     enemyShot(x, y, angle, speed, style = 'orb', r = 6) {
+        const skin = this.boss && this.boss.boss && this.boss.boss.shotSkin; // meme bosses throw their own things
+        if (skin) style = skin;
         this.enemyShots.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, r, life: 420, color: '#ff2d78', style });
     },
 
@@ -944,7 +946,11 @@ extendGame({
         ctx.restore();
         const O = '#111827';
         ctx.lineJoin = 'round';
-        if (BossSprites.get(def.voice)) {
+        if (def.memeFace) {
+            // meme mode: the boss is its own character (drawn on top by drawMemeBossFace); only the
+            // attack effects stay (shield, vortex…), never the old body
+            this.bigBossOverlays(ctx, b);
+        } else if (BossSprites.get(def.voice)) {
             // v3.9: illustrated sprite; the gravelord lifts for its slam, the lich keeps its shield and vortex
             if (def.pattern === 'gravelord' && b.slamT > 0) ctx.translate(0, -Math.sin((1 - b.slamT / 50) * Math.PI) * 10);
             this.drawBossSprite(ctx, b, def.voice);

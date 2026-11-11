@@ -175,6 +175,8 @@ extendGame({
         } else if (killer.ai === 'rickroll') {
             icon.translate(0, -size * 0.8);
             this.drawRickRoll(icon, { ...killer, flash: 0, t: 0, mode: 'aim' });
+        } else if (killer.boss && killer.boss.memeFace) {
+            this.drawMemeBossFace(icon, { ...killer, x: 0, y: 0, flash: 0, dying: false, t: 0 }); // meme boss: its own look
         } else if (killer.boss) {
             const fake = { ...killer, x: 0, y: 0, mode: 'fight', flash: 0 };
             const save = this.player;

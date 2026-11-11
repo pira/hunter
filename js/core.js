@@ -3,8 +3,8 @@
 class Game {
     constructor() {
         // Version system (bumped by the pre-commit hook, see VERSION-README.md)
-        this.version = "3.28.1";
-        this.buildDate = "2026-11-08";
+        this.version = "3.29.0";
+        this.buildDate = "2026-11-10";
 
         this.canvas = document.getElementById('gameCanvas');
         this.ctx = this.canvas.getContext('2d');

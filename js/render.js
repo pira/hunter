@@ -709,7 +709,9 @@ extendGame({
             }
         }
         if (def.sigma) this.drawSigmaCat(ctx, b); // meme mode (js/codes.js)
-        else if (!this.drawBossArt(ctx, b, def.voice)) Game.drawShape(ctx, 'circle', s, fill);
+        else if (def.memeFace) {
+            // a meme boss is its own character: only its picture/drawing (drawMemeBossFace), no old body
+        } else if (!this.drawBossArt(ctx, b, def.voice)) Game.drawShape(ctx, 'circle', s, fill);
 
         if (b.dying) {
             // Darkening body (a sprite darkens itself), glowing cracks spreading
@@ -1006,6 +1008,19 @@ extendGame({
         // Enemy shots: magenta orbs by default (never confused with your own violet bolts), plus styles.
         const pulse = 1 + 0.15 * Math.sin(this.frameNo * 0.3);
         for (const s of this.enemyShots) {
+            if (s.style.startsWith && s.style.startsWith('meme:')) {
+                // a meme boss's own projectiles, with a red glow so they still read as dangerous
+                ctx.fillStyle = 'rgba(255,45,120,0.28)';
+                ctx.beginPath();
+                ctx.arc(s.x, s.y, s.r * 2.1 * pulse, 0, TAU);
+                ctx.fill();
+                ctx.save();
+                ctx.translate(s.x, s.y);
+                ctx.rotate((this.frameNo + s.r * 7) * 0.08);
+                this.drawMemeArt(ctx, s.style.slice(5), 0, 0, s.r * 4.4);
+                ctx.restore();
+                continue;
+            }
             if (s.style === 'point' || s.style === 'shush') {
                 // Sigma Cat's hands: "well, actually" fingers fly finger first; "shh" hands spin
                 ctx.save();
